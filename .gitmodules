@@ -1,0 +1,12 @@
+[submodule "crates/freight"]
+	path = crates/freight
+	url = git@github.com:TiniTinyTerminator/Freight.git
+[submodule "crates/freight-registry"]
+	path = crates/freight-registry
+	url = git@github.com:TiniTinyTerminator/Freight-registry.git
+[submodule "crates/docify"]
+	path = crates/docify
+	url = git@github.com:TiniTinyTerminator/docify.git
+[submodule "crates/vcpkg-converter"]
+	path = crates/vcpkg-converter
+	url = git@github.com:TiniTinyTerminator/vcpkg-converter.git

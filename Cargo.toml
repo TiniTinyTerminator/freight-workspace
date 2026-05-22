@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/freight",
+    "crates/freight-registry",
+    "crates/docify",
+    "crates/vcpkg-converter",
+]
+resolver = "2"
