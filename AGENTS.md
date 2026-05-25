@@ -48,11 +48,11 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 | Crate | TODO | Top open item |
 |---|---|---|
-| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | Expose `AllCommands` publicly; variable tracker; `if` evaluator |
+| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | Pretty-printer / emitter (round-trip rewriting) |
 | `freight` | [`TODO.md`](crates/freight/TODO.md) | Compiler version gating for `std = "c++26"` on old GCC |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement |
-| `docify` | [`TODO.md`](crates/docify/TODO.md) | Zig / Swift / Kotlin extractors; HTML output |
-| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | Complex platform expression mapping; failure analysis command |
+| `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
+| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | `!windows` platform expression; C standard detection; failure analysis |
 
 ---
 
@@ -60,17 +60,17 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 ### 1. cmake-lossless `if` evaluator → freight + vcpkg-converter
 
-**Status:** Not started. Blocked on cmake-lossless work.
+**Status:** cmake-lossless half done (`eval::eval_condition`, `eval::platform_condition` implemented). Consumer wiring not started.
 
-Once cmake-lossless can evaluate constant `if` conditions (`WIN32`, `UNIX`, `APPLE`,
-`CMAKE_SYSTEM_NAME STREQUAL`), both consumers benefit:
+`eval::platform_condition` maps `WIN32`, `UNIX`, `APPLE`, `CMAKE_SYSTEM_NAME STREQUAL "<OS>"`,
+etc. to freight OS names. Both consumers need to be wired up:
 
 - **freight** `migration/cmake.rs`: map `if(WIN32)` blocks to
   `[os.windows.dependencies]` instead of silently dropping them.
 - **vcpkg-converter** `cmake_probe.rs`: restrict `find_package` detections that
   appear inside `if(WIN32)` to `windows` platform deps only.
 
-Touch order: cmake-lossless → freight migration tests → vcpkg-converter cmake_probe.
+Touch order: freight migration tests → vcpkg-converter cmake_probe.
 
 ### 2. Compiler version gating propagation
 
