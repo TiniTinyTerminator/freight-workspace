@@ -67,11 +67,10 @@ Each crate has its own `TODO.md` with detailed items. Start there:
   `[os.windows.dependencies]` / `[os.macos.dependencies]` / `[os.unix.dependencies]`
   etc.; `elseif` chains each get their own scope; `else` falls through to unconditional.
 - **vcpkg-converter** `cmake_probe.rs`: `!windows` platform expression mapped to
-  `[os.unix.dependencies]`; `CMAKE_C_STANDARD` detected and emitted as `[language.c] std`.
-
-Remaining gap: `cmake_probe.rs` does not yet restrict `find_package` calls inside
-`if(WIN32)` to the windows platform scope. That requires passing a scope accumulator
-through the cmake_probe walk, similar to how freight migration does it.
+  `[os.unix.dependencies]`; `CMAKE_C_STANDARD` detected and emitted as `[language.c] std`;
+  `find_package` calls inside `if(WIN32)` / `if(UNIX)` / etc. are now scoped correctly —
+  the AST is walked manually with a `scope: Option<&'static str>` accumulator derived from
+  `eval::platform_condition`, and `SysPackage.scope` gates which OS buckets are emitted.
 
 ### 2. Compiler version gating propagation
 
