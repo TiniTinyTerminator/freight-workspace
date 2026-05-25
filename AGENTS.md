@@ -96,6 +96,108 @@ Touch order: docify `agent.rs` → freight `doc/` → bump both crates together.
 
 ---
 
+## Crate guide — cmake-lossless
+
+A hand-written recursive-descent parser. No external parser dependencies. Everything
+lives in `src/lib.rs` (~1 000 lines); semantic passes are in `src/vars.rs` and
+`src/eval.rs`.
+
+```
+parse(src: &str) -> Result<CMakeFile, ParseError>
+    └── Parser (private struct)
+            parse_file()         → Vec<Node>
+            parse_node()         → Node
+            parse_command()      → CommandInvocation
+            parse_if()           → IfBlock
+            parse_foreach()      → ForeachBlock
+            parse_while()        → WhileBlock
+            parse_function()     → FunctionDef
+            parse_macro()        → MacroDef
+            parse_block()        → BlockDef
+            parse_args()         → Vec<Arg>
+            parse_bracket_arg()
+            parse_quoted_arg()
+            parse_unquoted_arg()
+```
+
+**Key invariants**
+
+| Invariant | Where enforced |
+|---|---|
+| `name` is always lowercase; original case in `name_raw` | `parse_command` |
+| Nested `(…)` groups are flattened into the parent arg list | `parse_args` |
+| `Arg::raw` is the verbatim source text | all `parse_*_arg` fns |
+| `Arg::value` has escapes decoded; `${V}` refs preserved as-is | `parse_quoted_arg`, `parse_unquoted_arg` |
+| `AllCommands` skips `Function`/`Macro` bodies | `AllCommands::next` |
+| `ParseError` carries 1-based line and column | `Parser::advance` |
+
+**Lossless** means every byte of the original input is recoverable from `raw` fields.
+Do not strip or transform `raw` during parsing.
+
+New public API methods belong on `CMakeFile`, `CommandInvocation`, `IfBlock`, or
+`Arg` as inherent `impl` blocks. Semantic analysis passes (`vars`, `eval`) stay in
+their own files and re-export from `lib.rs`.
+
+`eval::eval_condition` returns `Option<bool>` — `None` = "statically unknowable".
+Never guess; callers must handle the unknown case.
+
+Do not add external dependencies. Do not evaluate `${VAR}` inside the parser.
+
+---
+
+## Crate guide — docify
+
+Extracts structured doc comments from source files, renders them as Markdown, JSON,
+MessagePack, or a terminal TUI. Used by `freight doc`.
+
+```
+src/
+├── lib.rs           — public API: extract_file(), extract_dir(), DocSet, DocItem
+├── main.rs          — CLI binary
+├── agent.rs         — freight doc wire protocol (JSON/MessagePack over stdout)
+├── render_md.rs     — Markdown page renderer
+├── render_tui.rs    — terminal output renderer
+├── tui.rs           — interactive TUI
+└── extract/
+    ├── mod.rs       — DocExtractor trait, DocItem, DocSet, ExtractorRegistry
+    ├── common.rs    — shared helpers (collect_c_block, collect_line_block, build_item, …)
+    ├── cpp.rs / rust.rs / fortran.rs / ada.rs / d.rs / java.rs / go.rs
+    ├── zig.rs / kotlin.rs / swift.rs
+```
+
+**Core types**
+
+```rust
+pub trait DocExtractor: Send + Sync {
+    fn extensions(&self) -> &[&str];
+    fn extract(&self, path: &Path, source: &str) -> Vec<DocItem>;
+}
+// DocItem fields: name, kind, lang, file, line, brief, tags, signature, access, meta
+// DocKind: Function | Type | Constant | Module | Namespace | Subroutine | Variable | Unknown
+// TagKind: Param | Return | Throws | Note | Example | See | Since | Deprecated | Author
+```
+
+**Adding a new language extractor** (5 steps):
+
+1. Add a `DocLanguage` variant + `label()` + `display_signature()` arm in `extract/mod.rs`.
+2. Add file extensions to `lang_from_ext` in `extract/mod.rs`.
+3. Create `extract/<lang>.rs` implementing `DocExtractor`. Use `common.rs` helpers —
+   `rust.rs` for `///`-style, `java.rs` for `/** */`-style.
+4. Register via `ExtractorRegistry::new()` in `extract/mod.rs`.
+5. Add tests calling the lang-specific `extract_*` function directly (not via registry).
+
+**Common helpers in `common.rs`:** `collect_line_block`, `collect_c_block`,
+`build_item`, `item_has_content`, `next_non_blank`, `first_ident`, `next_decl_sym`.
+
+**Wire protocol (`agent.rs`):** `freight doc` reads MessagePack/JSON frames from
+docify's stdout. `SymbolJson` fields are the wire format — renaming requires a
+matching change in `freight/src/doc/` in the same commit.
+
+Do not rename or remove `DocItem` fields or `TagKind` variants without updating the
+`freight doc` reader. Do not add language-specific logic to `common.rs`.
+
+---
+
 ## What agents should and should not touch
 
 ### Safe to modify freely
