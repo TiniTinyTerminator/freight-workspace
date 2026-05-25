@@ -1,103 +1,158 @@
-# AGENTS.md
+# AGENTS.md — Workspace guide for AI coding agents
 
-Outstanding tasks, known gaps, and work items for Freight. Update this file when tasks are started, completed, or reprioritised.
+This file is for **AI coding agents** (Claude Code, Codex, etc.) working in the
+freight monorepo. It explains the workspace layout, how the crates relate to each
+other, what is safe to change, and where open work lives.
 
----
-
-## High priority
-
-### Per-standard compiler version gating
-**Status:** Not implemented  
-**Why it matters:** `std = "c++26"` silently passes `-std=c++26` even on GCC 11, which errors at compile time with a confusing message instead of a clear freight error.  
-**What to build:**
-- Extend `TemplateDef::standards` from `&[(&str, &str)]` to `&[(&str, &str, Option<&str>)]` — `(name, flag, min_compiler_version)`.
-- Propagate through `TemplateDef::build()` and `CompilerTemplate`.
-- In `assemble_compile_flags`, when the user requests a standard, check the detected compiler version against the entry's `min_compiler_version`. Emit a `FreightError` (or `BuildEvent::Warning`) if the version is too old.
-- Fill in version floors for existing templates (GCC, Clang, gfortran, MSVC, icpx, ldc2…).
-- Known floors to encode: `c++20` ≥ GCC 10 / Clang 10, `c++23` ≥ GCC 12 / Clang 14, `c++26` ≥ GCC 14 / Clang 17; `f2018` ≥ gfortran 8; `c17` ≥ GCC 8 / Clang 6.
-
-### ObjC / ObjC++ examples
-**Status:** Not done  
-**What to build:** `examples/objc-hello/` and `examples/objcpp-hello/` — minimal programs that compile with `clang`/`clang++` on Linux (with GNUstep) and macOS (native frameworks). Add rows to `examples/README.md` and `README.md`.
+For human-oriented project documentation see `CLAUDE.md`.
 
 ---
 
-## Language / toolchain gaps
+## Workspace layout
 
-### HIP example
-**Status:** Not done  
-**Blocker:** Requires ROCm hardware or a ROCm Docker image to verify.  
-**What to build:** `examples/hip-hello/` — simple vector-add kernel with `hipMalloc`/`hipMemcpy`. Mirror the structure of `cuda-hello`. Note in the README that ROCm hardware is required.
+```
+freight/                         ← workspace root (this repo)
+├── Cargo.toml                   # workspace manifest, no [package]
+├── CLAUDE.md                    # full project reference for Claude Code
+├── AGENTS.md                    # this file
+├── crates/
+│   ├── cmake-lossless/          # lossless CMake parser (library)
+│   ├── freight/                 # core build tool — library + CLI binary
+│   ├── freight-registry/        # self-hosted package registry server
+│   ├── docify/                  # doc-comment extractor (library + binary)
+│   └── vcpkg-converter/         # vcpkg → freight migration tool
+```
 
-### OpenCL example
-**Status:** Not done  
-**What to build:** `examples/opencl-hello/` — host-side C with a `.cl` kernel. Should work on any system with an ICD loader and at least one OpenCL platform.
-
-### ISPC example
-**Status:** Not done  
-**What to build:** `examples/ispc-hello/` — simple SPMD reduction or mandelbrot kernel. Requires `ispc` on `$PATH`.
-
-### GDC (GCC D compiler) support verification
-**Status:** Unknown  
-**What to check:** `gdc` is listed as a supported D compiler but has not been tested end-to-end. Verify `examples/d-hello` builds with `gdc` and that the linker selection correctly handles `libgphobos` vs `libphobos2`.
-
-### MSVC / Windows support
-**Status:** Partially implemented (templates exist)  
-**What to verify:** Build `examples/c-simple` and `examples/hello-cpp` on Windows with MSVC (`cl.exe`). Cross-compilation from Linux via Wine is not expected to work.
-
-### nvfortran (NVIDIA Fortran)
-**Status:** Template exists, untested  
-**What to verify:** Build `examples/fortran-hello` with `nvfortran`. Check that Fortran standard flags map correctly.
+Each crate is an independent git submodule with its own history. Commit and push
+**inside the submodule directory**, not from the workspace root.
 
 ---
 
-## Code quality / pipeline
+## Crate dependency graph
 
-### Linker priority list in `link.rs` is a raw string slice
-**Status:** Fragile  
-**Why it matters:** Adding a new lang key requires knowing to update two separate priority slices (`select_linker`) and there is no compile-time enforcement.  
-**Proposal:** Define a single `LINK_PRIORITY` constant with comments explaining the tiers (GPU accelerator > C++ ABI > C ABI > specialised > assembly). The current ad-hoc slice works but is easy to get wrong.
+```
+cmake-lossless  ←── freight (migration module)
+cmake-lossless  ←── vcpkg-converter (cmake_probe module)
+docify          ←── freight (freight doc command)
+freight-registry    (standalone; no internal deps)
+```
 
-### `has_lang` is duplicated between `compile.rs` and `link.rs`
-**Status:** Known duplication  
-**Fix:** Extract into a free function in `build/mod.rs` or a small `build/util.rs`, import in both files.
-
-### `REQUIRES_DECLARATION` comment is thin
-**Status:** Minor  
-**Fix:** Add an inline comment per entry explaining *why* that lang key must be declared (which extension it shares with C/C++).
-
-### Whole-program build mode needs a `BuildEvent`
-**Status:** Missing observability  
-**Why:** When gnatmake is invoked, freight currently emits no compile-phase events (because compilation is skipped). The user sees silence until the link step. Emit a `BuildEvent::Compiling` or similar before the whole-program linker invocation so the TUI/CLI shows progress.
+Changes to `cmake-lossless`'s public API will require updates in both `freight`
+and `vcpkg-converter`.
 
 ---
 
-## Testing gaps
+## Open work — per-crate
 
-### No integration tests for mixed-language linking
-**Status:** Missing  
-**What to add:** A test that builds `examples/multi-lang` and `examples/tri-lang` programmatically (via `freight-core` API, not shell) and asserts the binary exists and exits 0.
+Each crate has its own `TODO.md` with detailed items. Start there:
 
-### No test for `whole_program` mode
-**Status:** Missing  
-**What to add:** Unit test in `compile.rs` or `link.rs` that exercises the `whole_program: true` branch with a mock template.
-
-### No test for language auto-detection via `has_lang`
-**Status:** Missing  
-**What to add:** Test cases in `compile.rs` confirming that a manifest with no `[language.X]` section but a matching source extension is correctly routed to the right linker family.
-
-### Compiler version gating (once implemented)
-**Status:** Blocked on implementation  
-**What to add:** Tests that a requested standard with a too-old compiler version produces a `FreightError::UnsupportedStandard` (or equivalent), not a silent wrong flag.
+| Crate | TODO | Top open item |
+|---|---|---|
+| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | Expose `AllCommands` publicly; variable tracker; `if` evaluator |
+| `freight` | [`TODO.md`](crates/freight/TODO.md) | Compiler version gating for `std = "c++26"` on old GCC |
+| `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement |
+| `docify` | [`TODO.md`](crates/docify/TODO.md) | Zig / Swift / Kotlin extractors; HTML output |
+| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | Complex platform expression mapping; failure analysis command |
 
 ---
 
-## Documentation
+## Open work — cross-crate
 
-### `docs/manifest-reference.md` — `[language.ada]` section missing
-**Status:** Not done  
-**What to add:** Document the `ada` language key, supported options (opt-level, debug, warnings), and note that `[language.ada]` is optional when no configuration is needed.
+### 1. cmake-lossless `if` evaluator → freight + vcpkg-converter
 
-### `examples/README.md` — ObjC, HIP, OpenCL, ISPC rows missing
-**Status:** Blocked on example creation above  
-**Fix:** Add rows once the examples exist.
+**Status:** Not started. Blocked on cmake-lossless work.
+
+Once cmake-lossless can evaluate constant `if` conditions (`WIN32`, `UNIX`, `APPLE`,
+`CMAKE_SYSTEM_NAME STREQUAL`), both consumers benefit:
+
+- **freight** `migration/cmake.rs`: map `if(WIN32)` blocks to
+  `[os.windows.dependencies]` instead of silently dropping them.
+- **vcpkg-converter** `cmake_probe.rs`: restrict `find_package` detections that
+  appear inside `if(WIN32)` to `windows` platform deps only.
+
+Touch order: cmake-lossless → freight migration tests → vcpkg-converter cmake_probe.
+
+### 2. Compiler version gating propagation
+
+**Status:** Not started.
+
+`freight` needs the version floor table in the compiler templates. Once that
+exists, the `vcpkg-converter`'s C++ standard detection can cross-check the
+detected standard against the system compiler and warn if the floor is too low.
+
+Touch order: freight toolchain templates → freight `assemble_compile_flags` →
+optional warning in vcpkg-converter `convert` output.
+
+### 3. `freight doc` ↔ docify wire protocol versioning
+
+**Status:** Implicit — no version field in MessagePack envelope.
+
+The `freight doc` command shells out to `docify` and reads MessagePack. If the
+docify schema changes, `freight` will silently misparse the output. Add a
+`schema_version: u32` field to the envelope and reject unknown versions with a
+clear error.
+
+Touch order: docify `agent.rs` → freight `doc/` → bump both crates together.
+
+---
+
+## What agents should and should not touch
+
+### Safe to modify freely
+- Any file inside a single crate that has no cross-crate API surface.
+- Tests, documentation, and `TODO.md` files.
+- `CLAUDE.md` and `AGENTS.md` (this file) to reflect completed or new work.
+
+### Requires coordinated change across crates
+- **cmake-lossless public API** (`pub` items in `src/lib.rs`): changing a type or
+  removing a method breaks `freight/src/migration/cmake.rs` and
+  `vcpkg-converter/src/cmake_probe.rs`. Update all three in the same logical change.
+- **docify MessagePack schema** (`agent.rs`): must stay in sync with the
+  `freight doc` reader. Bump together.
+- **freight-core `BuildEvent` variants**: the CLI layer (`src/bin/freight/`) pattern-
+  matches exhaustively. Adding a variant requires updating the match arms there too.
+
+### Do not modify
+- `Cargo.toml` at the workspace root except to add/remove workspace members.
+- Submodule `.git` internals.
+- Generated files under `build-all-out/` and `log/converter/` in vcpkg-converter.
+
+---
+
+## How to run things
+
+```sh
+# Build and check
+cargo build                          # all crates
+cargo check --workspace              # fast type-check
+cargo clippy --workspace             # lint
+cargo test --workspace               # all tests
+
+# Individual crates
+cargo build -p freight               # freight binary
+cargo build -p freight-registry      # registry server
+cargo build -p vcpkg-scraper         # vcpkg converter
+
+# Registry server (local dev)
+cargo run -p freight-registry -- --data /tmp/freight-dev serve --base-url http://localhost:7878
+
+# vcpkg converter
+cargo run -p vcpkg-scraper -- convert <path/to/vcpkg.json> --vcpkg-root ~/vcpkg
+cargo run -p vcpkg-scraper -- build-all ~/vcpkg --jobs 6          # fresh run
+cargo run -p vcpkg-scraper -- build-all ~/vcpkg --jobs 6 --continue  # resume
+```
+
+---
+
+## Commit conventions
+
+- Commit and push **inside each submodule** for source changes.
+- After pushing a submodule, update the workspace pointer:
+  ```sh
+  git add crates/<name>
+  git commit -m "bump crates/<name>"
+  ```
+- Cross-crate changes get one commit per affected submodule, then a workspace bump
+  that references all of them in the message.
+- Keep `AGENTS.md` and the relevant `TODO.md` up to date in the same commit that
+  implements or closes an item.

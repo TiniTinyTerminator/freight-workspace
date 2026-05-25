@@ -4,5 +4,6 @@ members = [
     "crates/freight-registry",
     "crates/docify",
     "crates/vcpkg-converter",
+    "crates/cmake-lossless",
 ]
 resolver = "2"

@@ -10,3 +10,6 @@
 [submodule "crates/vcpkg-converter"]
 	path = crates/vcpkg-converter
 	url = git@github.com:TiniTinyTerminator/vcpkg-converter.git
+[submodule "crates/cmake-lossless"]
+	path = crates/cmake-lossless
+	url = https://github.com/TiniTinyTerminator/cmake-lossless.git
