@@ -48,29 +48,30 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 | Crate | TODO | Top open item |
 |---|---|---|
-| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | Pretty-printer / emitter (round-trip rewriting) |
-| `freight` | [`TODO.md`](crates/freight/TODO.md) | Compiler version gating for `std = "c++26"` on old GCC |
+| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | Bracket-argument round-trip; `if` evaluator compound conditions |
+| `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent` |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
-| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | `!windows` platform expression; C standard detection; failure analysis |
+| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | cmake_probe: `find_package` inside `if(WIN32)` → platform scope |
 
 ---
 
 ## Open work — cross-crate
 
-### 1. cmake-lossless `if` evaluator → freight + vcpkg-converter
+### ~~1. cmake-lossless `if` evaluator → freight + vcpkg-converter~~
 
-**Status:** cmake-lossless half done (`eval::eval_condition`, `eval::platform_condition` implemented). Consumer wiring not started.
+**Status:** Done. `eval::platform_condition` wired into both consumers.
 
-`eval::platform_condition` maps `WIN32`, `UNIX`, `APPLE`, `CMAKE_SYSTEM_NAME STREQUAL "<OS>"`,
-etc. to freight OS names. Both consumers need to be wired up:
+- **freight** `migration/cmake.rs`: `if(WIN32)`, `if(APPLE)`, `if(UNIX)`, `if(MSVC)` and
+  `CMAKE_SYSTEM_NAME STREQUAL "<OS>"` blocks route their deps to
+  `[os.windows.dependencies]` / `[os.macos.dependencies]` / `[os.unix.dependencies]`
+  etc.; `elseif` chains each get their own scope; `else` falls through to unconditional.
+- **vcpkg-converter** `cmake_probe.rs`: `!windows` platform expression mapped to
+  `[os.unix.dependencies]`; `CMAKE_C_STANDARD` detected and emitted as `[language.c] std`.
 
-- **freight** `migration/cmake.rs`: map `if(WIN32)` blocks to
-  `[os.windows.dependencies]` instead of silently dropping them.
-- **vcpkg-converter** `cmake_probe.rs`: restrict `find_package` detections that
-  appear inside `if(WIN32)` to `windows` platform deps only.
-
-Touch order: freight migration tests → vcpkg-converter cmake_probe.
+Remaining gap: `cmake_probe.rs` does not yet restrict `find_package` calls inside
+`if(WIN32)` to the windows platform scope. That requires passing a scope accumulator
+through the cmake_probe walk, similar to how freight migration does it.
 
 ### 2. Compiler version gating propagation
 
