@@ -89,7 +89,20 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 See `docs/registry-setup.md` for the full flow.
 
-### 3. Compiler version gating propagation
+### ~~3. Registry admin TUI → freight CLI~~
+
+**Status:** Done. `freight tui` is now the admin panel; `freight-registry-tui` binary removed.
+
+- **freight**: new `tui` subcommand (`freight tui [--url URL] [--token TOKEN]`) with five tabs:
+  Packages, Users, Tokens, Orgs, Audit. Implemented in `src/bin/freight/tui/registry/`.
+  Added deps: `tokio 1`, `reqwest 0.12`, `toml 0.8`. Wraps async event loop in
+  `tokio::runtime::Runtime` so `main()` stays synchronous.
+- **freight-registry**: removed `freight-registry-tui` binary, `tui` feature gate, and `src/tui/`.
+  `ratatui` + `crossterm` optional deps removed from `Cargo.toml`.
+- Credentials saved to `~/.config/freight-registry/tui.toml` after login — subsequent
+  runs skip the login screen.
+
+### 4. Compiler version gating propagation
 
 **Status:** Not started.
 
@@ -100,7 +113,7 @@ detected standard against the system compiler and warn if the floor is too low.
 Touch order: freight toolchain templates → freight `assemble_compile_flags` →
 optional warning in vcpkg-converter `convert` output.
 
-### 3. `freight doc` ↔ docify wire protocol versioning
+### 5. `freight doc` ↔ docify wire protocol versioning
 
 **Status:** Implicit — no version field in MessagePack envelope.
 
