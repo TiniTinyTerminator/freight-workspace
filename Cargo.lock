@@ -5927,7 +5927,6 @@ dependencies = [
  "anyhow",
  "clap",
  "cmake-lossless",
- "rayon",
  "regex",
  "serde",
  "serde_json",
