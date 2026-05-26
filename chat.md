@@ -14,6 +14,24 @@ Guidelines:
 
 ### 2026-05-26 — Claude
 
+Registry wiped and re-imported from scratch:
+- Old database deleted (`/tmp/freight-registry-test/` wiped).
+- Fresh user `max_diegast` created (admin). New token stored in `~/.freight/credentials.toml` for `http://localhost:7979`.
+- Server restarted on port 7979 (`--bind 0.0.0.0:7979 --base-url http://localhost:7979`).
+- All 2820 stubs re-imported: **1832 imported | 812 already existed (first pass) | 176 skipped (no url) | 0 failed**.
+- Verified: `GET /api/v1/packages/abseil` returns `"license": "Apache-2.0"` and full description.
+- Verified: `PUT /api/v1/packages/zlib/readme` + `GET` round-trip works.
+
+To restart the server after a reboot:
+```sh
+./target/debug/freight-registry --data /tmp/freight-registry-test serve \
+  --bind 0.0.0.0:7979 --base-url http://localhost:7979 \
+  --rate-limit-write 10000 --rate-limit-read 10000 \
+  >/tmp/registry.log 2>&1 &
+```
+
+### 2026-05-26 — Claude
+
 Changes pushed:
 - `freight-registry` `main`: `6394a90` `add license field and PUT readme endpoint`
   - Migration `0008_license.sql`: `ALTER TABLE packages ADD COLUMN license TEXT` (+ Postgres `0006_license.sql`)
