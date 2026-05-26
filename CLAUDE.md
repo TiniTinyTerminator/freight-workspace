@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for Claude Code when working in this workspace.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ---
 
@@ -47,17 +47,22 @@ src/
 ├── registry/               # HTTP registry client (FreightRegistry, PackageRepo trait)
 ├── fetch/                  # git.rs (git2), http.rs (curl + SHA-256 verify)
 ├── doc/                    # doc comment extraction + Markdown/JSON/msgpack rendering
-└── meta/                   # foreign build system integrations (CMake, Meson, autotools…)
+├── meta/                   # foreign build system integrations (CMake, Meson, autotools…)
+└── migration/              # cmake.rs, make.rs, autotools.rs — `freight migrate` converters
 ```
 
 **Build pipeline** (in order):
 1. Parse + validate `freight.toml`
 2. Detect toolchain — probe `$PATH`, run `.rhai` scripts, consult version cache
-3. Resolve dep graph — topo-sort, compile path deps (freight or foreign) in order
-4. Walk sources — map extension → language key
+3. Resolve dep graph — topo-sort; foreign deps (cmake/make/meson/autotools) collected then built in parallel via rayon; pkg-config/system/version deps resolved sequentially first
+4. Walk sources — map extension → language key; `src/` is walked automatically
 5. Scan C++ sources for `export module` / `import` (C++20 module DAG)
 6. Compile — parallel via rayon (flat) or batched by module topo-order
 7. Link — `.o` + dep `.a` → binary / `.a` / `.so`
+
+**Job count**: `rayon::current_num_threads()` is the single source of truth. Set once in `main()` from `--jobs` (default: `min(available_parallelism, 6)`). All of `meta/cmake.rs`, `meta/make.rs`, `meta/meson.rs`, `meta/autotools.rs` read it without taking a parameter.
+
+**Source discovery**: freight walks `src/` and compiles every file with a recognised extension. `BinTarget.src` identifies the entry-point file (the one with `main()`) for linker deduplication only — it does not restrict which files get compiled. All other sources in `src/` are picked up automatically.
 
 **`freight.toml` manifest — dependency system**
 
@@ -86,7 +91,7 @@ libfoo = { system = "foo" }                              # link -lfoo directly, 
 | `git` | `String` | Repo URL; one of `branch`/`tag`/`rev` selects the ref |
 | `branch` / `tag` / `rev` | `String` | Mutually exclusive; `rev` pins and blocks `freight update` |
 | `url` | `String` | Archive URL (`.tar.gz`, `.zip`, etc.) |
-| `sha256` | `String` | Checksum for `url` deps |
+| `sha256` | `String` | Optional checksum; omit to auto-detect on first fetch |
 | `system` | `String` | Link `-l<name>` directly; no source, no fetch |
 | `features` | `[String]` | Features to activate on this dep |
 | `default-features` | `bool` (true) | Set `false` to skip the dep's `default` feature set |
@@ -109,8 +114,6 @@ libfoo = { system = "foo" }                              # link -lfoo directly, 
 2. **System stubs** — hardcoded map of common libs (pthread, ws2_32, m, …)
 3. **`.deps/` cache** — populated by `freight fetch` from registry
 
-`system = "foo"` skips the chain and directly links `-lfoo`. Use only when the pkg-config name differs from the dep name or to force system-only linkage. For normal system libraries freight finds them automatically via pkg-config.
-
 **Conditional dependency sections** — merged on top of `[dependencies]` for the current host:
 
 ```toml
@@ -128,13 +131,6 @@ Valid `[arch.*]` keys: `x86_64`, `x86`, `aarch64`, `arm`, `mips`, `mips64`, `pow
 
 Merge order: base → family (e.g. `unix`) → specific OS → arch. Later entries shadow earlier ones for the same dep key.
 
-Inline `os`/`arch` filters on individual deps also work and follow the same valid key names:
-```toml
-[dependencies]
-pthread = { system = "pthread", os = "linux" }
-ws2_32  = { system = "ws2_32",  os = "windows" }
-```
-
 **Features** (`src/build/features.rs`):
 
 ```toml
@@ -142,17 +138,23 @@ ws2_32  = { system = "ws2_32",  os = "windows" }
 default = ["logging"]         # active unless --no-default-features
 logging = ["dep:spdlog"]      # activate optional dep "spdlog"
 tls     = ["openssl"]         # implies feature "openssl"
-full    = ["tls", "json"]     # transitive expansion
-json    = []                  # leaf feature, no extra deps
 ```
-
-Feature entry values are `Vec<String>`:
-- `"feature-name"` — activates that feature transitively
-- `"dep:name"` — activates an optional dep without emitting a define
 
 Active features are uppercased and injected as preprocessor defines: `with-tls` → `-DWITH_TLS`. Cycles are rejected at validation time.
 
-**Compiler templates** live in `toolchains/` as `.rhai` scripts. Each script registers callbacks via `compiler_option` / `language_option`. The script receives a `ctx` object (`ctx.value`, `ctx.version`, `ctx.arch`, `ctx.os`) and calls `add_flag(s)` to inject flags. See `docs/compiler-templates.md` for the full reference.
+**`freight migrate`** — in-place converters from foreign build systems:
+
+```sh
+freight migrate cmake /path/to/project      # reads CMakeLists.txt → writes freight.toml
+freight migrate make  /path/to/project      # reads Makefile → writes freight.toml
+freight migrate autotools /path/to/project  # reads configure.ac → writes freight.toml
+```
+
+Each migrator uses `cmake_lossless` to parse the source AST, routes `find_package` / `target_link_libraries` inside `if(WIN32)` / `if(UNIX)` blocks to `[os.windows.dependencies]` / `[os.unix.dependencies]`, and emits `src = "entry_point_file"` for `[[bin]]` targets (other sources in `src/` are auto-discovered).
+
+**Compiler templates** live in `toolchains/` as `.rhai` scripts. Each script registers callbacks via `compiler_option` / `language_option`. The script receives a `ctx` object (`ctx.value`, `ctx.version`, `ctx.arch`, `ctx.os`) and calls `add_flag(s)` to inject flags.
+
+---
 
 ### `crates/freight-registry` — self-hosted registry server
 
@@ -171,36 +173,73 @@ Wire format (matches cargo's publish endpoint):
 
 API modules: one file per handler group in `src/api/`, registered in `api/mod.rs::router()`. `ApiError` is the standard error type; its `From<anyhow::Error>` logs at error and returns 500.
 
-Run locally:
-```sh
-cargo run -p freight-registry -- --data /tmp/freight-dev serve --base-url http://localhost:7878
-```
+---
 
 ### `crates/docify` — doc comment extractor
 
 Library + binary. Extracts structured doc comments from C/C++ (Doxygen `///`, `/** */`), Fortran (`!>`, `!!`), Rust (`///`), D (`/++ +/`), Ada (`--!`), and more. Outputs Markdown, JSON, or MessagePack. Used by `freight doc` via a git dependency in freight-core's `Cargo.toml`.
 
+---
+
 ### `crates/vcpkg-converter` (package: `vcpkg-scraper`)
 
-Binary tool with two subcommands:
-- `scrape <VCPKG_ROOT>` — walks `ports/*/vcpkg.json`, generates `[[package]]` registry stubs to populate the freight registry
-- `convert <PATH> [--vcpkg-root DIR]` — converts a project's `vcpkg.json` into a `freight.toml`; resolves versions from `versions/baseline.json`; maps platform-conditional deps to `[os.*]` sections; filters vcpkg-internal pseudo-packages (`vcpkg-*`); propagates `features` and `default-features` on deps
+Binary tool with four subcommands:
+
+- **`scrape <VCPKG_ROOT> --out DIR`** — walks `ports/*/vcpkg.json`, generates one `[package]` stub `.toml` per port (one file per version). Resolves `${VERSION}` in source URLs, filters `vcpkg-*` internal packages from deps. No `sha256` in stubs — freight auto-detects on first fetch.
+
+- **`convert <PATH> [--vcpkg-root DIR]`** — converts a project's `vcpkg.json` into a `freight.toml`. Resolves versions from `versions/baseline.json`; maps platform-conditional deps to `[os.*]` sections; probes `CMakeLists.txt` for C/C++ standard and `find_package` calls (scoped by `if(WIN32)` / `if(UNIX)` blocks); filters `vcpkg-*` pseudo-packages. Emits a `# Add [[bin]] / [[lib]] sections as needed.` comment because source layout isn't known from `vcpkg.json` alone.
+
+- **`build-all <VCPKG_ROOT> [--jobs N] [--continue]`** — builds every Linux-compatible vcpkg port sequentially using the `vcpkg` binary, one at a time. `--jobs` controls `VCPKG_MAX_CONCURRENCY` (cmake/ninja threads per port, default 6). `--continue` resumes from a previous run.
+
+- **`freight-build-all <REGISTRY_DIR> --freight-bin BIN [--continue]`** — for each scraped stub with a `url` and `build` field, creates a test project with that package as a URL dep and runs `freight build`. Tests whether freight can fetch and compile the upstream source.
+
+**Registry stub format** (one file per version, e.g. `zlib.toml`):
+```toml
+[package]
+name    = "zlib"
+version = "1.3.2"
+url     = "https://github.com/madler/zlib/archive/v1.3.2.tar.gz"
+build   = "cmake"
+
+[dependencies]
+libfoo = "*"
+
+[features]
+bar = ["baz"]
+```
+
+**cmake_probe** (`src/cmake_probe.rs`) — walks the CMake AST manually (not `all_commands()`) with a `scope: Option<&'static str>` accumulator from `eval::platform_condition`. `find_package` calls inside `if(WIN32)` only emit Windows features; inside `if(UNIX)` only emit Linux/macOS features.
 
 ---
 
 ## Development commands
 
 ```sh
-cargo build                          # build all workspace crates
-cargo build -p freight               # build just the freight binary
-cargo check                          # fast type-check
-cargo clippy --workspace             # lint everything
-cargo test --workspace               # run all tests
+# Build
+cargo build                          # all workspace crates
+cargo build -p freight-core          # freight binary (package name is freight-core)
+cargo build -p vcpkg-scraper         # vcpkg converter
+cargo build -p freight-registry      # registry server
+cargo check --workspace              # fast type-check
+cargo clippy --workspace             # lint
 
-# Registry server
+# Test
+cargo test --workspace               # all tests
+cargo test -p freight-core           # one crate
+cargo test -p freight-core -- migration::cmake::tests::win32_deps_in_platform_section  # single test
+
+# Run
+cargo run -p freight-core -- build   # freight build (from a project dir)
 cargo run -p freight-registry -- --data /tmp/freight-dev serve --base-url http://localhost:7878
 cargo run -p freight-registry -- --data /tmp/freight-dev user add alice --email alice@example.com
 cargo run -p freight-registry -- --data /tmp/freight-dev token add dev --user alice
+
+# vcpkg-converter
+cargo run -p vcpkg-scraper -- scrape ~/vcpkg --out registry-out
+cargo run -p vcpkg-scraper -- convert /path/to/project --vcpkg-root ~/vcpkg
+cargo run -p vcpkg-scraper -- build-all ~/vcpkg --jobs 6
+cargo run -p vcpkg-scraper -- build-all ~/vcpkg --jobs 6 --continue
+cargo run -p vcpkg-scraper -- freight-build-all registry-out --freight-bin ./target/debug/freight
 ```
 
 ---
@@ -214,42 +253,32 @@ cargo run -p freight-registry -- --data /tmp/freight-dev token add dev --user al
 
 **No printing in library code**
 - `freight-core`: emit `BuildEvent`s (or return structured results); the CLI layer in `src/bin/freight/` formats and prints them.
-- Diagnostic output from the build engine must go through the event system, not `eprintln!`.
 
 **Database (freight-registry)**
-- Schema changes: add-only via `add_column_if_missing()`. Never drop or recreate tables — deployed databases upgrade on restart.
+- Schema changes: add-only via `add_column_if_missing()`. Never drop or recreate tables.
 - Always run `db.audit()` in a `tokio::spawn`; never `.await` it on the request path.
 
 **Compiler templates**
 - New compiler support: add a `.rhai` file under `toolchains/<vendor>/`. Register capabilities with `compiler_option` / `language_option`. Base shared logic in `_<vendor>-base.rhai` and `#include` it.
-- Fill in `min_compiler_version` for any standard flags you add (see AGENTS.md — per-standard version gating task).
-
-**Workspace hygiene**
-- Keep `AGENTS.md` at the workspace root updated: mark tasks done in the same commit that implements them; add new gaps as you find them.
-- Wire protocol or API shape changes to freight-registry and freight-core must be made together.
 
 **Style**
 - Rust edition 2024 for new crates, 2021 for existing ones until a deliberate upgrade.
 - `resolver = "2"` is set at the workspace level.
 - No `unsafe` without a comment explaining the invariant being upheld.
+- Keep `AGENTS.md` updated in the same commit that implements or closes an item.
 
 ---
 
 ## Git workflow
 
-This workspace exists purely for development convenience — each submodule is an independent GitHub repo with its own history. Keep them clean:
+Each submodule is an independent GitHub repo with its own history.
 
-- **Commit and push inside the submodule directory**, not from the workspace root. Each repo owns its own commits.
+- **Commit and push inside the submodule directory**, not from the workspace root.
+- **One repo per commit.** Cross-crate changes get one commit per affected submodule.
+- **Update the workspace submodule pointer** after pushing from a submodule:
   ```sh
-  cd crates/freight && git add -p && git commit && git push
-  cd crates/freight-registry && git add -p && git commit && git push
-  ```
-- **One repo per commit.** If a change touches multiple crates, make a separate commit in each affected submodule repo. Don't bundle cross-repo changes into a single workspace-level commit.
-- **Update the workspace submodule pointer** after pushing from a submodule, so the workspace root tracks the new HEAD:
-  ```sh
-  # from the workspace root
-  git add crates/freight   # (or whichever submodule moved)
-  git commit -m "bump crates/freight"
+  git add crates/<name>
+  git commit -m "bump crates/<name> — <brief reason>"
   git push
   ```
-- The workspace root (`/home/max/freight`) should only ever contain pointer bumps and workspace-level files (`Cargo.toml`, `CLAUDE.md`, `AGENTS.md`). No source code lives here.
+- The workspace root should only ever contain pointer bumps and workspace-level files (`Cargo.toml`, `CLAUDE.md`, `AGENTS.md`).
