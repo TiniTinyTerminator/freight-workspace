@@ -52,7 +52,7 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 | `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent` |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
-| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | cmake_probe: `find_package` inside `if(WIN32)` → platform scope |
+| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | registry-import: progress bar; `--dry-run` flag |
 
 ---
 
@@ -72,7 +72,24 @@ Each crate has its own `TODO.md` with detailed items. Start there:
   the AST is walked manually with a `scope: Option<&'static str>` accumulator derived from
   `eval::platform_condition`, and `SysPackage.scope` gates which OS buckets are emitted.
 
-### 2. Compiler version gating propagation
+### ~~2. Registry integration: vcpkg stubs → freight registry → freight build~~
+
+**Status:** Done. Full end-to-end pipeline implemented and tested (50/50 build pass).
+
+- **freight-registry**: new DB columns `upstream_url` + `build_system` in `versions`
+  (migration `0007_source_deps.sql`); `publish` accepts metadata-only packages
+  (empty tarball + `upstream_url`); `get_package` response includes both fields;
+  `/download` returns `302 → upstream_url` for metadata-only packages.
+- **freight**: `PackageVersion` carries `upstream_url`/`build_system`; `fetch_registry_deps()`
+  detects metadata-only packages and uses `fetch_url_dep()` + writes `.freight-build-system`;
+  `build_foreign_deps()` checks `.freight-build-system` for version deps and queues them as
+  foreign build jobs (cmake/make/etc.) before the normal prebuilt resolution chain.
+- **vcpkg-converter**: new `registry-import` subcommand pushes scraped stubs as metadata-only
+  packages to any running freight registry.
+
+See `docs/registry-setup.md` for the full flow.
+
+### 3. Compiler version gating propagation
 
 **Status:** Not started.
 
@@ -98,50 +115,40 @@ Touch order: docify `agent.rs` → freight `doc/` → bump both crates together.
 
 ## Crate guide — cmake-lossless
 
-A hand-written recursive-descent parser. No external parser dependencies. Everything
-lives in `src/lib.rs` (~1 000 lines); semantic passes are in `src/vars.rs` and
-`src/eval.rs`.
+Uses **tree-sitter-cmake** as the backend parser (migrated from a hand-written lexer).
+The tree-sitter CST is translated into a typed `Node` enum in `src/lib.rs`.
 
 ```
 parse(src: &str) -> Result<CMakeFile, ParseError>
-    └── Parser (private struct)
-            parse_file()         → Vec<Node>
-            parse_node()         → Node
-            parse_command()      → CommandInvocation
-            parse_if()           → IfBlock
-            parse_foreach()      → ForeachBlock
-            parse_while()        → WhileBlock
-            parse_function()     → FunctionDef
-            parse_macro()        → MacroDef
-            parse_block()        → BlockDef
-            parse_args()         → Vec<Arg>
-            parse_bracket_arg()
-            parse_quoted_arg()
-            parse_unquoted_arg()
+    └── translate_source_file() → Vec<Node>
+            translate_node()          → Option<Node>
+            translate_command()       → CommandInvocation
+            translate_if()            → IfBlock
+            translate_foreach()       → ForeachLoop
+            translate_while()         → WhileLoop
+            translate_function()      → FunctionDef
+            translate_macro()         → MacroDef
+            translate_block_def()     → BlockDef
+            translate_argument_list() → Vec<Arg>
+            decode_unquoted()         → String
+            decode_quoted()           → String
 ```
 
 **Key invariants**
 
 | Invariant | Where enforced |
 |---|---|
-| `name` is always lowercase; original case in `name_raw` | `parse_command` |
-| Nested `(…)` groups are flattened into the parent arg list | `parse_args` |
-| `Arg::raw` is the verbatim source text | all `parse_*_arg` fns |
-| `Arg::value` has escapes decoded; `${V}` refs preserved as-is | `parse_quoted_arg`, `parse_unquoted_arg` |
-| `AllCommands` skips `Function`/`Macro` bodies | `AllCommands::next` |
-| `ParseError` carries 1-based line and column | `Parser::advance` |
-
-**Lossless** means every byte of the original input is recoverable from `raw` fields.
-Do not strip or transform `raw` during parsing.
+| `name` is always lowercase | `translate_command` |
+| `Arg::value` has escape sequences decoded (`\t`, `\n`, `\;`, line-continuation) | `decode_unquoted`/`decode_quoted` |
+| `AllCommands` skips `Function`/`Macro`/`Comment` nodes | `AllCommands::next` |
+| `Node::Comment(String)` preserves comment text verbatim | `translate_node` |
 
 New public API methods belong on `CMakeFile`, `CommandInvocation`, `IfBlock`, or
 `Arg` as inherent `impl` blocks. Semantic analysis passes (`vars`, `eval`) stay in
 their own files and re-export from `lib.rs`.
 
-`eval::eval_condition` returns `Option<bool>` — `None` = "statically unknowable".
+`eval::platform_condition` returns `Option<&'static str>` — `None` = "statically unknowable".
 Never guess; callers must handle the unknown case.
-
-Do not add external dependencies. Do not evaluate `${VAR}` inside the parser.
 
 ---
 
