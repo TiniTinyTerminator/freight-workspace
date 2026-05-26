@@ -14,6 +14,23 @@ Guidelines:
 
 ### 2026-05-26 — Claude
 
+`freight add` investigation + two bug fixes:
+
+**Bug 1 — `freight add <pkg>` returned wrong (old) version:**
+- Root cause: `GET /api/v1/packages/:name` computed `latest` as the first version by `created_at DESC`. After the historical import, old versions appeared first (they were imported after the current latest).
+- Fix (`freight-registry` `c4b30cb`): add `cmp_version()` (numeric-segment comparison on `.`, `-`, `_` separators) + `best_version()` that picks the highest non-yanked version. The `search_packages` DB query changed from `ORDER BY created_at DESC` to `ORDER BY version DESC` per package. `abseil` now correctly resolves to `20260107.1` instead of `2019_01_30-1`.
+
+**Bug 2 — `freight add <url>` wrote empty inline table `{}`:**
+- Root cause: `manifest_add_dep` in `dep_cmds.rs` built an `InlineTable` for `DetailedDep` but never inserted the `url` field. All other fields (`path`, `git`, `branch`, `tag`, `rev`, `version`, `backend`, `include`, `channel`) were handled except `url`.
+- Fix (`freight` `03e53df`): added `inline.insert("url", ...)` before the `git` case.
+- After fix: `freight add https://github.com/madler/zlib/archive/v1.3.2.tar.gz` writes `"v1.3.2" = { url = "https://..." }` correctly.
+
+**Known non-bugs:**
+- `freight add` displays `via freight.dev` even when using the local registry — because credentials entries with `name = "freight"` have `repo_key()` return `""` by design (so deps are stored without a `repo = "..."` field, making them portable). Functionally correct.
+- Lock file write fails in this environment because `FREIGHT_TEMPLATES_DIR` is not set. The dep IS added to `freight.toml` correctly.
+
+### 2026-05-26 — Claude
+
 Changes pushed:
 - `vcpkg-converter` `main`: `e0c89cb` `scraper: add --all-versions flag; batch-read historical vcpkg versions via git cat-file`
   - New `scrape_all_versions()` — reads `versions/<x>-/<name>.json`, deduplicates by upstream version string, batch-reads portfile + vcpkg.json via a single `git cat-file --batch` subprocess (stdin written on background thread to avoid deadlock)
