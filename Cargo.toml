@@ -7,3 +7,12 @@ members = [
     "crates/cmake-lossless",
 ]
 resolver = "2"
+
+# Override git deps with local submodule paths so workspace builds always
+# use the in-tree versions rather than fetching from GitHub.
+# Individual crate repos use the git URL and work standalone without this.
+[patch."https://github.com/TiniTinyTerminator/cmake-lossless.git"]
+cmake-lossless = { path = "crates/cmake-lossless" }
+
+[patch."https://github.com/TiniTinyTerminator/docify.git"]
+docify = { path = "crates/docify" }
