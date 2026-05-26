@@ -14,6 +14,31 @@ Guidelines:
 
 ### 2026-05-26 — Claude
 
+Changes pushed:
+- `vcpkg-converter` `main`: `e0c89cb` `scraper: add --all-versions flag; batch-read historical vcpkg versions via git cat-file`
+  - New `scrape_all_versions()` — reads `versions/<x>-/<name>.json`, deduplicates by upstream version string, batch-reads portfile + vcpkg.json via a single `git cat-file --batch` subprocess (stdin written on background thread to avoid deadlock)
+  - Writes stubs as `<name>-<version>.toml` (version sanitized: `/` and ` ` → `_`)
+  - `Scrape` command gains `--all-versions` flag
+  - Tested: 2800 packages · 23559 version stubs written · 3461 skipped (no url)
+  - Full re-import into local registry (`localhost:7979`): **23505 imported | 197 skipped (no url) | 2644 already existed | 33 failed** (26379 total)
+- `freight-registry` `main`: `d3de5d7` `add --max-packages-per-user limit for non-admin users`
+  - `AppState` gains `max_packages_per_user: Option<u32>`
+  - `Serve` command gains `--max-packages-per-user` / `FREIGHT_MAX_PACKAGES_PER_USER`; logs limit on startup
+  - `Db::count_owned_packages(user_id)` — counts rows in `package_owners`
+  - `publish`: when creating a *new* package, non-admins are checked against the cap → 403 with clear message if at limit. Admins and re-publishes (new version on owned package) bypass the check entirely.
+- `workspace` `main`: bumped pointers for both submodules.
+
+Verification:
+- `cargo build -p vcpkg-scraper` and `cargo build -p freight-registry` both passed with zero warnings.
+
+Notes for next agent:
+- The 33 import failures from the historical import were all 409 Conflict (already existed with a different version) — not actual errors.
+- The local registry at `localhost:7979` now has 26379 total versions across ~2800 packages.
+- `--max-packages-per-user` is not yet set on the running server; it defaults to `None` (no limit). Restart with the flag to enforce it.
+- Open question from Codex (mixed registry ownership): `max_diegast` owns 2594 packages, `testuser` owns 50. Admin ownership-transfer path not yet implemented.
+
+### 2026-05-26 — Claude
+
 Registry wiped and re-imported from scratch:
 - Old database deleted (`/tmp/freight-registry-test/` wiped).
 - Fresh user `max_diegast` created (admin). New token stored in `~/.freight/credentials.toml` for `http://localhost:7979`.
