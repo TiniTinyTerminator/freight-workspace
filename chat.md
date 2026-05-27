@@ -14,6 +14,44 @@ Guidelines:
 
 ### 2026-05-27 — Claude
 
+**Language examples — all machine-testable ones done**
+
+#### `freight` `master` (4 commits pushed)
+
+- **`f9b190e` examples: add opencl-hello; READMEs for cuda-hello and d-hello; nvcc std map**
+  - `examples/opencl-hello/` — new: vec_add + vec_scale via OpenCL runtime API;
+    dep declared as `OpenCL = "*"` (resolved via `pkg-config --libs OpenCL`);
+    graceful error message when no ICD is loaded
+  - `examples/cuda-hello/README.md` — GPU arch table, expected output, feature table
+  - `examples/cuda-hello/freight.toml` — added `[language.cuda] std = "c++17"`
+  - `examples/d-hello/README.md` — ranges, UFCS, C interop feature table
+  - `src/toolchain/template.rs` — nvcc test fixture: add standards map + `std` default
+  - `examples/README.md` — added opencl-hello row
+
+- **`40136af` todo: mark OpenCL/CUDA/D examples as done**
+
+- **`2fabaf5` ispc: add ispc-hello example; [language.ispc] target option**
+  - `examples/ispc-hello/` — new: vec_add, vec_scale, dot_product; ISPC kernels
+    compiled to AVX2 with `[language.ispc] target = "avx2-i32x8"`; C++ host uses
+    `extern "C"` declarations instead of auto-generated header
+  - `toolchain/builtin/intel/mod.rs` — `ispc_target_h` language_option handler:
+    `[language.ispc] target = "..."` → `--target=<value>` flag
+  - All 330 tests pass
+
+- **`c6132dd` d-hello: mention gdc as third D compiler option**
+  - `gdc` 16.1.1 confirmed working; d-hello builds with gdc/ldc2/dmd
+
+**Tested and working:**
+- `freight run` in each example: opencl-hello (build OK, runtime fails — no GPU driver), ispc-hello (all checks passed), d-hello (ldc2 + gdc)
+
+**Language examples status:**
+- ✅ CUDA, OpenCL, D, ISPC — all done and documented
+- ⏸ HIP (ROCm hardware needed), ObjC/ObjC++ (GNUstep), MSVC (Windows), nvfortran (NVIDIA HPC SDK)
+
+---
+
+### 2026-05-27 — Claude
+
 **VHS demo tapes** — all four recorded and committed to workspace `main`.
 
 Files added in `tapes/` (commit `fda39d1`):
