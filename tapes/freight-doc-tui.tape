@@ -14,7 +14,7 @@ Type "cd /home/max/freight/crates/docify/examples/doc-example"
 Enter
 Show
 
-Type "docify --tui src/"
+Type "docify browse libs/"
 Enter
 Sleep 3s
 
@@ -54,8 +54,16 @@ Tab
 Sleep 800ms
 
 Escape
-Sleep 500ms
+Sleep 800ms
 
-Type "docify src/ --format md"
+Type "docify search stddev libs/"
+Enter
+Sleep 2s
+
+Type "docify source gcd libs/"
+Enter
+Sleep 2s
+
+Type "docify gen libs/"
 Enter
 Sleep 2s
