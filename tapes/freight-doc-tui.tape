@@ -18,19 +18,20 @@ Type "docify browse libs/"
 Enter
 Sleep 3s
 
-Down
-Sleep 400ms
-Down
-Sleep 400ms
-Down
-Sleep 400ms
-Down
-Sleep 400ms
-
-Sleep 1s
+# Search for "mean" — filters to stats::mean with auto-expanded tree
+Type "mean"
+Sleep 1.5s
 
 Down
-Sleep 400ms
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
 Down
 Sleep 400ms
 
@@ -38,32 +39,49 @@ Sleep 1.5s
 
 Tab
 Sleep 1.5s
-
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-Down
-Sleep 300ms
-
-Sleep 1s
 
 Tab
 Sleep 800ms
+
+# Clear "mean" (4 chars), search for "linreg"
+Backspace
+Backspace
+Backspace
+Backspace
+Sleep 300ms
+
+Type "linreg"
+Sleep 1.5s
+
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 300ms
+Down
+Sleep 500ms
+
+Sleep 1.5s
+
+# Clear "linreg" (6 chars), search Fortran with "scale"
+Backspace
+Backspace
+Backspace
+Backspace
+Backspace
+Backspace
+Sleep 300ms
+
+Type "scale"
+Sleep 1.5s
+
+Down
+Sleep 300ms
+Down
+Sleep 500ms
+
+Sleep 1.5s
 
 Escape
-Sleep 800ms
-
-Type "docify search stddev libs/"
-Enter
-Sleep 2s
-
-Type "docify source gcd libs/"
-Enter
-Sleep 2s
-
-Type "docify gen libs/"
-Enter
-Sleep 2s
+Sleep 500ms
