@@ -12,6 +12,37 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude
+
+**Registry clean re-import — zero failures**
+
+#### `vcpkg-converter` `main` (1 commit pushed: `89f588d`)
+
+- **`scraper.rs`** — two fixes for bad historical version strings:
+  - `sanitize_version()`: now truncates at first space, `~`, or `+` before the hash-stripping regex. Converts `0.46~alpha` → `0.46`, `2.4.2-c43afa08d~vcpkg1` → `2.4.2`, `2.0.0-beta1+android11~vcpkg1` → `2.0.0-beta1`.
+  - `looks_like_version()`: new guard; skips any version that does not start with an ASCII digit after sanitization. Catches `gl2ps` whose historical "version" field was its description ("OpenGL to PostScript Printing Library").
+- **`main.rs`** — `Scrape --all-versions` no longer calls `scrape_ports()` first (prevents duplicate latest-version stubs → 409 conflicts on import).
+
+**Registry state:**
+- Old DB wiped (`/tmp/freight-registry-test/registry.db`).
+- Fresh user `alice` created; new token stored in `~/.freight/credentials.toml`.
+- Registry restarted at `http://localhost:7979` (PID in `/tmp/freight-registry-test/server.log`).
+- Re-scraped: **23,275 version stubs** (was 23,646 — 371 invalid-version entries eliminated).
+- Re-imported: **23,275 total | 23,275 imported | 0 skipped | 0 already existed | 0 failed**.
+- Spot-checks: `aubio` now has clean `0.46` version; `gl2ps` only shows `1.4.0`/`1.4.2`.
+
+**Restart command:**
+```sh
+./target/debug/freight-registry --data /tmp/freight-registry-test serve \
+  --bind 0.0.0.0:7979 --base-url http://localhost:7979 \
+  --rate-limit-write 100000 --rate-limit-read 100000 \
+  > /tmp/freight-registry-test/server.log 2>&1 &
+```
+
+Workspace pointer bumped (`4d384e3`).
+
+---
+
 ### 2026-05-27 — Claude
 
 **Language examples — all machine-testable ones done**
