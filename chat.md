@@ -14,6 +14,24 @@ Guidelines:
 
 ### 2026-05-27 — Claude
 
+`freight fetch` / `freight build` fixes:
+
+- **Root cause**: vcpkg stubs for historical versions were imported with `${VERSION}` unsubstituted in `upstream_url`. The `scrape_all_versions()` path in `scraper.rs` used `u.clone()` instead of `u.replace("${VERSION}", &entry.version)`, while `convert_port()` (single-version scrape) did the substitution correctly.
+- **`freight` `030f226` fix fetch: substitute `${VERSION}` in upstream_url; paginate search results**:
+  - `dep_cmds.rs`: in `fetch_registry_deps()`, apply `.replace("${VERSION}", &concrete)` on `upstream_url` before passing to `fetch_url_dep()`. Fixes existing stubs already in the registry without re-import.
+  - `freight_registry.rs`: `search()` now paginates with `limit=100` + `offset` (was returning only the first 20 results). Includes the uncommitted pagination work from Codex.
+- **`vcpkg-converter` `e4260c9` scraper: fix `${VERSION}` substitution in `scrape_all_versions()`**: prevents future scrape runs from generating stubs with unsubstituted template literals.
+- Re-scraped all 23559 version stubs (`vcpkg-tomls/` regenerated with correct URLs). Re-import was not needed since the client-side fix handles the existing registry data.
+
+Tested:
+- `freight fetch` with `abseil = "20260107.1"` → fetches `https://github.com/abseil/abseil-cpp/archive/20260107.1.tar.gz`, extracts, writes sentinel.
+- `freight build` → CMake configure → 247 targets compiled → link → success.
+- `zlib = "1.3.2"` → correctly resolved via system pkg-config (not re-fetched).
+
+Workspace: bumped `crates/freight` + `crates/vcpkg-converter` pointers.
+
+### 2026-05-27 — Claude
+
 `freight add` TUI improvements (all three pushed to `freight` `master`):
 
 - **`e67be07` remove dead templates_dir / load_templates**: `load_templates(path)` ignored its argument; `templates_dir()` searched for an external `toolchains/` directory that no longer exists. Both removed. All callers updated to `load_all_templates()`. `freight add` no longer errors "toolchains directory not found" on lock write.
@@ -257,6 +275,59 @@ Started on `docify` language-support TODOs:
 - `docify/TODO.md`
   - Marked the explicit CUDA `__global__` classification test item done and
     narrowed the remaining CUDA work to broader semantic coverage.
+
+Verification:
+- Ran `cargo test` in `crates/docify`; it passed.
+
+### 2026-05-27 — Codex
+
+Docify TUI tree index update:
+- `docify/src/tui/browser.rs`
+  - Replaced the flat filtered symbol index with a collapsible tree.
+  - Top level is language. Below that, C/C++ groups by file/header, then
+    namespace/class scopes where present. Other languages group by module or
+    parent scope where available.
+  - Group rows show disclosure markers and symbol counts.
+  - Click, Enter, or Space toggles a group. Selecting a symbol leaf keeps the
+    existing documentation/source detail pane behavior.
+  - Filtering auto-expands matching branches so search results remain visible
+    without manually opening every parent.
+
+Verification:
+- Ran `cargo test` in `crates/docify`; it passed.
+- Ran `git -C crates/docify diff --check`; it passed.
+
+### 2026-05-27 — Codex
+
+Docify TUI scroll/focus follow-up:
+- `docify/src/tui/browser.rs`
+  - Mouse wheel no longer moves the selected tree row up/down.
+  - The tree pane has an independent viewport offset. Wheel and PgUp/PgDn
+    scroll the focused pane: tree viewport or detail/source text.
+  - Arrow keys still move the selected tree row.
+  - Mouse movement/clicks update focused pane and focused pane border.
+  - C and C++ now share a top-level `C/C++` tree group.
+  - Symbol leaf rows now display only the simple/local name inside their group
+    (`mean` under `stats`, not `stats::mean`). The detail pane still shows the
+    full qualified name.
+
+Verification:
+- Ran `cargo test` in `crates/docify`; it passed.
+- Ran `git -C crates/docify diff --check`; it passed.
+
+### 2026-05-27 — Codex
+
+Docify TUI ordering update:
+- `docify/src/tui/browser.rs`
+  - The symbol list is now sorted by language first, then by group, then kind,
+    then name.
+  - C/C++ grouping currently uses the source/header file name, per Max's note
+    that header-level grouping is good enough for now.
+  - Rust grouping uses `::` module prefixes; Ada/D/Go/Fortran use dotted
+    prefixes where available; Java/Kotlin/Swift/Zig prefer `meta.parent` and
+    then fall back to dotted or `::` prefixes.
+  - The list rows now show the group/header after the language so the ordering
+    is visible while browsing and filtering.
 
 Verification:
 - Ran `cargo test` in `crates/docify`; it passed.
