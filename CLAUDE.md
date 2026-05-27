@@ -84,7 +84,12 @@ src/
 
 **`freight.toml` manifest — dependency system**
 
-Every entry in `[dependencies]` (and its conditional variants) is one of:
+Three dependency sections:
+- `[dependencies]` — linked in all builds (release + debug)
+- `[build-dependencies]` — executables needed during compilation (cmake, ninja, protoc, …). Fetched first; if an installed dep has a `bin/` directory, those executables are prepended to PATH for all subsequent build steps so locally-installed tools take precedence over system ones.
+- `[dev-dependencies]` — linked only in debug/dev builds (test frameworks, sanitizers, debug utilities)
+
+Every entry in `[dependencies]` (and `[build-dependencies]` / `[dev-dependencies]`) is one of:
 
 ```toml
 # Simple: bare version constraint — freight resolves via pkg-config → stubs → registry
