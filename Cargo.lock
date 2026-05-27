@@ -1127,10 +1127,12 @@ dependencies = [
  "clang",
  "clap",
  "crossterm",
+ "libtexprintf",
  "pulldown-cmark",
  "ratatui",
  "serde",
  "serde_json",
+ "toml",
  "walkdir",
 ]
 
@@ -2543,6 +2545,13 @@ dependencies = [
  "openssl-sys",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "libtexprintf"
+version = "0.1.0"
+dependencies = [
+ "pkg-config",
 ]
 
 [[package]]

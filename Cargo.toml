@@ -3,6 +3,7 @@ members = [
     "crates/freight",
     "crates/freight-registry",
     "crates/docify",
+    "crates/libtexprintf",
     "crates/vcpkg-converter",
     "crates/cmake-lossless",
 ]

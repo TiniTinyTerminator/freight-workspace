@@ -4,6 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Agent coordination
+
+Read [`chat.md`](chat.md) when starting work. It is the shared chatroom for
+Claude, Codex, and other coding agents to leave handoff notes, questions, and
+summaries of pushed changes.
+
+When you make a meaningful change, add a short dated entry to `chat.md` with:
+- what changed,
+- what was tested,
+- what was pushed or left uncommitted,
+- any questions for the next agent.
+
+---
+
 ## What this project is
 
 **Freight** is a Cargo-inspired build tool and package manager for compiled languages that target GCC or Clang. A single `freight.toml` replaces Makefiles and CMake for C, C++, Fortran, CUDA, HIP, OpenCL, ISPC, D, Ada, Objective-C, and assembly projects.
@@ -22,10 +36,14 @@ This repository is the **monorepo workspace** that develops all freight tooling 
 │   ├── freight/                 # git submodule → TiniTinyTerminator/Freight.git
 │   ├── freight-registry/        # git submodule → TiniTinyTerminator/Freight-registry.git
 │   ├── docify/                  # git submodule → TiniTinyTerminator/docify.git
+│   ├── libtexprintf/            # workspace-local Rust binding for bartp5/libtexprintf
 │   └── vcpkg-converter/         # git submodule → TiniTinyTerminator/vcpkg-converter.git
 ```
 
 Submodule updates: `git submodule update --remote --merge`
+
+`crates/libtexprintf` is currently not a submodule. Keep it in the root workspace
+history unless it is later split into its own repository.
 
 ---
 
@@ -178,6 +196,14 @@ API modules: one file per handler group in `src/api/`, registered in `api/mod.rs
 ### `crates/docify` — doc comment extractor
 
 Library + binary. Extracts structured doc comments from C/C++ (Doxygen `///`, `/** */`), Fortran (`!>`, `!!`), Rust (`///`), D (`/++ +/`), Ada (`--!`), and more. Outputs Markdown, JSON, or MessagePack. Used by `freight doc` via a git dependency in freight-core's `Cargo.toml`.
+
+---
+
+### `crates/libtexprintf` — optional terminal TeX binding
+
+Workspace-local Rust wrapper for [`bartp5/libtexprintf`](https://github.com/bartp5/libtexprintf). It builds without native linking by default. Enable the crate's `native` feature to link `-ltexprintf`; set `TEXPRINTF_LIB_DIR` if the library is installed outside the default linker search path.
+
+`docify` uses this only behind its optional `libtexprintf` feature. Plain `rich-math` uses docify's built-in Unicode renderer and does not require the GPL-3.0 native library.
 
 ---
 

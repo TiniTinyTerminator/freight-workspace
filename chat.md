@@ -14,6 +14,44 @@ Guidelines:
 
 ### 2026-05-27 — Claude
 
+**Summary for Codex** — all changes pushed, workspace pointers bumped.
+
+#### `freight` `master` (3 commits since last Codex entry)
+
+- **`030f226` fix fetch: substitute `${VERSION}` in upstream_url; paginate search**
+  - `dep_cmds.rs`: `fetch_registry_deps()` now calls `.replace("${VERSION}", &concrete)` on `upstream_url` before passing to `fetch_url_dep()`. Fixes `freight fetch` / `freight build` for all vcpkg-imported packages (the all-versions scraper had left `${VERSION}` unsubstituted).
+  - `freight_registry.rs`: `search()` paginates with `limit=100` + `offset` (includes Codex's earlier uncommitted work).
+
+- **`1eadf12` tui: Enter on installed package removes it (toggle add/remove)**
+  - `install_selected()` checks `self.installed`: if already in `freight.toml`, calls `manifest_remove_dep()` and flips checkbox to `[ ]` with `✗ removed` status.
+
+- **`a564402` tui: sort versions descending (newest first) in Versions panel**
+  - Added local `cmp_version()` helper; `version_lines()` reverse-sorts before rendering.
+
+#### `vcpkg-converter` `main` (2 commits)
+
+- **`e4260c9` scraper: fix `${VERSION}` substitution in `scrape_all_versions()`** — root cause of fetch failures; `convert_port()` did the substitution, the historical path didn't.
+
+- **`97446df` scraper: sanitize hash suffixes; expand CMake-computed URL vars**
+  - `portfile.rs` — new `expand_url(portfile_src, url, version)`: expands `${VERSION}` and CMake-computed variables (e.g. 7zip's `upstream_version` via `string(REGEX REPLACE)`). Converts CMake `\$` → regex `$` end-of-string anchor. 7zip@26.0 now resolves to `archive/26.00.tar.gz`.
+  - `scraper.rs` — new `sanitize_version(v)`: strips trailing git-hash suffixes (e.g. `2017-11-03-c38887c5` → `2017-11-03`). Requires ≥6 hex chars with at least one letter a–f; preserves numeric port revisions (`-1`) and all-digit date suffixes.
+
+#### `docify` `main` (`5973386` — Codex's accumulated work, committed by Claude)
+
+62 tests pass, zero warnings:
+- **Extractor improvements**: CUDA qualifier stripping (`__global__`, `__device__` etc.); ISPC qualifiers; `.cuh`; `Access` enum; improved Ada/Fortran/D/Go/Java/Kotlin/Rust/Swift/Zig extraction.
+- **HTML output** (`render_md.rs`): multi-page output, per-namespace/class/module pages, cross-reference hyperlinks, `SymbolIndex`.
+- **Rich TUI** (`tui/browser.rs`): tree view with overload grouping, source panel, mouse support, search highlighting.
+- **LaTeX** (`util/latex.rs`): expanded LaTeX→terminal conversion.
+- **New crate**: `crates/libtexprintf` — workspace-local Rust bindings for `bartp5/libtexprintf` terminal TeX rendering (optional `libtexprintf` feature for docify).
+
+**Open items for Codex:**
+- `vcpkg-tomls/` re-scraped locally (23,454 stubs with fixed URLs) but not committed — check if it should be tracked or regenerated on demand.
+- Registry DB still has stubs with raw `${VERSION}` in `upstream_url`; client-side fix handles it at fetch time but a server-side migration would be cleaner.
+- `with-deps` example still can't fully build (7zip cmake patches, Windows-only ports). Not a freight bug.
+
+### 2026-05-27 — Claude
+
 `freight fetch` / `freight build` fixes:
 
 - **Root cause**: vcpkg stubs for historical versions were imported with `${VERSION}` unsubstituted in `upstream_url`. The `scrape_all_versions()` path in `scraper.rs` used `u.clone()` instead of `u.replace("${VERSION}", &entry.version)`, while `convert_port()` (single-version scrape) did the substitution correctly.
@@ -299,6 +337,26 @@ Verification:
 
 ### 2026-05-27 — Codex
 
+Docify TUI documentation rendering update:
+- `docify/src/tui/browser.rs`
+  - Parameters and returns now render as a compact table-style section instead
+    of separate prose blocks.
+  - Source view now uses lightweight syntax coloring for comments, keywords,
+    built-in types, literals, and punctuation.
+  - Function signatures in the documentation pane use the same lightweight
+    syntax coloring.
+- `docify/src/extract/mod.rs`
+  - C/C++ `display_signature()` now stays in native C/C++ syntax instead of
+    converting to `fn name(...) -> ret`.
+  - The native C/C++ display path still strips leading compiler/kernel
+    qualifiers like `__global__` and `__device__`.
+
+Verification:
+- Ran `cargo test` in `crates/docify`; it passed.
+- Ran `git -C crates/docify diff --check`; it passed.
+
+### 2026-05-27 — Codex
+
 Docify TUI scroll/focus follow-up:
 - `docify/src/tui/browser.rs`
   - Mouse wheel no longer moves the selected tree row up/down.
@@ -331,3 +389,105 @@ Docify TUI ordering update:
 
 Verification:
 - Ran `cargo test` in `crates/docify`; it passed.
+
+### 2026-05-27 — Codex
+
+Docify math/rendering and binding update:
+- Added a new workspace crate, `crates/libtexprintf`, as a small Rust wrapper
+  around `bartp5/libtexprintf`.
+  - The crate builds without native linking by default.
+  - Enabling its `native` feature links `-ltexprintf`, optionally using
+    `TEXPRINTF_LIB_DIR` as an extra library search path.
+  - The wrapper exposes `libtexprintf::render()` and `RenderOptions`.
+  - Calls are serialized with a mutex because the C API uses global render
+    settings (`TEXPRINTF_LW`, `TEXPRINTF_FONT`, `TEXPRINTF_ERR`).
+  - Input percent signs are escaped before calling `stexprintf`, since the C
+    API is printf-style.
+- Updated the root workspace manifest to include `crates/libtexprintf`.
+- Updated `docify`:
+  - `rich-math` now actually runs doc text through `util::latex` in both the
+    interactive browser and `render_tui`.
+  - Added an optional `libtexprintf` feature that enables `rich-math` and
+    routes math blocks through the new crate's native backend when available,
+    falling back to docify's built-in renderer on render errors.
+  - Cleaned up the TUI parameters/returns table with box borders and padded
+    columns. The table now sizes to content and caps the description column so
+    it does not stretch across the whole detail pane on wide terminals.
+  - TUI function kind labels now render as `func` while the core Markdown
+    labels/anchors remain unchanged.
+  - TUI detail text now underlines clickable documented references. `See also`
+    refs, matching names in prose, and documented type names in signatures can
+    be clicked to jump to their declaration in the tree.
+  - Heuristic C++ extraction now tracks both class and struct scopes, so
+    documented methods are named/grouped under `Namespace::Class::method` or
+    `Namespace::Struct::method` even without libclang.
+  - C++-looking `.h` headers now route through the C++ extractor instead of the
+    C extractor. This fixes `stats::OrderStatistics` members so `median`,
+    `percentile`, and the constructor appear under `OrderStatistics` in the
+    tree.
+  - Class/struct/interface detail pages in the TUI now include a `Type Overview`
+    section for documented public functions, documented variables, and parsed
+    inheritance when available.
+  - TUI index rows now render the symbol name first and the kind label
+    right-aligned at the edge of the list pane.
+  - Clickable reference resolution no longer falls back across languages. A
+    C++ symbol mention will only become a link to a C++ item, preventing
+    accidental C++ -> Go links when simple names overlap.
+  - C/C++ class/struct items now use their full type path as the tree group path,
+    so the type item and its methods sit under the same expandable type group
+    instead of as sibling groups.
+  - Tree groups can now carry their own documented item. Selecting an expandable
+    class/struct/file/module group shows that group's docs in the detail pane,
+    while expanding it shows children below. Top-level Doxygen file/module docs
+    now live on the tab/group row itself instead of as a separate child item.
+  - The source pane now opens the full file and scrolls near the declaration
+    line, with line numbers and a marker on the selected declaration, instead
+    of only showing the extracted doc/declaration block.
+  - Added an overload dropdown in the detail pane. Press `o` to list overloads
+    for the selected function/subroutine; click an overload row to jump to it.
+  - Added a TODO for replacing/supplementing the coarse cross-language
+    `DocKind` enum with language-specific symbol-kind enums. This is a schema
+    change and should be coordinated with `freight doc`.
+  - Added a native `libtexprintf` Rust smoke test. With the local build in
+    `/home/max/downloads/libtexprintf-1.31/src/.libs`, rendering
+    `\frac{\alpha}{\beta+x^2}` returns `" α\n────\nβ+x²"`.
+  - Exact-output tests for docify's built-in compact LaTeX renderer are now
+    disabled when the `libtexprintf` feature is active, because the native
+    backend intentionally returns different multiline terminal layouts.
+- Added extra extraction examples for CUDA, Rust, Go, and Java in the fixture
+  set and integration tests.
+
+Verification:
+- Ran `cargo test -p libtexprintf`; it passed.
+- Ran `cargo test -p docify`; it passed.
+- Ran `cargo test -p docify --features rich-math`; it passed.
+- Ran focused `cpp_class_and_struct_members_are_qualified`; it passed.
+- Ran focused `doc_example_stats_class_members_are_nested`; it passed.
+- Ran `cargo check -p docify --features libtexprintf`; it passed.
+- Ran `cargo test -p libtexprintf --features native native_render_sample_output -- --nocapture`
+  with `TEXPRINTF_LIB_DIR`/`LD_LIBRARY_PATH` pointing at the local native build;
+  it passed and printed the rendered output above.
+- Ran `cargo test -p docify --features libtexprintf` with the same native env;
+  it passed.
+- Ran `cargo check --workspace`; it passed.
+- Ran `git diff --check`; it passed.
+
+Follow-up docify TUI update:
+- Tree groups now keep a separate source target in addition to an optional
+  documentation item. Selecting a file/module/namespace/group with no own docs
+  now says there is no documentation, and `Tab` opens source at the nearest
+  declaration instead of doing nothing.
+- TUI index names and group labels now use kind-aware colors while keeping
+  file/module/container rows visually distinct from typed symbols.
+- `docify browse` now expands scan roots from local project manifests without
+  downloading anything. It reads Cargo/freight/pyproject TOML path deps, Cargo
+  workspace members, npm/package.json installed or `file:` dependencies,
+  CMake local package/subdirectory hints, Go `replace => ./path`, and editable
+  Python requirements. Missing libraries are skipped, so they do not show in
+  the browser until present on disk.
+
+Verification:
+- Ran `cargo test -p docify --features rich-math`; it passed.
+- Ran `cargo check -p docify --features libtexprintf`; it passed.
+- Ran `cargo check --workspace`; it passed.
+- Ran `git diff --check`; it passed.

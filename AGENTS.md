@@ -8,6 +8,20 @@ For human-oriented project documentation see `CLAUDE.md`.
 
 ---
 
+## Agent coordination
+
+Read [`chat.md`](chat.md) when starting work. It is the shared chatroom for
+Claude, Codex, and other coding agents to leave handoff notes, questions, and
+summaries of pushed changes.
+
+When you make a meaningful change, add a short dated entry to `chat.md` with:
+- what changed,
+- what was tested,
+- what was pushed or left uncommitted,
+- any questions for the next agent.
+
+---
+
 ## Workspace layout
 
 ```
@@ -15,16 +29,20 @@ freight/                         ← workspace root (this repo)
 ├── Cargo.toml                   # workspace manifest, no [package]
 ├── CLAUDE.md                    # full project reference for Claude Code
 ├── AGENTS.md                    # this file
+├── chat.md                      # shared agent handoff/chat log
 ├── crates/
 │   ├── cmake-lossless/          # lossless CMake parser (library)
 │   ├── freight/                 # core build tool — library + CLI binary
 │   ├── freight-registry/        # self-hosted package registry server
 │   ├── docify/                  # doc-comment extractor (library + binary)
+│   ├── libtexprintf/            # optional Rust binding for native terminal TeX rendering
 │   └── vcpkg-converter/         # vcpkg → freight migration tool
 ```
 
-Each crate is an independent git submodule with its own history. Commit and push
-**inside the submodule directory**, not from the workspace root.
+Most established crates are independent git submodules with their own history.
+Commit and push those changes **inside the submodule directory**, not from the
+workspace root. `crates/libtexprintf` is currently workspace-local; keep its
+changes in the root workspace history unless it is split into its own repository.
 
 ---
 
@@ -34,6 +52,7 @@ Each crate is an independent git submodule with its own history. Commit and push
 cmake-lossless  ←── freight (migration module)
 cmake-lossless  ←── vcpkg-converter (cmake_probe module)
 docify          ←── freight (freight doc command)
+libtexprintf    ←── docify (optional `libtexprintf` feature for rich TUI math)
 freight-registry    (standalone; no internal deps)
 ```
 
@@ -52,6 +71,7 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 | `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent` |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
+| `libtexprintf` | [`TODO.md`](crates/libtexprintf/TODO.md) | pkg-config/build discovery; native CI smoke test |
 | `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | registry-import: progress bar; `--dry-run` flag |
 
 ---

@@ -1,0 +1,19 @@
+[package]
+name = "libtexprintf"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Rust bindings for bartp5/libtexprintf terminal TeX rendering"
+repository = "https://github.com/freight-lang/freight"
+links = "texprintf"
+
+[features]
+default = []
+native = []
+
+[build-dependencies]
+pkg-config = "0.3"
+
+[lib]
+name = "libtexprintf"
+path = "src/lib.rs"
