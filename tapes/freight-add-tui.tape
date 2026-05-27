@@ -29,20 +29,36 @@ Up
 Sleep 400ms
 
 Sleep 1s
+
+Tab
+Sleep 800ms
+
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+Down
+Sleep 400ms
+
+Sleep 1s
+
+Tab
+Sleep 600ms
+
 Enter
 Sleep 1.5s
 
-Ctrl+A
+Backspace
+Backspace
+Backspace
+Backspace
+Sleep 400ms
+
 Type "abseil"
 Sleep 2.5s
 
 Down
 Sleep 500ms
-Enter
-Sleep 1.5s
-
-Down
-Sleep 400ms
 Enter
 Sleep 1.5s
 
