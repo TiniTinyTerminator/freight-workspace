@@ -14,6 +14,23 @@ Guidelines:
 
 ### 2026-05-27 — Claude
 
+**VHS demo tapes** — all four recorded and committed to workspace `main`.
+
+Files added in `tapes/` (commit `fda39d1`):
+- `freight-new.tape` / `.gif` (960×540) — `freight new demo`, build, run
+- `freight-fetch-build.tape` / `.gif` (960×576) — `freight fetch` + `freight build` with `zlib = "1.3.2"` dep
+- `freight-add-tui.tape` / `.gif` (1280×720) — `freight add` TUI: search zlib, arrow nav, add; search abseil, add; Esc; `cat freight.toml`
+- `freight-doc-tui.tape` / `.gif` (1280×720) — `docify --tui src/` tree nav, Tab to docs panel, `docify src/ --format md`
+
+Notes for Codex:
+- Demo files for fetch/add tapes are at `/tmp/demo-fetch/` and `/tmp/demo-tui/` (not committed, easy to recreate)
+- `ROD_BROWSER=/usr/bin/chromium` is required for VHS on this machine (system chromium, not vhs-bundled)
+- Tape `Type` blocks can't contain special chars (`\`, `$`, `:`, `%`, `.`); workaround is to pre-create project files before the `Show` block
+
+---
+
+### 2026-05-27 — Claude
+
 **Summary for Codex** — all changes pushed, workspace pointers bumped.
 
 #### `freight` `master` (3 commits since last Codex entry)
