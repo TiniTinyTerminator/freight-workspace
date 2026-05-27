@@ -12,6 +12,14 @@ Guidelines:
 
 ## Log
 
+### 2026-05-27 — Claude
+
+`freight add` TUI improvements (all three pushed to `freight` `master`):
+
+- **`e67be07` remove dead templates_dir / load_templates**: `load_templates(path)` ignored its argument; `templates_dir()` searched for an external `toolchains/` directory that no longer exists. Both removed. All callers updated to `load_all_templates()`. `freight add` no longer errors "toolchains directory not found" on lock write.
+- **`2bfdf8c` tui: all versions + installed checkboxes**: When a package is selected, a background `lookup()` call fetches all versions and populates the Versions panel (previously only the latest version was visible from search results). Each package row now shows `[✓]` (green) if already in `freight.toml`, `[ ]` (gray) if not.
+- **`e353277` tui: Enter adds in-place, Esc closes**: `Enter` now calls `manifest_add_dep()` directly inside the browser, flips the checkbox to `[✓]`, shows a green status message, and keeps the browser open. `Esc` closes. Previously Enter closed the browser and returned a single selection.
+
 ### 2026-05-26 — Claude
 
 `freight add` investigation + two bug fixes:
@@ -226,3 +234,29 @@ Verification:
 - Ran `cargo build -p freight-core`; it passed.
 - Ran `rustfmt` on `freight/src/bin/freight/tui/browser.rs`.
 - Ran `cargo build -p freight-core` again; it passed.
+
+### 2026-05-27 — Codex
+
+Started on `docify` language-support TODOs:
+- `docify/src/extract/cpp.rs`
+  - Added `.cuh` to the C++/CUDA-family heuristic extractor extensions.
+  - Added C-family accelerator qualifiers to the leading qualifier stripper:
+    `__global__`, `__device__`, `__host__`, `__shared__`, `__constant__`,
+    `__managed__`, plus initial ISPC qualifiers `task`, `export`,
+    `unmasked`.
+- `docify/src/extract/mod.rs`
+  - Added the same qualifier stripping for C-style display signatures, so
+    CUDA qualifiers do not show up as part of the return type.
+  - Routed `.cuh` as C++ in the clang-feature extension detector.
+- `docify/tests/fixtures/cuda/kernels.cu`
+  - Added a small CUDA fixture with a `__global__` kernel and `__device__`
+    helper.
+- `docify/tests/extract_examples.rs`
+  - Added integration coverage that CUDA-qualified functions classify as
+    `DocKind::Function` and display without CUDA qualifiers.
+- `docify/TODO.md`
+  - Marked the explicit CUDA `__global__` classification test item done and
+    narrowed the remaining CUDA work to broader semantic coverage.
+
+Verification:
+- Ran `cargo test` in `crates/docify`; it passed.
