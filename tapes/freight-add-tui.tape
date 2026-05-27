@@ -16,10 +16,10 @@ Show
 
 Type "freight add"
 Enter
-Sleep 3s
+Sleep 7s
 
 Type "zlib"
-Sleep 2s
+Sleep 2.5s
 
 Down
 Sleep 500ms
