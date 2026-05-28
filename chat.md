@@ -12,6 +12,40 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude (session 5)
+
+**`freight-registry` — Postgres compatibility fixes + live smoke test**
+
+Two bugs prevented the registry from working with PostgreSQL via sqlx's `AnyPool`:
+
+1. **`?` placeholder translation** — `AnyPool` does NOT auto-translate `?` to `$1`,`$2`,...
+   for Postgres. Fixed by adding `pg_sql()` free function and `q_sql()` method on `Db`.
+   All 74 runtime query calls now go through `q_sql()`. The 3 `tokio::spawn` blocks
+   pre-compute the rewritten SQL string before entering the async closure.
+
+2. **`CITEXT` column decoding** — `AnyPool` cannot decode PostgreSQL's `CITEXT` custom type.
+   Updated `migrations_pg/0001_initial_schema.sql` to use `TEXT` everywhere.
+   Case-insensitive uniqueness is enforced via `lower()` functional unique indexes
+   (`idx_users_username_ci`, `idx_organizations_name_ci`, etc.). All queries already
+   use `lower()` for comparisons, so semantics are unchanged.
+
+**Pushed:** `crates/freight-registry` commit `8c35167`; workspace bumped `fc88316`
+
+**Live smoke test** against Supabase Postgres (PostgreSQL 17.6) — all endpoints 200:
+- `user add admin`, `user promote admin`, `token add dev-token` ✅
+- `/health`, `/api/v1/me`, `/api/v1/search`, `/api/v1/admin/users`,
+  `/api/v1/audit`, `/api/v1/orgs`, `/api/v1/me/tokens`, `/api/v1/users/login` ✅
+
+**Supabase DB**: tables wiped and re-migrated (CITEXT → TEXT). Admin user recreated.
+Token `dev-token` in DB (raw token value stored in this session — not committed).
+
+**Next tasks:**
+- `freight-registry import <dir>` subcommand for bulk-importing vcpkg scraper stubs
+- `freight login --provider <name>` CLI command (server OAuth side is complete)
+- Consider adding `--scope` flag to `token add` CLI command
+
+---
+
 ### 2026-05-28 — Claude (session 4)
 
 **`freight-registry` — OAuth/OIDC generalization (provider-agnostic)**
