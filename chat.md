@@ -12,6 +12,51 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude (session 4)
+
+**`freight-registry` — OAuth/OIDC generalization (provider-agnostic)**
+
+#### `freight-registry` (uncommitted — pending push from submodule)
+
+Replaced the GitHub-only OAuth implementation with a fully generic OAuth 2.0 / OIDC system.
+
+**New files / major rewrites**:
+
+| File | Change |
+|---|---|
+| `src/oauth.rs` | New module — `OAuthProviderConfig` (config/deserialize) + `OAuthProvider` (resolved) + OIDC discovery + `github_from_env`, `gitlab_from_env`, `google_from_env` presets |
+| `src/api/oauth.rs` | Rewritten — generic `oauth_start` + `oauth_callback` with `Path<String>` provider name |
+
+**Updated**:
+- `src/lib.rs`: removed `GitHubOAuthConfig`; `PendingOAuthState` gains `provider_name`; `AppState.github_oauth` → `AppState.oauth_providers: Vec<OAuthProvider>`
+- `src/config.rs`: `ServeConfig` gains `oauth: Vec<OAuthProviderConfig>`; `load()` returns `(Option<PathBuf>, Vec<OAuthProviderConfig>)` — OAuth configs can't be expressed as env vars
+- `src/api/mod.rs`: routes changed to `/auth/:provider` + `/auth/:provider/callback`
+- `src/main.rs`: removed `--github-client-id`/`--github-client-secret` flags; at startup collects providers from config file + env-var presets + resolves all (OIDC discovery async)
+- `src/db.rs`: `OAUTH_SENTINEL` const → `fn oauth_sentinel(provider: &str) -> String`; sentinel is now `"!oauth:{provider}"` (login.rs already checks `starts_with("!oauth:")`)
+
+**How to configure OAuth now**:
+
+Env-var shortcuts (no config file needed):
+```sh
+GITHUB_CLIENT_ID=…    GITHUB_CLIENT_SECRET=…   # → /auth/github
+GITLAB_CLIENT_ID=…    GITLAB_CLIENT_SECRET=…   # → /auth/gitlab (+ GITLAB_ISSUER for self-hosted)
+GOOGLE_CLIENT_ID=…    GOOGLE_CLIENT_SECRET=…   # → /auth/google
+```
+
+Config file for custom / company OIDC providers:
+```toml
+[[serve.oauth]]
+name          = "okta"
+display_name  = "Okta SSO"
+client_id     = "0oa…"
+client_secret = "…"
+issuer        = "https://company.okta.com"    # triggers OIDC auto-discovery
+```
+
+**Backward compatibility**: existing `"!oauth:github"` sentinels in the DB are unaffected — new GitHub users still get `"!oauth:github"`.  Workspace `cargo check --workspace` passes clean. Zero clippy warnings.
+
+**Not yet done**: `freight login --github` / `freight login --provider okta` CLI commands (open browser + local listener). Server side is complete; CLI side is a follow-on task.
+
 ### 2026-05-28 — Claude (session 3, cont.)
 
 **`freight-registry` — GitHub OAuth login**
