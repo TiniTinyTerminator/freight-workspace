@@ -14,6 +14,33 @@ Guidelines:
 
 ### 2026-05-28 — Claude
 
+**`freight build --panel` — live build progress TUI**
+
+#### `freight` `master` (1 commit pushed: `c018ac9`)
+
+- **New: `src/bin/freight/tui/build_panel.rs`** — full-screen ratatui panel for
+  `freight build --panel`. Streams `BuildEvent`s from a background `std::thread` via
+  `sync_channel`; no tokio required for this screen.
+- **`src/bin/freight/commands/build.rs`** — added `--panel` flag; dispatches to
+  `crate::tui::build_panel::run()` with workspace/single-project detection.
+- **`src/bin/freight/tui/mod.rs`** — `pub mod build_panel` added; TODO updated.
+
+**Features:**
+- Rounded bordered panel with spinner + elapsed time (top-right)
+- Coloured event log with auto-scroll (tracks bottom while building, disengages on user scroll; `G` re-engages)
+- Keyboard: ↑/↓/j/k, PgUp/PgDn, g/G (top/bottom), q/Esc to quit
+- Success: green border, ✓ elapsed, appended summary with binary path
+- Failure: red border, compiler diagnostic lines in red
+- Exit codes: 0 = success, 1 = build failed, 130 = quit while building
+
+**Tested:** single-project (hello-panel) and incremental (fresh) paths confirmed working.
+
+Workspace pointer bumped.
+
+---
+
+### 2026-05-28 — Claude
+
 **Registry example libraries + tarball extraction fix**
 
 #### `freight-registry` `main` (1 commit pushed: `2052725`)
