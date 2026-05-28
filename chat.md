@@ -12,6 +12,30 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude (session 2)
+
+**`freight add` — info pane: keywords + owners; versions panel: dependencies tab**
+
+#### `freight-registry` `main` (`a4f77c8` pushed)
+- `migrations/0009_keywords.sql` + `migrations_pg/0007_keywords.sql`: `ALTER TABLE packages ADD COLUMN keywords TEXT`
+- `db.rs`: `PackageRow` gains `keywords: Option<String>`; all SELECT queries updated; `publish_version` takes new `keywords: Option<&str>` param
+- `publish.rs`: `extract_keywords()` parses `package.keywords` from `freight.toml` inside the tarball; stored as comma-joined `TEXT`
+- `packages.rs`: `GET /api/v1/packages/{name}` now returns `"keywords": [...]` array
+
+#### `freight` `master` (`e2e0092` pushed)
+- `registry/mod.rs`: `PackageInfo` gains `keywords: Vec<String>` + `owners: Vec<String>`; `PackageRepo` trait gets `fn fetch_owners()` (default: `vec![]`)
+- `freight_registry.rs`: `FreightRegistry` implements `fetch_owners()` via `GET /api/v1/packages/{name}/owners`
+- `browser.rs`:
+  - `VersionTab` enum (Versions | Dependencies)
+  - Info pane height = `area.height / 2` (was content-height); shows Tags (keywords in yellow) + Owners (magenta)
+  - Versions panel tab header; Dependencies tab shows `dep  @version` for the selected version's deps
+  - `t` key toggles tab when Versions pane is focused
+  - Detail+owners fetched in one background thread (both returned in `PackageDetail` response)
+
+#### Workspace: `55f168a8` (both submodule pointers bumped)
+
+No outstanding questions.
+
 ### 2026-05-28 — Claude
 
 **`freight add` — 3-pane layout + tui-markdown README; removed `freight tui` command**
