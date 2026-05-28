@@ -12,6 +12,61 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude (session 7)
+
+**`freight-registry` — website W1–W9**
+
+**What changed:**
+- `GET /api/v1/stats` endpoint returns `{packages, downloads, versions, users}` using existing `DbStats`
+- `security_headers` middleware now also sets `Content-Security-Policy` (W2)
+- Homepage stats bar renders real package + download counts (W1)
+- Keyword badges in search-result cards are now `<a href="/?q=kw">` links (W3)
+- Package detail: prebuilt triples panel with per-triple download links (W4)
+- Package detail: total downloads summed across all versions in header + sidebar (W5)
+- Package detail: `?version=` param selects active version; highlighted row in table; deps/prebuilts shown for that version (W6)
+- `renderMarkdown` in `package.html` now handles ordered/unordered lists, blockquotes, GFM tables, images (W8)
+- SVG favicon at `/favicon.svg` linked from both HTML pages (W9)
+- `WEBSITE.md` added to track all open/closed website tasks
+- All pushed: `crates/freight-registry` @ `5aa4a4f`; workspace @ `195fd2fe`
+
+**What remains (in WEBSITE.md):**
+- W7: channel filter dropdown on search
+- W10: custom 404 page
+- W11: browse by keyword section on homepage
+- W12: sort order on search (needs API `sort=` param first)
+- W13: responsive nav hamburger
+
+**Tested:** stats endpoint returns `{downloads:2, packages:2797, versions:23275, users:2}`; CSP header present on all responses; build clean.
+
+### 2026-05-28 — Claude (session 6)
+
+**`freight-registry` — ON CONFLICT fix + bulk vcpkg import**
+
+**What changed:**
+- `pg_sql()`: added translation of `ON CONFLICT(name, channel)` → `ON CONFLICT(lower(name), lower(channel))` so `publish_version` upserts work on Postgres (functional unique index requires the expression form)
+- `Db::is_postgres()` / `Db::pool()`: new public accessors for bulk-import tooling
+- `Command::Import`: new CLI subcommand — reads a directory of vcpkg-scraper `.toml` stubs and bulk-imports them as metadata-only packages. Batches 500 rows/query. Deduplicates package names (multiple version files → one package row + N version rows). 3-phase: packages → id resolution → versions+owners
+- Server bound to `0.0.0.0:7878` (was `127.0.0.1`). Static files served via `FREIGHT_STATIC_DIR` env var or relative `static/` fallback
+- Web UI shipped: `static/index.html` (search + pagination), `static/package.html` (detail view), `static/app.js`, `static/style.css`
+
+**What was tested:**
+- Build: clean (`cargo build -p freight-registry`)
+- Server started with Supabase Postgres; `/health` returns `{"db":"ok","status":"ok"}`
+- Import of 23,275 vcpkg stubs under user `vcpkg`: 2,797 distinct packages, 23,275 versions, completed in ~2 min
+- API verified: `GET /api/v1/search?q=zlib` returns zlib + oatpp-zlib
+
+**What was pushed:**
+- `crates/freight-registry` @ `512b04c`
+- Workspace bumped @ `9b98c23`
+
+**Server is running** at PID 544755 (check with `ps aux | grep freight-registry`). Logs in `/tmp/freight-server.log`.
+
+**What remains:**
+- `freight login --provider <name>` CLI command (OAuth side server-complete, CLI side not started)
+- `--scope` flag for `token add` CLI subcommand
+- Stats bar on index.html only shows ✓ status; could fetch package/version counts from a new `/api/v1/stats` endpoint
+- The `search_packages` query only searches by name (`lower(name) LIKE lower(?)`); could also search `description` and `keywords`
+
 ### 2026-05-28 — Claude (session 5)
 
 **`freight-registry` — Postgres compatibility fixes + live smoke test**
