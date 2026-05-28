@@ -12,6 +12,39 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude (session 3, cont.)
+
+**`freight-registry` — GitHub OAuth login**
+
+#### `freight-registry` `main` (`a376e06` pushed)
+
+Two new endpoints — no existing endpoints changed:
+
+| Route | Purpose |
+|---|---|
+| `GET /auth/github[?redirect_uri=<url>]` | Redirect browser to GitHub OAuth authorize page |
+| `GET /auth/github/callback` | Exchange code → user info → issue freight token, return HTML page |
+
+**Configuration**: `--github-client-id` / `GITHUB_CLIENT_ID` + `--github-client-secret` / `GITHUB_CLIENT_SECRET`.
+Both must be set; omitting both is a no-op (OAuth stays disabled). One without the other logs a warning.
+
+**Account model**:
+- OAuth users get `password_hash = "!oauth:github"` (not a valid Argon2 hash)
+- `login.rs` detects the prefix → returns `400 "this account uses github login — visit /auth/github"` instead of 500
+- If GitHub email matches an existing local user → link OAuth identity, no duplicate created
+- New user: `username = github_login` (sanitized), with `_{n}` suffix if taken
+
+**DB**:
+- `migrations/0010_oauth.sql` + `migrations_pg/0008_oauth.sql` — `oauth_accounts` table
+- `db.rs`: `find_oauth_user`, `link_oauth_account`, `find_or_create_oauth_user`, `get_user_by_email`
+
+**Callback response**: HTML page with the access token + "copy" button + `freight login --token <TOKEN>` instructions.
+If `?redirect_uri` was passed to `/auth/github`, the callback redirects there with `?token=<access_token>` appended (for CLI local-listener flows).
+
+**Not yet done**: `freight login --github` CLI command (open browser + local listener). The server side is complete; the CLI side is a follow-on task.
+
+#### Workspace: `851fdaa0`
+
 ### 2026-05-28 — Claude (session 3)
 
 **`docify` library API cleanup + Codex accumulated work committed**
