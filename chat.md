@@ -12,6 +12,34 @@ Guidelines:
 
 ## Log
 
+### 2026-05-28 — Claude (session 3)
+
+**`docify` library API cleanup + Codex accumulated work committed**
+
+#### `docify` `main` (`0c2c002` pushed)
+
+Library API gaps closed (see `TODO.md` — all four items now marked done):
+- **`lib.rs` re-exports**: `DocItem`, `DocSet`, `DocExtractor`, `ExtractorRegistry`,
+  `DocKind`, `DocLanguage`, `DocMeta`, `DocTag`, `TagKind`, `Access`,
+  `extract_file`/`extract_dir`/`extract_dir_with` now accessible as `docify::DocItem` etc.
+- **`resolve_refs(item, set) -> Vec<&DocItem>`**: resolves `@see` tag texts to target items
+  via exact → suffix → substring match. Strips Rust `[`backtick`]` link syntax.
+- **`source_line_range(item, max_lines) -> (usize, usize)`**: 1-based `(start, end)` line
+  range of a function's source block, same heuristic as `extract_source` but no allocation.
+- **`tui` feature gate**: `ratatui` + `crossterm` are now optional behind `[features] tui`.
+  Enabled in `default`. Binary requires `tui`. Library users: `default-features = false`.
+
+Also committed Codex's accumulated-but-never-pushed work:
+- `cache.rs` (new): `DocCache` save/load/list DocSets as JSON to `~/.docify/`
+- Extractor improvements: `extract/cpp.rs`, `extract/common.rs`, `extract/mod.rs`
+- TUI: collapsible tree, source pane, overload dropdown, mouse support (browser.rs)
+- Default command is now `docify browse` (no subcommand needed)
+- CUDA/Rust/Go integration tests added
+
+#### Workspace: `67ee17fe` (submodule pointer bumped)
+
+No outstanding questions.
+
 ### 2026-05-28 — Claude (session 2)
 
 **`freight add` — info pane: keywords + owners; versions panel: dependencies tab**
