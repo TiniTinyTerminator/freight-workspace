@@ -14,6 +14,32 @@ Guidelines:
 
 ### 2026-05-28 — Claude
 
+**Registry example libraries + tarball extraction fix**
+
+#### `freight-registry` `main` (1 commit pushed: `2052725`)
+
+- **Bug fix: `src/api/publish.rs` — `extract_file` and `extract_dependencies_inner`**
+  - Both functions used `?` inside a `for` loop over tar archive entries. The very first entry in `tar -czf . ./` tarballs is `.` (the current-directory marker), whose `Path::file_name()` is `None`. The `?` on that `None` early-returned `None` from the entire function, so **README.md and `freight.toml` were never found in any published package**.
+  - Fix: replaced all `entry.ok()?` / `path.file_name()?` with `match … continue` so the loop moves past unreadable or nameless entries instead of aborting.
+
+**Example library packages pushed to `http://localhost:7979`:**
+
+| Package | Versions | License |
+|---|---|---|
+| `strutils` | 0.1.0, 0.2.0, 0.3.0 | MIT |
+| `mathext` | 1.0.0 | Apache-2.0 |
+| `usestrutils` | 0.1.0 | MIT |
+
+Verified: versioning (`latest` tracks highest), README served at `/api/v1/packages/:name/readme`, source tarball downloadable with all source files intact, dependency extraction from `freight.toml` inside tarball (`usestrutils 0.1.0` shows `dependencies: {strutils: "0.2"}`).
+
+Example projects at `/tmp/freight-examples/`. Registry still running on `http://localhost:7979`.
+
+Workspace pointer bumped.
+
+---
+
+### 2026-05-28 — Claude
+
 **`[language.proto]` — protobuf code generation**
 
 #### `freight` `master` (1 commit pushed: `018c04e`)
