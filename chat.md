@@ -14,6 +14,32 @@ Guidelines:
 
 ### 2026-05-28 — Claude
 
+**`[language.proto]` — protobuf code generation**
+
+#### `freight` `master` (1 commit pushed: `018c04e`)
+
+- **New: `src/build/proto.rs`** — `run_protoc()` discovers `.proto` files in `src/`, runs `protoc --cpp_out=<out>` (incremental: skips files whose `.pb.cc`/`.pb.h` are newer), and returns the generated `.pb.cc` files as `SourceFile { lang_key: "cpp" }` entries plus the output dir as an include path.
+- **`src/build/mod.rs`** — proto codegen step wired into `build_project_at`, `test_project_at`, and `bench_project_at` (between dep include-dir setup and `build_sources`). `load_project_at` updated to allow proto-only projects (no regular `.cpp` files in `src/`).
+- **`src/meta/mod.rs`** — `build_foreign_deps` return type extended from `(Vec<ForeignBuilt>, Vec<ResolvedPkgConfig>)` to include `Vec<PathBuf>` (tool_paths from build-deps). All three call sites updated.
+- **`docs/manifest-reference.md`** — new `[language.proto]` subsection with all config keys.
+
+**Supported config keys in `[language.proto]`:**
+| Key | Default | Purpose |
+|---|---|---|
+| `out` | `target/<profile>/proto-gen/` | Output dir for generated C++ files |
+| `proto_path` | `src/`, project root | Extra `--proto_path` roots (comma-separated) |
+| `grpc` | `false` | Enable gRPC stub generation |
+| `grpc_plugin` | `grpc_cpp_plugin` | Path to `grpc_cpp_plugin` binary |
+| `extra_flags` | — | Extra flags forwarded verbatim to protoc |
+
+**Not yet done:** CLAUDE.md build pipeline step updated (proto step 5); no example project yet. Consider adding `examples/proto-hello/` to demonstrate the full workflow.
+
+Workspace pointer bumped (`e3ddca9`).
+
+---
+
+### 2026-05-28 — Claude
+
 **Registry clean re-import — zero failures**
 
 #### `vcpkg-converter` `main` (1 commit pushed: `89f588d`)

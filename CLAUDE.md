@@ -59,7 +59,7 @@ Package name: `freight-core` (lib) + `freight` (binary).
 src/
 ├── lib.rs / error.rs / event.rs
 ├── bin/freight/            # clap dispatch — one cmd_* per command
-├── build/                  # compile.rs, link.rs, discover.rs, deps.rs, features.rs, modules.rs
+├── build/                  # compile.rs, link.rs, discover.rs, deps.rs, features.rs, modules.rs, proto.rs
 ├── manifest/               # freight.toml parsing + validation
 ├── toolchain/              # compiler detection, Rhai template evaluation, version cache
 ├── registry/               # HTTP registry client (FreightRegistry, PackageRepo trait)
@@ -74,9 +74,10 @@ src/
 2. Detect toolchain — probe `$PATH`, run `.rhai` scripts, consult version cache
 3. Resolve dep graph — topo-sort; foreign deps (cmake/make/meson/autotools) collected then built in parallel via rayon; pkg-config/system/version deps resolved sequentially first
 4. Walk sources — map extension → language key; `src/` is walked automatically
-5. Scan C++ sources for `export module` / `import` (C++20 module DAG)
-6. Compile — parallel via rayon (flat) or batched by module topo-order
-7. Link — `.o` + dep `.a` → binary / `.a` / `.so`
+5. **Proto codegen** (if `[language.proto]` declared) — runs `protoc` on `.proto` files in `src/`, injects generated `.pb.cc` files into the compile list, adds generated header dir to include path
+6. Scan C++ sources for `export module` / `import` (C++20 module DAG)
+7. Compile — parallel via rayon (flat) or batched by module topo-order
+8. Link — `.o` + dep `.a` → binary / `.a` / `.so`
 
 **Job count**: `rayon::current_num_threads()` is the single source of truth. Set once in `main()` from `--jobs` (default: `min(available_parallelism, 6)`). All of `meta/cmake.rs`, `meta/make.rs`, `meta/meson.rs`, `meta/autotools.rs` read it without taking a parameter.
 
