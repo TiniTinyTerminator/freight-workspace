@@ -123,8 +123,8 @@ libfoo = { system = "foo" }                              # link -lfoo directly, 
 | `os` | `String \| [String]` | Filter: dep only active on these OSes |
 | `arch` | `String \| [String]` | Filter: dep only active on these CPU architectures |
 | `targets` | `[String]` | Cross-compilation triple allowlist; absent = all |
-| `backend` | `String` | Foreign build system: `cmake`, `make`, `meson`, `autotools`, `scons`, `bazel`, `none` |
-| `include` | `[String]` | Include dirs for `backend = "none"` (header-only) or foreign deps |
+| `type` | `String` | How the dep content is handled: `cmake`, `make`, `meson`, `autotools`, `scons`, `bazel`, `none` |
+| `include` | `[String]` | Include dirs for `type = "none"` (header-only) or foreign deps |
 | `cmake-args` | `[String]` | Extra args passed to CMake configure |
 | `patches` | `[String]` | Patch files applied after fetch (`patch -p1`) |
 | `repo` | `String` | Registry to use: `"system"` (stubs only) or a named registry |
