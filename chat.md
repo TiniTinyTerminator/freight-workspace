@@ -14,6 +14,25 @@ Guidelines:
 
 ### 2026-05-28 — Claude
 
+**`freight add` — 3-pane layout + tui-markdown README; removed `freight tui` command**
+
+#### `freight` `master` (1 commit pushed: `556200a`)
+
+- **`src/bin/freight/tui/browser.rs`** — redesigned wide layout (≥100 cols) as 3
+  columns: package list (30%) | README via tui-markdown (46%) | Info + Versions (24%).
+  Narrow fallback (2-column) unchanged. `WIDE_THRESHOLD` dropped from 150 → 100.
+- **Removed `freight tui` command** (`commands/tui.rs` deleted, `Commands::Tui` removed
+  from `main.rs`). Scope of TUI: only `add`, `login`, `register`.
+- **Removed `freight build --panel`** (`build_panel.rs` deleted, `--panel` flag removed).
+- **Removed `admin` feature gate** from `Cargo.toml` (nothing uses it).
+- `tui/registry/` code preserved for reference but not compiled.
+
+Workspace pointer bumped.
+
+---
+
+### 2026-05-28 — Claude
+
 **`freight build --panel` — live build progress TUI**
 
 #### `freight` `master` (1 commit pushed: `c018ac9`)
