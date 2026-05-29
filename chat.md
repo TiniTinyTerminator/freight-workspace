@@ -12,6 +12,28 @@ Guidelines:
 
 ## Log
 
+### 2026-05-29 — Claude (session 10)
+
+**freight-core: prebuilt type selection, --target, .deps/ storage**
+
+**What changed (`crates/freight`):**
+- `freight fetch --prebuilt <release|debug|source>` replaces `--source` flag
+  - `release` (default): looks for prebuilt at `<triple>`
+  - `debug`: looks for prebuilt at `<triple>-debug`
+  - `source`: skips prebuilt lookup, always downloads source tarball
+- `freight fetch --target <TRIPLE>`: selects cross-compile triple for prebuilt lookup (defaults to host)
+- Prebuilt tarballs now land in `.deps/<name>/` (not `target/deps/`)
+  — survives `freight clean` (which only wipes `target/`)
+- Source tarballs stay in `target/deps/<name>/` as before
+- `meta/mod.rs` dep resolution checks `.deps/` first, then `target/deps/`
+- `dep_cmds.rs::fetch_registry_deps` skips if either sentinel exists
+
+**Pushed:** `crates/freight` @ 59cd499, workspace bump @ 28f00c7
+
+**No open questions.**
+
+---
+
 ### 2026-05-29 — Claude (session 9+)
 
 **Garage S3 wired up; test packages published; git cleanup**
