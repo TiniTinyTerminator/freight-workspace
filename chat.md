@@ -12,6 +12,74 @@ Guidelines:
 
 ## Log
 
+### 2026-05-29 — Claude (session 9+)
+
+**Garage S3 wired up; test packages published; git cleanup**
+
+**What changed:**
+- Registry restarted with `--s3-bucket test --s3-endpoint http://192.168.178.45:3900 --s3-region garage` (region must be `garage` for AWS4 auth scope)
+- Published 3 test packages via `freight publish`: `mathutils@0.1.0`, `strslice@0.2.1`, `clog@1.0.0` — all stored in Garage S3
+- `crates/freight` pushed (rustfmt pass, `0d2225b`)
+- `crates/freight-registry` committed + pushed all W10–W14 + S3/Postgres fixes (`98aca8b`)
+- Workspace root updated with submodule pointer bumps + Cargo changes
+
+**Questions for next agent:** None — all WEBSITE.md and session tasks complete.
+
+---
+
+### 2026-05-29 — Claude (session 9)
+
+**`freight-registry` — W10–W14 (all remaining website tasks)**
+
+**What changed:**
+- **W10** `static/404.html` — freight-themed 404 page; explicit `/` route; fallback_service uses `tower::service_fn` returning 404.html for unknown paths
+- **W11** `GET /api/v1/keywords` — counts comma-separated keywords across packages table, returns top N; `static/app.js` `renderKeywordCloud()` shows keyword cloud on homepage (no-query state); falls back to 25 curated browse categories (audio, json, ssl, …) when API returns empty
+- **W12** Sort dropdown (A–Z / Most downloaded / Newest) in filter bar; `sort=` param added to `SearchParams` in `search.rs`; `search_packages` in `db.rs` switches `ORDER BY` based on sort value
+- **W13** Hamburger button added to all 5 HTML pages; CSS `@media (max-width: 600px)` collapses `.nav-links`; JS closes menu on outside click
+- **W14** `migrations/0003_packages_latest_version.sql`: `ALTER TABLE packages ADD COLUMN latest_version TEXT`; `cmp_version`/`best_version` moved to `db.rs` as public; `publish_version` maintains `latest_version` on each publish; `update_all_latest_versions()` new method; import phase 4 calls it; search query joins on `p.latest_version` (COALESCE fallback for old rows)
+- `tower` moved from dev-deps to regular deps (needed for `tower::service_fn` in prod code)
+- `api/keywords.rs` new module; registered in `api/mod.rs`
+
+**What was tested:**
+- `cargo build` clean ✓
+- `curl /api/v1/keywords` — returns `{"keywords":[]}` (vcpkg stubs have no keywords, fallback shows curated list in UI)
+- `curl /api/v1/search?q=&sort=downloads` → sorted by downloads ✓
+- `curl /api/v1/packages/zlib` → `"latest":"1.3.2"` (semantic sort correct) ✓
+- `curl /nonexistent` → HTTP 404 ✓
+- Import re-run: phase 4 set `latest_version` for 2797 packages ✓
+
+**What was pushed:** `crates/freight-registry` @ `98aca8b`; `crates/freight` (fmt) @ `0d2225b`; workspace root updated below
+
+**All WEBSITE.md items now complete.**
+
+### 2026-05-29 — Claude (session 8)
+
+**`freight-registry` — W7 channel filter, login/register/account pages, package layout, `supports` platform badges**
+
+**What changed:**
+- Channel filter buttons on homepage (stable / experimental / all) — replaces build-system filter which was client-side only (W7)
+- Login, register, account pages (`static/login.html`, `register.html`, `account.html`) + routes in `api/mod.rs`
+- Auth routes protected from CSP issues; `Auth` object in `app.js` manages `freight_session` in localStorage
+- Package detail layout redesigned: README in left column; Install widget → Metadata → Platform support → Dependencies → Owners in right sidebar
+- Dependency names are clickable links to `/packages/<name>` (with channel param for non-stable)
+- Version selector: `?version=` param, highlighted row in table
+- `renderSupports(expr)` in `package.html`: parses vcpkg-style `!uwp & !arm` into ✓/✗ badges
+- **Database**: `migrations/0002_add_supports.sql` + `migrations_pg/0002_add_supports.sql` add `supports TEXT` to versions
+- `VersionRow` in `db.rs`: added `supports: Option<String>`; all three version SELECTs updated
+- `publish_version`: accepts and stores `supports`; `publish.rs` `PublishMeta` struct updated
+- `batch_version_insert_sql` in `main.rs`: 7 columns; `ON CONFLICT DO UPDATE SET supports = excluded.supports` so re-import populates existing rows
+- Re-ran import from `/home/max/freight/vcpkg-tomls` (23,275 stubs) — `supports` now populated
+- `favicon.svg` freight-box icon; `.badge.lang` yellow language tag; `.support-badge` green/red platform badges
+
+**What was tested:**
+- `curl /api/v1/packages/mailio` → `supports: "!uwp"` ✓
+- `cargo build -p freight-registry` clean ✓
+- Server running at `0.0.0.0:7878` (PID 2251, log `/tmp/registry.log`)
+
+**What was pushed:** changes uncommitted — submodule (`crates/freight-registry`) has local edits only
+
+**WEBSITE.md open items:** W10 (custom 404), W11 (browse by keyword), W12 (sort order), W13 (responsive nav), W14 (search version consistency)
+
 ### 2026-05-28 — Claude (session 7)
 
 **`freight-registry` — website W1–W9**
