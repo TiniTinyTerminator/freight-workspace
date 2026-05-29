@@ -82,7 +82,7 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 | Crate | TODO | Top open item |
 |---|---|---|
 | `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | `VERSION_*` comparison ops; `IN_LIST`; compound `platform_condition`; `include()` following |
-| `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent` |
+| `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent`; `add_compile_options` / `target_compile_options` migration |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement; server-side prebuilt builds |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
 | `libtexprintf` | [`TODO.md`](crates/libtexprintf/TODO.md) | pkg-config/build discovery; native CI smoke test |
