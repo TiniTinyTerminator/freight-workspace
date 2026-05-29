@@ -170,15 +170,14 @@ clones, URL archives) extract to `.pkgs/<name>/`. Only compiled build artifacts 
 - **Deps / supports fallback**: walks `pkg.versions` for first entry with data when the
   selected version has an empty field.
 
-### 7. `freight doc` ↔ docify wire protocol versioning
+### ~~7. `freight doc` ↔ docify wire protocol versioning~~
 
-**Status:** Implicit — no version field in the MessagePack envelope.
+**Status:** Done. `docify::agent::SCHEMA_VERSION = 1` and `Envelope<T>` added.
 
-The `freight doc` command shells out to `docify` and reads MessagePack. If the docify
-schema changes, `freight` will silently misparse the output. Add a `schema_version: u32`
-field to the envelope and reject unknown versions with a clear error.
-
-Touch order: docify `agent.rs` → freight `doc/` → bump both crates together.
+All JSON-outputting docify commands (`get`, `context`, `search`, `outline`) now wrap
+their output in `{ "schema_version": 1, "data": ... }`. Consumers should reject
+`schema_version` values they don't recognise. `freight doc` uses docify as a Rust
+library (not a subprocess), so API changes there are caught at compile time.
 
 ### 8. IDE plugins
 

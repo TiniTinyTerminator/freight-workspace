@@ -51,7 +51,7 @@ history unless it is later split into its own repository.
 
 ### `crates/freight` — core build tool
 
-Package name: `freight-core` (lib) + `freight` (binary).
+Package name: `freight` (package + binary); lib crate name is `freight_core`.
 
 **The library (`src/lib.rs`) is the entire build engine.** The binary only parses CLI args and calls into the library. Never print from library code; emit `BuildEvent`s instead and let the CLI layer format them.
 
@@ -249,7 +249,7 @@ bar = ["baz"]
 ```sh
 # Build
 cargo build                          # all workspace crates
-cargo build -p freight-core          # freight binary (package name is freight-core)
+cargo build -p freight               # freight binary
 cargo build -p vcpkg-scraper         # vcpkg converter
 cargo build -p freight-registry      # registry server
 cargo check --workspace              # fast type-check
@@ -257,11 +257,11 @@ cargo clippy --workspace             # lint
 
 # Test
 cargo test --workspace               # all tests
-cargo test -p freight-core           # one crate
-cargo test -p freight-core -- migration::cmake::tests::win32_deps_in_platform_section  # single test
+cargo test -p freight                # one crate
+cargo test -p freight -- migration::cmake::tests::win32_deps_in_platform_section  # single test
 
 # Run
-cargo run -p freight-core -- build   # freight build (from a project dir)
+cargo run -p freight -- build        # freight build (from a project dir)
 cargo run -p freight-registry -- --data /tmp/freight-dev serve --base-url http://localhost:7878
 cargo run -p freight-registry -- --data /tmp/freight-dev user add alice --email alice@example.com
 cargo run -p freight-registry -- --data /tmp/freight-dev token add dev --user alice
@@ -279,12 +279,12 @@ cargo run -p vcpkg-scraper -- freight-build-all registry-out --freight-bin ./tar
 ## Coding rules
 
 **Error handling**
-- `freight-core`: use `thiserror` for typed errors, `anyhow` for internal call chains. Public API functions return `Result<_, FreightError>` or `Result<_, anyhow::Error>` depending on whether callers need to match on the variant.
+- `freight` (`freight_core` lib): use `thiserror` for typed errors, `anyhow` for internal call chains. Public API functions return `Result<_, FreightError>` or `Result<_, anyhow::Error>` depending on whether callers need to match on the variant.
 - `freight-registry`: `ApiError` in `api/mod.rs` is the only error type crossing into handlers. Use `anyhow` everywhere else and let the `From<anyhow::Error>` impl convert it.
 - Never use `.unwrap()` or `.expect()` in library code.
 
 **No printing in library code**
-- `freight-core`: emit `BuildEvent`s (or return structured results); the CLI layer in `src/bin/freight/` formats and prints them.
+- `freight` lib: emit `BuildEvent`s (or return structured results); the CLI layer in `src/bin/freight/` formats and prints them.
 
 **Database (freight-registry)**
 - Schema changes: add-only via `add_column_if_missing()`. Never drop or recreate tables.
