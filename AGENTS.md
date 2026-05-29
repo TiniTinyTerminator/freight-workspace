@@ -39,6 +39,20 @@ freight/                         ← workspace root (this repo)
 │   └── vcpkg-converter/         # vcpkg → freight migration tool
 ```
 
+**Package cache layout** (written by `freight fetch`):
+```
+<project>/
+├── .pkgs/                       # all deps downloaded by freight (survives `freight clean`)
+│   └── <name>/                  # source tarball, prebuilt, git clone, or url archive
+│       ├── .freight-fetched     # sentinel — present = fully extracted
+│       ├── include/             # (prebuilt) headers
+│       └── lib/                 # (prebuilt) static/shared libs + pkgconfig
+└── target/                      # compiled build artifacts only (wiped by `freight clean`)
+    ├── dev/                     # debug build outputs
+    ├── release/                 # release build outputs
+    └── deps/                    # NOT used — kept here for clarity; all deps are in .pkgs/
+```
+
 Most established crates are independent git submodules with their own history.
 Commit and push those changes **inside the submodule directory**, not from the
 workspace root. `crates/libtexprintf` is currently workspace-local; keep its
@@ -67,12 +81,12 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 | Crate | TODO | Top open item |
 |---|---|---|
-| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | Bracket-argument round-trip; `if` evaluator compound conditions |
+| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | `VERSION_*` comparison ops; `IN_LIST`; compound `platform_condition`; `include()` following |
 | `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent` |
-| `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement |
+| `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement; server-side prebuilt builds |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
 | `libtexprintf` | [`TODO.md`](crates/libtexprintf/TODO.md) | pkg-config/build discovery; native CI smoke test |
-| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | registry-import: progress bar; `--dry-run` flag |
+| `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | `add_subdirectory()` following; failure analysis subcommand |
 
 ---
 
@@ -122,27 +136,101 @@ See `docs/registry-setup.md` for the full flow.
 - Credentials saved to `~/.config/freight-registry/tui.toml` after login — subsequent
   runs skip the login screen.
 
-### 4. Compiler version gating propagation
+### ~~4. Compiler version gating propagation~~
 
-**Status:** Not started.
+**Status:** Done. `TemplateDef` has `standard_min_versions`; `CompilerTemplate::check_standard_floor`
+enforces the floor at compile time; `compile_one` rejects unsupported standards with
+`FreightError::OptionError`. Floors set for GCC and Clang across c++20/23/26, c17/23, f2018.
 
-`freight` needs the version floor table in the compiler templates. Once that
-exists, the `vcpkg-converter`'s C++ standard detection can cross-check the
-detected standard against the system compiler and warn if the floor is too low.
+### ~~5. Package dep storage — `.pkgs/` layout~~
 
-Touch order: freight toolchain templates → freight `assemble_compile_flags` →
-optional warning in vcpkg-converter `convert` output.
+**Status:** Done. All deps downloaded by freight (source tarballs, prebuilt tarballs, git
+clones, URL archives) extract to `.pkgs/<name>/`. Only compiled build artifacts live in
+`target/`. `freight clean` wipes `target/` only, leaving the package cache intact.
 
-### 5. `freight doc` ↔ docify wire protocol versioning
+- `fetch/http.rs`, `registry/freight_registry.rs`: write to `.pkgs/`
+- `dep_cmds.rs`, `build/deps.rs`, `build/mod.rs`, `meta/mod.rs`: read from `.pkgs/`
+- `freight fetch --prebuilt <release|debug|source>`: variant selection
+- `freight fetch --target <TRIPLE>`: cross-compile prebuilt selection
 
-**Status:** Implicit — no version field in MessagePack envelope.
+### ~~6. Registry website — channels, platform support, sidebar, versions~~
 
-The `freight doc` command shells out to `docify` and reads MessagePack. If the
-docify schema changes, `freight` will silently misparse the output. Add a
-`schema_version: u32` field to the envelope and reject unknown versions with a
-clear error.
+**Status:** Done. Full package browser UI delivered.
+
+- **Channels**: moved from inline filter to a settings modal (gear icon); persisted in
+  `localStorage`; `GET /api/v1/channels` endpoint; `search_packages` accepts `channels=`
+  comma-separated param.
+- **Platform support**: per-version `supports` string shown in its own sidebar widget.
+- **Sidebar order**: Info → Owners → Platform support → Install → Dependencies → Quick links.
+- **Versions table**: descending semver order; active version from server's `best_version()`.
+- **Owners widget**: circular avatar placeholder (initial letter); ready for GitHub profile pictures.
+- **S3 object layout**: `/{name}/{version}/source.tar.gz`, `/{name}/{version}/README.md`,
+  `/{name}/{version}/{triple}/{name}-{version}-{triple}.tar.gz`.
+- **Keywords**: server-side fallback term verification so empty clouds never appear.
+- **Deps / supports fallback**: walks `pkg.versions` for first entry with data when the
+  selected version has an empty field.
+
+### 7. `freight doc` ↔ docify wire protocol versioning
+
+**Status:** Implicit — no version field in the MessagePack envelope.
+
+The `freight doc` command shells out to `docify` and reads MessagePack. If the docify
+schema changes, `freight` will silently misparse the output. Add a `schema_version: u32`
+field to the envelope and reject unknown versions with a clear error.
 
 Touch order: docify `agent.rs` → freight `doc/` → bump both crates together.
+
+### 8. IDE plugins
+
+**Status:** Planned. See design notes below.
+
+#### Two-component architecture
+
+**Component A — `freight lsp` subcommand** (Rust, `tower-lsp`)
+A language server for `freight.toml` that runs over stdio. Likely a sub-crate
+`crates/freight-lsp/` or a subcommand inside `crates/freight/src/bin/freight/commands/lsp.rs`.
+
+Capabilities:
+- **Diagnostics** — validate keys, unknown fields, malformed version strings, missing path deps on disk
+- **Completion** — dep names from registry metadata cache, version constraints, known manifest keys
+- **Hover** — dep description + latest version from local msgpack cache (no network on keystroke)
+- **Go to definition** — for `path = "../foo"` deps, open that `freight.toml`
+- **Code actions** — "Update to latest version", "Add missing section"
+
+**Component B — `vscode-freight`** (TypeScript VS Code extension)
+Shell that wires the LSP and provides IDE-native features.
+
+| Feature | How |
+|---|---|
+| `freight.toml` syntax highlighting | TextMate grammar (TOML base + freight-specific scopes) |
+| Validation + completion + hover | delegates to `freight lsp` via `vscode-languageclient` |
+| Build tasks | VS Code task provider — `build`, `build --release`, `test`, `run`, `clean`, `fetch` |
+| Inline diagnostics | Problem matcher on freight's stderr (`error:`, `warning:`, file:line) |
+| Status bar | Current profile (dev/release), last build result |
+| Keybinding | `Ctrl+Shift+B` → `freight build` |
+| clangd integration | Auto-detect `compile_commands.json` generated by freight |
+
+**Phase 1 — VS Code MVP** (no LSP yet)
+- TextMate grammar for `freight.toml`
+- JSON Schema for `freight.toml` → free validation via VS Code's TOML extension
+- Task provider with standard commands + problem matcher
+- Status bar item
+
+**Phase 2 — Language server**
+- `freight lsp` subcommand implementing LSP over stdio
+- Plugged into the VS Code extension via `vscode-languageclient`
+- Diagnostics, hover, completion using the local registry msgpack cache
+
+**Phase 3 — Rich features + other IDEs**
+- Dependency tree panel (codelens / tree view)
+- Inline "newer version available" codelens
+- JetBrains (CLion) plugin — reuses the same `freight lsp` binary, Kotlin wrapper
+- Neovim — minimal `lazy.nvim` plugin that auto-starts `freight lsp`
+
+**Key decisions before starting:**
+- LSP as `freight lsp` subcommand (preferred — single binary, no separate install) vs
+  standalone `freight-lsp` crate.
+- Registry queries: always from local msgpack cache; never block on network in the LSP hot path.
 
 ---
 
