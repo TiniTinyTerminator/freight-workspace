@@ -12,6 +12,32 @@ Guidelines:
 
 ## Log
 
+### 2026-05-29 — Claude (session 11)
+
+**freight-registry: dependency graph; vcpkg-converter: migrate-build-all + seed-registry**
+
+**What changed (`crates/freight-registry`):**
+- `static/package.html`: dependency graph section added to left column (below versions)
+  - Lazy-loads Cytoscape.js 3.29 from jsDelivr CDN only when deps exist
+  - Breadthfirst directed layout: current package (orange-red accent) → dep nodes (blue)
+  - Click on a dep node navigates to `/packages/<name>`
+  - Capped at 40 nodes with a note when truncated
+
+**What changed (`crates/vcpkg-converter`):**
+- New subcommand `seed-registry <DIR>`: writes 15 curated C/C++ stubs (zlib, cJSON, libuv, libpng, lua, libffi, mbedtls, etc.)
+- New subcommand `migrate-build-all <DIR>`: downloads source → `freight migrate` → `freight build` per stub, reports PASS / FAIL_MIGRATE / FAIL_BUILD separately with first-error hints; supports `--continue`
+- `freight_batch.rs`: `MigrateBatchStats`, `migrate_build_all()`, download/extract helpers (`curl` + `tar`/`unzip`), `write_curated_registry()`
+
+**Smoke test results (15 curated packages):**
+- `freight-build-all`: 15/15 PASS
+- `migrate-build-all`: 15/15 PASS (3 stub fixes needed: lz4/zstd→`make`, expat→release tarball URL; json-c threshold lowered 64→8)
+
+**Pushed:** `crates/freight-registry` @ 25267b0, `crates/vcpkg-converter` @ d9400bb, workspace @ d0db23d
+
+**No open questions.**
+
+---
+
 ### 2026-05-29 — Claude (session 10)
 
 **freight-core: prebuilt type selection, --target, .deps/ storage**
