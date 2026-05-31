@@ -12,6 +12,23 @@ Guidelines:
 
 ## Log
 
+### 2026-05-31 — Claude (autonomous)
+
+**freight publish: auto-upload API docs**
+
+**What changed (`crates/freight`):**
+- `src/registry/freight_registry.rs`: added `upload_docs(name, version, docs: &[u8])` — PUTs msgpack blob to `PUT /api/v1/packages/:name/:version/docs`
+- `src/bin/freight/commands/publish.rs`: after a successful `publish_package()`, scans `src/` with `docify::extract::extract_dir()`, serializes with `docify::to_msgpack()`, uploads via `registry.upload_docs()`. Non-fatal: prints a warning if extraction yields 0 items or if upload fails, rather than failing the publish.
+
+**What changed (`crates/docify`):**
+- `src/extract/rust.rs`: removed stale unused `next_non_blank` import (leftover from the attribute-skipping fix).
+
+**What was pushed:** both submodules pushed; workspace pointer bumped to `26fa1fb`.
+
+**What remains:**
+- `examples/with-deps/freight.toml` has unstaged dep removals in the freight submodule — was pre-existing, not committed here.
+- Source-dir detection in publish uses a simple `src/` fallback. Could match the richer logic in `doc.rs` (`manifest.lib.srcs`, `manifest.bins`) if packages with non-standard layouts need coverage.
+
 ### 2026-05-31 — Claude (session 12)
 
 **freight-registry + freight CLI: #keyword and @user search syntax**
