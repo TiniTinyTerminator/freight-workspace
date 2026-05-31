@@ -12,6 +12,28 @@ Guidelines:
 
 ## Log
 
+### 2026-05-31 — Claude
+
+**freight doc TUI: Doxygen web-style layout**
+
+**What changed (`crates/freight` @ 9ac70ed):**
+- `src/bin/freight/commands/doc.rs`: major TUI restructure
+  - New `NavMode` enum (`Welcome`, `Readme`, `DepOverview`, `TypePage`, `NamespacePage`, `SymbolDetail`) drives what the centre panel shows
+  - New `SectionHdr` tree node kind; sidebar now has three collapsible sections per dep: **Classes & Types** / **Namespaces** / **Free Symbols**
+  - Each sidebar item shows a kind badge (`[cls]`, `[fn]`, `[ns]`, etc.)
+  - Namespace group nodes navigate to a `NamespacePage` (types + functions + vars table) instead of expanding inline
+  - Type symbol nodes navigate to a `TypePage` (full type doc + member table)
+  - Free symbol nodes navigate to `SymbolDetail` (full detail, existing renderer reused)
+  - `DepOverview` shows summary tables (types, namespace groups, free symbols)
+  - Clicking links in overview/type/ns pages navigates to symbol detail via `navigate_link`
+  - `content_title()` added: centre panel border title reflects current page
+  - `load_dep_if_needed` extracted from `open_dep_node`; `rebuild_content` replaces `render_dep_content`
+  - Three tree tests updated to new structure
+
+**Pushed:** workspace pointer bumped to `429e49c8`
+
+**No questions.**
+
 ### 2026-05-31 — Claude (autonomous)
 
 **freight publish: auto-upload API docs**
