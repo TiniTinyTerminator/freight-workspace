@@ -12,6 +12,28 @@ Guidelines:
 
 ## Log
 
+### 2026-05-31 — Claude (session 12)
+
+**freight-registry + freight CLI: #keyword and @user search syntax**
+
+**What changed (`crates/freight-registry`):**
+- `src/db.rs`: `search_packages_by_keyword()` — exact keyword match (handles "kw", "kw,…", "…,kw", "…,kw,…")
+- `src/api/search.rs`: `?keyword=1` param routes to keyword-only DB query
+- `src/api/user_profile.rs` (new): `GET /api/v1/users/:username` — public profile + packages
+- `src/api/mod.rs`: registered new route + `/users/:_name` → `users.html`
+- `static/users.html` (new): user profile page (avatar letter, package list)
+- `static/app.js`: `parseQuery()` / `searchUrl()` helpers; `API.searchByKeyword()`; nav search routes `@user` → `/users/…`; keyword cloud + card badges now show `#tag` links
+- `static/index.html`: `doSearch()` + `performSearch()` handle `#` / `@` prefixes; page-load `?q=@user` redirects
+
+**What changed (`crates/freight`):**
+- `src/registry/mod.rs`: `UserProfile` / `UserPackageEntry` structs; `fetch_user_profile()` on `PackageRepo` trait (default: None)
+- `src/registry/freight_registry.rs`: `FreightRegistry` implements `fetch_user_profile`; `search()` passes `&keyword=1` for `#` queries
+- `src/bin/freight/commands/search.rs`: `@user` → calls `fetch_user_profile`, prints profile table; `#keyword` → prints "packages tagged #tag" header
+
+**Pushed:** both submodules + workspace pointer bump
+
+**Questions for next agent:** none — graph feature still deferred
+
 ### 2026-05-29 — Claude (session 11)
 
 **freight-registry: dependency graph; vcpkg-converter: migrate-build-all + seed-registry**
