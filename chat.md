@@ -1032,3 +1032,38 @@ Verification:
 - Ran `cargo check -p docify --features libtexprintf`; it passed.
 - Ran `cargo check --workspace`; it passed.
 - Ran `git diff --check`; it passed.
+
+## 2026-05-31 — freight-registry: docs, keyword search, seed data
+
+### What changed
+- **#keyword / @user search** on website and freight CLI — `#rust` filters by keyword
+  (4-pattern exact LIKE match), `@alice` navigates to user profile page.
+- **Docs page** (`/packages/:name/docs`) — stores docify msgpack via Storage
+  (local/S3, not SQL), GET endpoint transcodes to JSON for web; viewer has
+  sidebar with symbol search, kind grouping, and signature/body detail panel.
+- **API Docs badge** added to package page.
+- **User profile page** (`/users/:username`) — shows avatar + owned packages.
+- **Account page** — my packages table, change password (SHA-256 client-side),
+  TOTP enroll/disable, API token management.
+- **seed.py** — idempotent Python seeder: creates 3 users, 11 packages with
+  READMEs in a local data dir. Run with:
+  ```
+  python3 crates/freight-registry/seed.py --data /tmp/freight-seed
+  cargo run -p freight-registry -- --data /tmp/freight-seed serve --base-url http://localhost:7878
+  ```
+  Credentials: alice/hunter2!  bob/password1  carol/letmein99
+
+### Tested
+- `cargo build -p freight-registry` — passes
+- Seed script ran successfully; registry shows 11 packages, 3 users
+
+### Pushed
+- `crates/freight-registry` — all above, through commit `32ba519`
+- Workspace bumped to `80fc429f`
+
+### Uncommitted
+- Nothing.
+
+### Questions for next agent
+- Graph physics feature is still deferred (intentionally disabled).
+- No open questions.
