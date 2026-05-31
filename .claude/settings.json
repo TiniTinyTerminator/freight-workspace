@@ -3,7 +3,13 @@
     "allow": [
       "Bash(cargo check *)",
       "Bash(cargo clippy *)",
-      "Bash(cargo search *)"
+      "Bash(cargo search *)",
+      "Bash(cargo build *)",
+      "Bash(git -C * diff *)",
+      "Bash(git -C * status *)",
+      "Bash(git -C * log *)",
+      "Bash(git -C * show *)",
+      "Bash(git -C * branch *)"
     ]
   }
 }

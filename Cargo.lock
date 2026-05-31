@@ -1157,6 +1157,7 @@ dependencies = [
  "crossterm",
  "pulldown-cmark 0.12.2",
  "ratatui",
+ "rmp-serde",
  "serde",
  "serde_json",
  "toml",
@@ -1511,7 +1512,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "freight-core"
+name = "freight"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1560,6 +1561,7 @@ dependencies = [
  "async-trait",
  "axum",
  "clap",
+ "docify",
  "flate2",
  "futures",
  "governor",
