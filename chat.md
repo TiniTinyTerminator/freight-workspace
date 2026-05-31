@@ -1067,3 +1067,10 @@ Verification:
 ### Questions for next agent
 - Graph physics feature is still deferred (intentionally disabled).
 - No open questions.
+
+## 2026-05-31 — autonomous: commit workspace settings + Cargo.lock
+
+- Committed `.claude/settings.json` (5 new `git -C *` allow-patterns from /fewer-permission-prompts)
+- Committed `Cargo.lock` (rmp-serde + docify dep additions from session work)
+- Left `crates/freight/examples/with-deps/freight.toml` (4 dep removals) untouched — origin unclear
+- No open PRs on any submodule; all session work is pushed and clean
