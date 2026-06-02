@@ -78,8 +78,8 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 | Crate | TODO | Top open item |
 |---|---|---|
-| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | `VERSION_*` comparison ops; `IN_LIST`; compound `platform_condition`; `include()` following |
-| `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent`; `add_compile_options` / `target_compile_options` migration |
+| `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | `include()` following; `add_subdirectory()` following; `MATCHES` regex |
+| `freight` | [`TODO.md`](crates/freight/TODO.md) | `add_compile_options` / `target_compile_options` migration |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement; server-side prebuilt builds |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
 | `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | `add_subdirectory()` following; failure analysis subcommand |
@@ -175,7 +175,18 @@ their output in `{ "schema_version": 1, "data": ... }`. Consumers should reject
 `schema_version` values they don't recognise. `freight doc` uses docify as a Rust
 library (not a subprocess), so API changes there are caught at compile time.
 
-### 8. IDE plugins
+### ~~8. Registry web documentation viewer~~
+
+**Status:** Done. `static/docs.html` in `freight-registry` is a full in-browser documentation browser that mirrors the `freight doc` TUI aesthetic and grouping logic.
+
+- **Styling**: monospace font (JetBrains Mono), One Dark Pro palette, heading pills (H1–H4 each have their own fg/bg), fenced code blocks with `─── lang ─────` header box.
+- **Syntax highlighting**: highlight.js wired in with custom CSS overlay matching the TUI token colours.
+- **Sidebar**: pure hierarchy matching `freight doc` — type items (expandable if they have class members) → namespaces (expandable, type items inside namespaces also get a nested sub-group) → free symbols. No section headers, matching `rebuild_rows()` in `browser.rs`.
+- **Tag rendering**: reads `item.tags` (DocTag array) correctly, handling both plain-variant kinds (`"Param"`, `"Return"`) and the Debug-format `Other("tparam")` serialisation. Renders: tparams table, params table, returns, retvals, throws, notes (blue box), warnings (amber box), examples (syntax-highlighted), deprecated banner, since badge, see-also pills.
+- **Sidebar header**: package name + version + source link (derived via `repoUrl()` from `upstream_url` in the latest version entry) + owner chips (from `/api/v1/packages/:name/owners`, using the `login` field).
+- **Wire format quirks fixed**: item `kind` is `DocKind::label()` lowercase (`"fn"`, `"class"`, `"mod"`); `lang` is `DocLanguage::label()` string (`"C++"`, `"Rust"`); tag `Other` uses Debug format not JSON object.
+
+### 9. IDE plugins
 
 **Status:** In progress. `freight lsp` now exists as a first-pass stdio server in
 `crates/freight/src/bin/freight/commands/lsp.rs`; first-pass VS Code and Neovim

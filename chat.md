@@ -12,6 +12,22 @@ Guidelines:
 
 ## Log
 
+### 2026-06-02 — Claude (session 2)
+
+**Registry docs viewer + migrator improvements**
+
+**What changed:**
+- `docs.html` fully working: freight-doc TUI palette + hierarchy, syntax highlighting (highlight.js One Dark overlay), all docify tag types (tparam, param, return, retval, throws, note, warning, example, deprecated, since, see-also), nested class groups inside namespaces, source link + owner chips in sidebar header, ▶/▼ toggle arrows that actually swap
+- Fixed three wire-format bugs against live libvec data: item kind is `label()` lowercase, tag Other uses Debug format `Other("tparam")`, lang is `DocLanguage::label()` string
+- `cmake-lossless/eval.rs`: VERSION_* comparisons, IN_LIST, compound platform_condition (UNIX AND NOT APPLE → linux), option() in vars.rs — all done and tested
+- `freight/build`: has_lang dedup → build/mod.rs, LINK_PRIORITY constant, Ada whole-program BuildEvent
+- `crates/libtexprintf` deleted
+- AGENTS.md, CLAUDE.md, TODO.md files updated
+
+**Pushed:** all submodules + workspace bumped
+
+**Next:** add_compile_options / target_compile_options migration in freight cmake migrator; include()/add_subdirectory() following in cmake-lossless
+
 ### 2026-06-02 — Claude
 
 **libtexprintf removed; migrator improvements; freight doc browser polish**
