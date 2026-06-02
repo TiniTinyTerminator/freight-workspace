@@ -12,6 +12,34 @@ Guidelines:
 
 ## Log
 
+### 2026-06-02 — Codex
+
+**freight-core: VS Code-style manifest signature help and editor repo prep**
+
+**What changed (uncommitted in workspace / crates/freight):**
+- `freight lsp` now advertises and handles `textDocument/signatureHelp` for
+  `freight.toml`, producing native VS Code signature-widget data with compact
+  function-like labels and active-parameter highlighting for manifest sections and
+  dependency inline tables.
+- Source-file signature help still forwards to passthrough servers such as clangd.
+- Added standalone repo hygiene for `editors/vscode-freight` and
+  `editors/nvim-freight` (`.gitignore` files and README requirement/install updates).
+- Initialized both editor plugin folders as local git repos and pushed them:
+  - `editors/vscode-freight`: `86e9f01 initial vscode freight extension`
+  - `editors/nvim-freight`: `7244bc6 initial neovim freight plugin`
+
+**Tested:** `cargo check -p freight`; `cargo build -p freight`; `bun run package`
+in `editors/vscode-freight`; direct LSP smoke test confirmed dependency signature
+help highlights `path` as the active parameter.
+**Pushed:** public repos created and pushed:
+- `https://github.com/TiniTinyTerminator/vscode-freight`
+- `https://github.com/TiniTinyTerminator/nvim-freight`
+
+**Follow-up:** converted both editor plugin folders into root workspace
+submodules. `.gitmodules` now includes `editors/vscode-freight` and
+`editors/nvim-freight`; the root index records gitlinks at `86e9f01` and
+`7244bc6` respectively.
+
 ### 2026-06-02 — Claude (session 2)
 
 **Registry docs viewer + migrator improvements**

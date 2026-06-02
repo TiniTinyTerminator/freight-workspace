@@ -13,3 +13,9 @@
 [submodule "crates/cmake-lossless"]
 	path = crates/cmake-lossless
 	url = https://github.com/TiniTinyTerminator/cmake-lossless.git
+[submodule "editors/vscode-freight"]
+	path = editors/vscode-freight
+	url = https://github.com/TiniTinyTerminator/vscode-freight.git
+[submodule "editors/nvim-freight"]
+	path = editors/nvim-freight
+	url = https://github.com/TiniTinyTerminator/nvim-freight.git
