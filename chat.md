@@ -14,6 +14,24 @@ Guidelines:
 
 ### 2026-06-02 — Codex
 
+**VS Code extension debug launch configs**
+
+**What changed:**
+- Added VS Code Extension Development Host launch/tasks configs for both workflows:
+  opening the whole freight workspace and opening `editors/vscode-freight` directly.
+- Constrained source map resolution to the Freight extension paths and skipped
+  `.vscode-server`, which avoids missing source-map warnings from built-in remote
+  VS Code extensions during extension debugging.
+- Narrowed the VS Code extension `.gitignore` so `.vscode/launch.json` and
+  `.vscode/tasks.json` are tracked while local settings remain ignored.
+- Updated the VS Code extension README with the root-workspace launch config name.
+
+**Tested:** JSON parse check for all launch/task files; `bun run package` in
+`editors/vscode-freight`.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
 **freight-core: VS Code-style manifest signature help and editor repo prep**
 
 **What changed (uncommitted in workspace / crates/freight):**

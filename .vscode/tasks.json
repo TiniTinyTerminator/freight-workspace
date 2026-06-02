@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "vscode-freight: package",
+      "type": "shell",
+      "command": "bun run package",
+      "options": {
+        "cwd": "${workspaceFolder}/editors/vscode-freight"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
