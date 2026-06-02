@@ -36,14 +36,10 @@ This repository is the **monorepo workspace** that develops all freight tooling 
 │   ├── freight/                 # git submodule → TiniTinyTerminator/Freight.git
 │   ├── freight-registry/        # git submodule → TiniTinyTerminator/Freight-registry.git
 │   ├── docify/                  # git submodule → TiniTinyTerminator/docify.git
-│   ├── libtexprintf/            # workspace-local Rust binding for bartp5/libtexprintf
 │   └── vcpkg-converter/         # git submodule → TiniTinyTerminator/vcpkg-converter.git
 ```
 
 Submodule updates: `git submodule update --remote --merge`
-
-`crates/libtexprintf` is currently not a submodule. Keep it in the root workspace
-history unless it is later split into its own repository.
 
 ---
 
@@ -202,14 +198,6 @@ API modules: one file per handler group in `src/api/`, registered in `api/mod.rs
 ### `crates/docify` — doc comment extractor
 
 Library + binary. Extracts structured doc comments from C/C++ (Doxygen `///`, `/** */`), Fortran (`!>`, `!!`), Rust (`///`), D (`/++ +/`), Ada (`--!`), and more. Outputs Markdown, JSON, or MessagePack. Used by `freight doc` via a git dependency in freight-core's `Cargo.toml`.
-
----
-
-### `crates/libtexprintf` — optional terminal TeX binding
-
-Workspace-local Rust wrapper for [`bartp5/libtexprintf`](https://github.com/bartp5/libtexprintf). It builds without native linking by default. Enable the crate's `native` feature to link `-ltexprintf`; set `TEXPRINTF_LIB_DIR` if the library is installed outside the default linker search path.
-
-`docify` uses this only behind its optional `libtexprintf` feature. Plain `rich-math` uses docify's built-in Unicode renderer and does not require the GPL-3.0 native library.
 
 ---
 

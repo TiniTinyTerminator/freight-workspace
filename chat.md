@@ -12,6 +12,179 @@ Guidelines:
 
 ## Log
 
+### 2026-06-02 — Codex
+
+**freight-core: hidden LSP compile database and manifest help**
+
+**What changed (uncommitted):**
+- `freight lsp` now generates its clangd compile database in a backend cache
+  outside the project tree and starts clangd with that `--compile-commands-dir`;
+  the explicit `freight compile-commands` command still writes the project-root
+  `compile_commands.json`.
+- Added backend `generate_lsp_compile_commands_at()` plus a reusable
+  `compile_commands::write_to()` helper.
+- Expanded `freight.toml` LSP completion and hover help for workspace, package,
+  dependency, language, target, profile, formatter, linter, OS, and arch sections.
+- Expanded the VS Code `schemas/freight.schema.json` to cover the current manifest
+  surface, including profiles, formatter/linter, PCH/unity, conditional overlays,
+  dependency filters, and known language/platform keys.
+- Updated `crates/freight/docs/manifest-reference.md` to document the hidden LSP
+  compile database behavior.
+
+**Tested:** `cargo check -p freight`; `cargo build -p freight`;
+`cargo test -p freight build::compile_commands::tests --lib`; `bun run package`
+in `editors/vscode-freight`; JSON parse check for the schema; LSP smoke test in
+`/tmp` confirmed no root `compile_commands.json` is created.
+**Pushed:** nothing.
+
+### 2026-06-02 — Codex
+
+**freight-core: clangd `#include_next` diagnostic suppression**
+
+**What changed (`crates/freight`, uncommitted):**
+- `build/compile_commands.rs` now injects `-Wno-gnu-include-next` into generated
+  compile command entries for C-family languages only.
+- This affects clangd/IDE diagnostics only; real build warning flags are unchanged.
+- Added unit tests covering C-family inclusion and non-C-family exclusion.
+
+**Tested:** `cargo check -p freight`; `cargo test -p freight build::compile_commands::tests --lib`.
+**Pushed:** nothing.
+
+### 2026-06-02 — Codex
+
+**freight-core: Neovim plugin scaffold**
+
+**What changed (uncommitted):**
+- Added `editors/nvim-freight/`.
+- Detects `freight.toml` as `freight`.
+- Provides `require("freight").setup()` for Lazy.nvim-style setup.
+- Starts/reuses `freight lsp` with Neovim's built-in LSP client.
+- Autostarts for `freight.toml`, C/C++/CUDA/HIP/ObjC/ObjC++, Fortran, and assembly buffers.
+- Watches `freight.toml` writes and notifies `workspace/didChangeWatchedFiles`.
+- Adds `:FreightBuild`, `:FreightRun`, `:FreightTest`, `:FreightFetch`, `:FreightClean`,
+  `:FreightCompileCommands`, and `:FreightRestartLsp`.
+- Updated `AGENTS.md` and `crates/freight/docs/TODO.md`.
+
+**Tested:** not runtime-tested because `nvim`, `lua`, and `luac` are not installed locally.
+Reviewed source manually for Neovim built-in LSP API usage.
+**Pushed:** nothing.
+
+### 2026-06-02 — Codex
+
+**freight-core: VS Code extension scaffold**
+
+**What changed (uncommitted):**
+- Added `editors/vscode-freight/` extension scaffold.
+- Contributes `freight-manifest` language for `freight.toml` plus TextMate highlighting.
+- Starts `freight lsp` through `vscode-languageclient` with settings for freight, clangd, fortls, asm-lsp, profile, and passthrough toggles.
+- Removed explicit `TransportKind.stdio` from executable server options because it caused some
+  VS Code language-client versions to append `--stdio` to the server command.
+- Registers Freight tasks: build, build --release, run, test, fetch, clean, compile-commands.
+- Contributes a `Freight` debug type for the Run and Debug panel; an inline debug adapter opens
+  a VS Code terminal and launches `freight run`, `freight run --release`, or `freight debug`.
+- Adds command palette commands for restarting the language server and generating `compile_commands.json`.
+- Adds a status bar item and a basic Freight problem matcher.
+- Added a draft `schemas/freight.schema.json` asset for future TOML schema integration.
+- Updated `AGENTS.md` and `crates/freight/docs/TODO.md`.
+
+**Tested:** `node --check src/extension.js`, JSON parse check for extension assets, and package script passed. Package script now uses Bun. Did not run an Extension Development Host because dependencies are not installed.
+**Pushed:** nothing.
+
+### 2026-06-02 — Codex
+
+**freight-core: first-pass `freight lsp`**
+
+**What changed (`crates/freight`, uncommitted):**
+- Added `freight lsp` subcommand in `src/bin/freight/commands/lsp.rs`.
+- The server owns `freight.toml` diagnostics, completion, and hover over stdio.
+- It starts `clangd`, `fortls`, and `asm-lsp` by default when those executables are available,
+  and forwards source-file LSP traffic by extension.
+- On initialize and `freight.toml` save, it refreshes `compile_commands.json` via Freight's manifest-aware generator, so clangd only sees sources/includes/libs from explicitly declared active targets/deps.
+- Added `--no-clangd`, `--clangd`, `--no-fortls`, `--fortls`, `--no-asm-lsp`, `--asm-lsp`, and `--profile` options.
+- Added hidden `--stdio` compatibility flag after VS Code language client appended it during startup.
+- Fixed initialize response shape to return `{ capabilities, serverInfo }` and added
+  `capabilities.positionEncoding = "utf-16"` for `vscode-languageclient` 9.x.
+- Registers an editor file watcher for `**/freight.toml`; `workspace/didChangeWatchedFiles`
+  regenerates `compile_commands.json`, so package additions from `freight add` are picked up.
+- Updated `README.md`, `docs/manifest-reference.md`, and `AGENTS.md`.
+
+**Tested:** `cargo check -p freight` passed; LSP initialize/shutdown smoke test passed with `--no-clangd`; watched-file notification smoke test regenerated diagnostics/compile DB; default LSP smoke test passed with clangd installed and missing `fortls`/`asm-lsp` skipped cleanly. `fortls` and `asm-lsp` were not installed locally, so those child-server paths were compile-checked but not runtime-smoked.
+**Pushed:** nothing.
+
+### 2026-06-02 — Codex
+
+**freight-core: Objective-C, Objective-C++, and HIP examples**
+
+**What changed (`crates/freight`, uncommitted):**
+- Added `examples/objc-hello/`: Objective-C `.m` binary using clang and macOS Foundation.
+- Added `examples/objcpp-hello/`: Objective-C++ `.mm` binary mixing Foundation and C++ containers.
+- Added `examples/hip-hello/`: HIP `.hip` binary with vector add/scale kernels for ROCm systems.
+- Updated `examples/README.md` matrix and mixed-language workflow.
+- Updated `TODO.md` example status for ObjC/ObjC++ and HIP.
+
+**Tested:** `/home/max/freight/target/debug/freight check` passed in all three new example dirs.
+**Pushed:** nothing.
+
+### 2026-06-01 — Claude (second pass)
+
+**docify: declaration-line and PHP hierarchy fixes**
+
+**What changed (all in `crates/docify`, uncommitted):**
+
+- `src/extract/go.rs`, `ada.rs`, `d.rs`: changed `i + 1` → `end + 2` as the
+  line number passed to `build_item`. Like Fortran (fixed earlier), these
+  three were passing the comment-start line, so the source pane was scrolling
+  to the doc comment rather than the declaration.
+
+- `src/tui/browser.rs` `declaration_line_idx`: extended to recognise `//`
+  (plain Go/C++ style), `/++` (D), and `--` (Ada/Haskell) comment openers as
+  well as the existing `///`/`/**` patterns, so any item whose line still
+  points to a comment is correctly advanced to the declaration.
+
+- `src/extract/php.rs`: added brace-depth class scope tracking (same pattern
+  as C# from the previous pass). PHP methods are now qualified as
+  `Collection.filter` etc. so they group under their class node in the tree
+  instead of all landing in `(root)`.
+
+**Tested:** all 373 tests pass.
+**Pushed:** nothing yet.
+
+### 2026-06-01 — Claude
+
+**docify: example package manifests + hierarchy fixes**
+
+**What changed (all in `crates/docify`, uncommitted):**
+- Added `freight.toml` to the 5 `doc-example/libs/` subdirs missing them:
+  `csvkit`, `formatter`, `geometry`, `scripting`, `signals` — they were all
+  rolling up under the root `doc-example` package instead of having their own
+  package nodes in the TUI tree.
+
+- `src/tui/browser.rs` `item_group_parts`:
+  - Ada/D/Go/Fortran arm: module items (e.g. Fortran `linalg` module) now route
+    to `split_scope(&item.name)` instead of `(root)`, so the module becomes the
+    group node its children were already in.
+  - Ruby extracted as its own match arm: module items get the same fix, and
+    the `#` method separator (`Formatter#float_field`) is now recognised so
+    methods appear under their module instead of `(root)`.
+  - Big multi-language arm (TS/JS/C#/PHP/Lua/R/Haskell/Python): same module
+    routing fix — Haskell `Stats` module item was landing in `(root)` while
+    `Stats.mean` etc. were correctly in the `Stats` subtree.
+
+- `src/extract/lua.rs`: normalize `:` method syntax to `.` in function names
+  (`Vec:__tostring` → `Vec.__tostring`) so it groups under `Vec` like siblings.
+
+- `src/extract/csharp.rs`:
+  - `detect_cs_member` rewritten: extracts the identifier directly before `(`
+    (method) or `{` (property). The old version returned garbage names for
+    methods with generic return types (e.g. `ReadRow` was extracted as
+    `string>?` from `Dictionary<string, string>? ReadRow()`).
+  - Added brace-depth class scope tracking: methods are now qualified with
+    their enclosing class (`CsvKit.CsvReader.ReadRow`) so they appear under
+    the class node in the tree hierarchy.
+
+**Tested:** all 307 existing tests still pass.
+**Pushed:** nothing yet — waiting for review.
+
 ### 2026-05-31 — Claude
 
 **freight doc TUI: Doxygen web-style layout**

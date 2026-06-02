@@ -35,7 +35,6 @@ freight/                         ← workspace root (this repo)
 │   ├── freight/                 # core build tool — library + CLI binary
 │   ├── freight-registry/        # self-hosted package registry server
 │   ├── docify/                  # doc-comment extractor (library + binary)
-│   ├── libtexprintf/            # optional Rust binding for native terminal TeX rendering
 │   └── vcpkg-converter/         # vcpkg → freight migration tool
 ```
 
@@ -53,10 +52,9 @@ freight/                         ← workspace root (this repo)
     └── deps/                    # NOT used — kept here for clarity; all deps are in .pkgs/
 ```
 
-Most established crates are independent git submodules with their own history.
+All crates are independent git submodules with their own history.
 Commit and push those changes **inside the submodule directory**, not from the
-workspace root. `crates/libtexprintf` is currently workspace-local; keep its
-changes in the root workspace history unless it is split into its own repository.
+workspace root.
 
 ---
 
@@ -66,7 +64,6 @@ changes in the root workspace history unless it is split into its own repository
 cmake-lossless  ←── freight (migration module)
 cmake-lossless  ←── vcpkg-converter (cmake_probe module)
 docify          ←── freight (freight doc command)
-libtexprintf    ←── docify (optional `libtexprintf` feature for rich TUI math)
 freight-registry    (standalone; no internal deps)
 ```
 
@@ -85,7 +82,6 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 | `freight` | [`TODO.md`](crates/freight/TODO.md) | `has_lang` dedup; `LINK_PRIORITY` constant; Ada whole-program `BuildEvent`; `add_compile_options` / `target_compile_options` migration |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement; server-side prebuilt builds |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
-| `libtexprintf` | [`TODO.md`](crates/libtexprintf/TODO.md) | pkg-config/build discovery; native CI smoke test |
 | `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | `add_subdirectory()` following; failure analysis subcommand |
 
 ---
@@ -181,18 +177,24 @@ library (not a subprocess), so API changes there are caught at compile time.
 
 ### 8. IDE plugins
 
-**Status:** Planned. See design notes below.
+**Status:** In progress. `freight lsp` now exists as a first-pass stdio server in
+`crates/freight/src/bin/freight/commands/lsp.rs`; first-pass VS Code and Neovim
+wrappers live in `editors/vscode-freight/` and `editors/nvim-freight/`; JetBrains
+is still planned.
 
 #### Two-component architecture
 
-**Component A — `freight lsp` subcommand** (Rust, `tower-lsp`)
-A language server for `freight.toml` that runs over stdio. Likely a sub-crate
-`crates/freight-lsp/` or a subcommand inside `crates/freight/src/bin/freight/commands/lsp.rs`.
+**Component A — `freight lsp` subcommand** (Rust, manual stdio LSP bridge)
+A language server for `freight.toml` that runs over stdio from
+`crates/freight/src/bin/freight/commands/lsp.rs`.
 
 Capabilities:
-- **Diagnostics** — validate keys, unknown fields, malformed version strings, missing path deps on disk
-- **Completion** — dep names from registry metadata cache, version constraints, known manifest keys
-- **Hover** — dep description + latest version from local msgpack cache (no network on keystroke)
+- **Diagnostics** — first pass implemented: parse + manifest validation + path-dep compatibility
+- **Completion** — first pass implemented: known manifest sections/keys and dependency forms
+- **Hover** — first pass implemented: manifest section help, including explicit-dep semantics
+- **source passthroughs** — first pass implemented: `freight lsp` starts clangd for C-family
+  files, fortls for Fortran, and asm-lsp for assembly; it refreshes `compile_commands.json`
+  from explicitly declared Freight targets/deps and forwards source-file LSP traffic by extension
 - **Go to definition** — for `path = "../foo"` deps, open that `freight.toml`
 - **Code actions** — "Update to latest version", "Add missing section"
 
@@ -216,19 +218,18 @@ Shell that wires the LSP and provides IDE-native features.
 - Status bar item
 
 **Phase 2 — Language server**
-- `freight lsp` subcommand implementing LSP over stdio
-- Plugged into the VS Code extension via `vscode-languageclient`
+- `freight lsp` subcommand implementing LSP over stdio — first pass done
+- Plugged into the VS Code extension via `vscode-languageclient` — scaffold done
 - Diagnostics, hover, completion using the local registry msgpack cache
 
 **Phase 3 — Rich features + other IDEs**
 - Dependency tree panel (codelens / tree view)
 - Inline "newer version available" codelens
 - JetBrains (CLion) plugin — reuses the same `freight lsp` binary, Kotlin wrapper
-- Neovim — minimal `lazy.nvim` plugin that auto-starts `freight lsp`
+- Neovim — minimal `lazy.nvim` plugin that auto-starts `freight lsp` — scaffold done
 
-**Key decisions before starting:**
-- LSP as `freight lsp` subcommand (preferred — single binary, no separate install) vs
-  standalone `freight-lsp` crate.
+**Key decisions:**
+- LSP is a `freight lsp` subcommand in the main binary, not a standalone crate.
 - Registry queries: always from local msgpack cache; never block on network in the LSP hot path.
 
 ---
