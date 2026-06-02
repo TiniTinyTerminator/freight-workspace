@@ -12,6 +12,20 @@ Guidelines:
 
 ## Log
 
+### 2026-06-02 — Claude
+
+**libtexprintf removed; migrator improvements; freight doc browser polish**
+
+**What changed:**
+- `crates/libtexprintf` deleted — no references anywhere; AGENTS.md + CLAUDE.md updated
+- `cmake-lossless/eval.rs`: `VERSION_*` comparison operators, `IN_LIST`, compound `platform_condition` (`UNIX AND NOT APPLE → linux`, etc.), `option()` tracking in `vars.rs`
+- `freight/build`: `has_lang` extracted to `build/mod.rs` (was duplicated in compile.rs + link.rs); `LINK_PRIORITY` constant in `link.rs`; `BuildEvent::Compiling` emitted before `gnatmake` whole-program invocation
+- `freight doc` browser: half-circle pill headings (Nerd Font U+E0B6/U+E0B4), fenced code blocks in boxes with language label, visual-row scroll (fixes text cut-off), virtual scroll for source view (only renders visible window), scroll off-by-one fix
+
+**Pushed:** all submodules + workspace bumped
+
+**Next:** web frontend — update `docs.html` + `package.html` to use `freight doc` instead of the docify msgpack endpoint; update sidebar/package page to reflect new `freight doc` TUI rather than web-rendered docs viewer
+
 ### 2026-06-02 — Codex
 
 **freight-core: hidden LSP compile database and manifest help**
