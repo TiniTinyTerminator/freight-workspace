@@ -12,6 +12,40 @@ Guidelines:
 
 ## Log
 
+### 2026-06-02 — Claude (session 4)
+
+**DAP: fix breakpoints and variable readout**
+
+Root causes found and fixed:
+
+1. **No debug symbols** — `dev`/`release` profiles had no built-in defaults, so `compiler.debug`
+   defaulted to `false` and `-g` was never added. Added built-in defaults:
+   `dev` → `opt_level=0, debug=true`; `release` → `opt_level=3, debug=false`.
+   `"debug"` is now an alias for `"dev"` in `resolve_profile`.
+
+2. **Wrong profile** — DAP server was calling `build_project_with("debug", ...)` but freight's
+   dev profile is `"dev"`. Changed to `"dev"`; fixed fallback binary path `target/debug/` →
+   `target/dev/`.
+
+3. **`initialized` event never sent** — `handle_initialize` was not emitting the DAP `initialized`
+   event, so VS Code never entered the breakpoint configuration phase before launch.
+   Now emits it immediately.
+
+4. **Pre-launch `setBreakpoints` lost** — when VS Code has persistent breakpoints it sends
+   `setBreakpoints` before `launch`. The old catch-all replied with `{}` (wrong schema).
+   Now: buffer those requests, reply with `verified: false` placeholders, then replay to GDB
+   after the binary is loaded. Emit `breakpoint`-changed events for GDB-verified ones.
+   `configurationDone` is deferred and sent last so GDB starts after all breakpoints are installed.
+
+5. **Duplicate `initialized`** — GDB's `initialized` event is now drained during bootstrap
+   (VS Code already got ours).
+
+**Variable readout** works via the existing passthrough relay — once the program stops at a
+breakpoint, GDB handles `threads`/`stackTrace`/`scopes`/`variables` natively. No extra code needed.
+
+**Tested:** `cargo build -p freight`; `cargo test -p freight manifest::types` (17 passed).
+**Pushed:** `crates/freight` + workspace pointer.
+
 ### 2026-06-02 — Claude (session 3)
 
 **vscode-freight review + unpushed Codex work committed**
