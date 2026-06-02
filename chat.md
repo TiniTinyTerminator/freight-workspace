@@ -12,6 +12,146 @@ Guidelines:
 
 ## Log
 
+### 2026-06-02 — Claude (session 3)
+
+**vscode-freight review + unpushed Codex work committed**
+
+- Reviewed `editors/vscode-freight` — extension builds clean (`bun run check`)
+- Committed and pushed Codex's unpushed changes:
+  - `vscode-freight`: `FreightDebugAdapterFactory` delegates to `freight dap`; `freight.run` wired through DAP; `debugger` enum + `debuggerPath` in launch config; activation events updated
+  - `crates/freight`: 771-line `freight dap` stdio DAP backend (breakpoints, stepping, variables, watch/repl); `default_debugger` in GlobalConfig; hidden LSP compile DB; `-Wno-gnu-include-next` for clangd
+- Registry: unified monospace/TUI theme in style.css; dep graph convergence + ResizeObserver auto-centre; namespace summary in docs viewer; conditional Docs badge in Info sidebar; hljs on package page
+
+**Pushed:** all submodules + workspace
+
+### 2026-06-02 — Codex
+
+**Freight DAP backend for editor debugging**
+
+**What changed:**
+- Added `freight dap`, a stdio Debug Adapter Protocol backend owned by Freight.
+- VS Code now spawns `freight dap` as the debug adapter executable instead of
+  carrying GDB/MI adapter logic in the extension.
+- Debugger selection is now pipelined through Freight core: launch configs may
+  omit `debugger`, and Freight resolves `.freight/config.toml` /
+  `~/.freight/config.toml` `default_debugger`.
+- The backend supports run sessions, debug launch through GDB/MI, breakpoints,
+  stepping, stack traces, local variables, hover evaluation, and watch/repl
+  expression evaluation.
+- Neovim now registers a `freight dap` adapter when `nvim-dap` is available and
+  adds `:FreightDebug`.
+
+**Tested:** `cargo check -p freight`; `cargo build -p freight`; DAP initialize
+stdio smoke test; `node --check src/extension.js`; `bun run package`.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**Project-local developer config default debugger**
+
+**What changed:**
+- Added `default_debugger` to Freight developer config (`/etc/freight/config.toml`,
+  `~/.freight/config.toml`, and `<project>/.freight/config.toml`).
+- `freight debug` now uses `--debugger` first, then `default_debugger`, then the
+  first detected debugger.
+- Existing `default_backend` already controlled preferred compiler selection for
+  builds/LSP through the same local config loader; docs now show
+  `default_backend = "clang"` with `default_debugger = "lldb"`.
+- VS Code Freight debug launch resolution now reads simple scalar defaults from
+  `~/.freight/config.toml` and `<workspace>/.freight/config.toml` so an omitted
+  `"debugger"` field follows project-local developer config.
+
+**Tested:** `cargo check -p freight`; `cargo test -p freight default_debugger
+--lib`; `node --check src/extension.js`; `bun run package`.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**VS Code debug activation and DAP sequencing fix**
+
+**What changed:**
+- Added broader debug activation events to `vscode-freight`: `onDebug`,
+  `onDebugInitialConfigurations`, and `onDebugAdapterProtocolTracker:freight`
+  in addition to `onDebugResolve:freight`.
+- Fixed the Freight inline debug adapter lifecycle: it no longer emits DAP
+  `initialized` during `initialize`. It now emits `initialized` after the
+  run/debug launch backend is ready, so VS Code sends breakpoints and
+  `configurationDone` after GDB has been started.
+- Added a guard so an early `configurationDone` is remembered and starts the
+  debuggee once GDB is ready.
+
+**Tested:** `node --check src/extension.js`; `bun run package`; package JSON
+parse check.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**LSP codeAction diagnostic sanitization**
+
+**What changed:**
+- `freight lsp` now handles `textDocument/codeAction` explicitly.
+- For `freight.toml`, it returns an empty action list for now.
+- For source files, it sanitizes forwarded `context.diagnostics[*].code` values
+  so passthrough servers such as clangd receive string codes and do not reject
+  VS Code requests with `expected string`.
+
+**Doxygen note:** source signature help/hover forwarded from clangd should keep
+clangd's Doxygen-rendered Markdown intact. When Freight adds doc-cache-backed
+hint enrichment, preserve/render Doxygen sections as Markdown in `MarkupContent`
+instead of flattening them into plain text.
+
+**Tested:** `cargo check -p freight`; `cargo test -p freight
+commands::lsp::tests::code_action_diagnostic_codes_are_sanitized_to_strings --bin
+freight`; `node --check src/extension.js`; `bun run package`.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**Freight-owned VS Code debug adapter**
+
+**What changed:**
+- Added a Freight-owned GDB/MI debug adapter path inside `editors/vscode-freight`.
+- `Freight: Debug` now runs `freight build`, resolves the produced `target/dev`
+  binary, starts `gdb --interpreter=mi2`, applies VS Code breakpoints, and wires
+  DAP commands for launch/configurationDone, breakpoints, continue, next, step
+  in/out, pause, threads, stack trace, scopes, locals, disconnect, and terminate.
+- No dependency on cpptools, CodeLLDB, or any other debug extension.
+- `debugger` / `debuggerPath` launch fields are exposed; `gdb` is implemented,
+  and the same shape is reserved for LLDB/other backends.
+
+**Tested:** `node --check src/extension.js`; `bun run package`; package JSON
+parse check; `cargo check -p freight`; `cargo test -p freight
+build::tests::lsp_include_filter --lib`.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**Freight VS Code run/debug sessions, signature help polish, and stricter LSP includes**
+
+**What changed:**
+- VS Code `Freight: Run` now starts a real VS Code debug session instead of a
+  plain task; the inline debug adapter runs `freight run` / `freight debug`,
+  streams stdout/stderr into the Debug Console, reports exit/termination events,
+  and keeps the session visible in the Run and Debug panel.
+- Follow-up correction: Freight must not depend on cpptools/CodeLLDB or any
+  external debug extension. The VS Code plugin now keeps run/debug wired to the
+  Run and Debug panel through Freight's own inline adapter; real breakpoint
+  debugging remains future work for a Freight-owned DAP/MI adapter.
+- `freight.toml` signature help now uses compact C++-style labels such as
+  `freight::dependency { semver version, path path, ... }` so VS Code's native
+  signature widget renders closer to cpptools' compact style and includes
+  type-like metadata without depending on cpptools.
+- Hidden LSP compile database generation now filters broad external include dirs
+  from clangd input, keeping Freight project/package paths and known standard
+  C/C++ compiler resource/stdlib include dirs only.
+- `freight lsp` starts clangd with background indexing disabled and header
+  insertion disabled to reduce external header crawling/suggestions.
+
+**Tested:** `cargo check -p freight`; `cargo test -p freight
+build::tests::lsp_include_filter --lib`; `bun run package` and `node --check
+src/extension.js` in `editors/vscode-freight`.
+**Pushed:** pending.
+
 ### 2026-06-02 — Codex
 
 **VS Code extension debug launch configs**
