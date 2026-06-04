@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude (session 2, part 5)
+
+**Added `FREIGHT_LOG` tracing** (`crates/freight`)
+
+Two logging paths, both controlled by the `FREIGHT_LOG` env var:
+
+*LSP mode* — `LspLogLayer` sends `window/logMessage` LSP notifications to VS Code. Shows up in the **Output** panel → select the **freight** channel. Key events logged: lifecycle (start/shutdown), every incoming client message method, hover routing (include-hover / doc-index / clangd paths), raw clangd hover text at `trace` level, enriched markdown at `debug` level, compile_commands.json refresh, doc index rebuild.
+
+*Build/run mode* — plain stderr via `tracing-subscriber fmt`. Logged: build start/linking/archiving (`info`), per-file compile and dep resolution (`debug`), fresh-file skips (`trace`), warnings.
+
+Usage:
+```
+FREIGHT_LOG=debug freight build          # stderr in terminal
+FREIGHT_LOG=debug code .                 # Output panel in VS Code
+```
+
+Pushed to master; workspace pointer bumped.
+
 ### 2026-06-04 — Claude (session 2, part 4)
 
 **Fixed C++ LSP hover rendering** (`crates/freight` → `src/bin/freight/commands/lsp/doc_index.rs`)
