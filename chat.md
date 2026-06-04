@@ -12,6 +12,148 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude
+
+**Added Mermaid architecture diagrams (freight core + registry + DAP)**
+
+- Appended six diagrams to `crates/freight/docs/architecture.md`:
+  build pipeline flowchart, dependency resolution chain, CLI commands overview,
+  compiler template evaluation, DAP adapter selection + launch/attach sequence,
+  registry HTTP router + publish wire format + SHA-256/Argon2id auth flow.
+- LSP architecture diagrams (from prior session) live in `docs/lsp-architecture.md`.
+- Committed to `crates/freight` as `49d9d4d`. Not yet pushed.
+
+### 2026-06-04 — Codex
+
+**Adjusted VHS homepage demo scaffold output**
+
+- Updated the org Pages VHS tape so the first real command remains visible long enough to show Freight's scaffold output:
+  `✓ created \`hello\` (c++ project)`, followed by `cd hello` and `freight build`.
+- Tape now follows the scaffold hint directly: `freight new hello --lang c++`, `cd hello`, `freight build`.
+- Regenerated `img/freight-quickstart.gif` from the actual local Freight binary.
+- Pushed: `freight-app.github.io` commit `908acd4` (`match quickstart gif to scaffold output`) to `main`.
+- Tested: real `freight new hello --lang c++` output, VHS render, inspected frames showing the scaffold output and successful build, Pages workflow `26960166431`, and `curl -I https://freight-app.github.io/`.
+- Note: separate post-deploy `curl -I` for the GIF asset was blocked by the environment's escalation usage limit after the page check; not retried.
+
+### 2026-06-04 — Codex
+
+**VHS homepage demo now uses real Freight**
+
+- Replaced the mocked VHS homepage demo with a recording generated from the actual local Freight binary at `/home/max/freight/target/debug/freight`.
+- Tape now runs real commands: `freight new hello --lang c++`, `cd hello`, `freight check`, and `freight run`.
+- Removed `tapes/mock-freight.sh`; regenerated `img/freight-quickstart.gif`.
+- Pushed: `freight-app.github.io` commit `33b5e1c` (`record vhs demo with real freight`) to `main`.
+- Tested: real CLI commands in `/tmp/freight-vhs-real`, VHS render with `/home/max/go/bin/vhs`, inspected end GIF frame showing `Hello, world!`, Pages workflow `26959769474`, `curl -I https://freight-app.github.io/`, and `curl -I https://freight-app.github.io/img/freight-quickstart.gif`.
+
+### 2026-06-04 — Codex
+
+**Switched org Pages terminal demo to VHS GIF**
+
+- Replaced the asciinema-player embed on `freight-app.github.io` with a VHS-rendered GIF.
+- Added `tapes/freight-quickstart.tape`, `tapes/mock-freight.sh`, and generated `img/freight-quickstart.gif`.
+- Removed the previous checked-in asciinema cast file from the org Pages repo.
+- Pushed: `freight-app.github.io` commit `5e7aa3e` (`use vhs gif for quickstart demo`) to `main`.
+- Tested: installed VHS with `go install github.com/charmbracelet/vhs@latest`, rendered the tape with `/home/max/go/bin/vhs`, inspected a late GIF frame, Pages workflow `26959351684`, `curl -I https://freight-app.github.io/`, and `curl -I https://freight-app.github.io/img/freight-quickstart.gif`.
+
+### 2026-06-04 — Codex
+
+**Live asciinema demo on org Pages main page**
+
+- Replaced the static terminal block on `freight-app.github.io` with an embedded asciinema player.
+- Added `casts/freight-quickstart.cast` to the org Pages repo and wired `AsciinemaPlayer.create()` to autoplay/loop inside the terminal frame.
+- Pushed: `freight-app.github.io` commit `ff240fd` (`embed asciinema quickstart demo`) to `main`.
+- Tested: cast JSON lines parse with `bun`, jsDelivr asciinema-player asset returns HTTP 200, GitHub Pages workflow `26958703586`, `curl -I https://freight-app.github.io/`, and `curl -I https://freight-app.github.io/casts/freight-quickstart.cast`.
+
+### 2026-06-04 — Codex
+
+**Docs terminal demo pipeline**
+
+- Added a VHS/asciinema terminal demo pipeline to `freight-app/freight-docs`.
+- New files: `examples/terminal/quickstart.tape`, matching `quickstart.sh` scenario, `scripts/render-terminal-examples.sh`, generated quickstart text transcript, and `docs/terminal-demos.md`.
+- Added `bun run examples:terminal` to render VHS GIFs, asciinema `.cast` files, and text transcripts.
+- Updated sidebar and intro docs to link the new Terminal demos page; fixed README path wording from old `docs-site/docs/` to `docs/`.
+- Pushed: `freight-docs` commit `daa2506` (`add terminal demo pipeline`) to `main`.
+- Tested: `bash -n` for scripts, `bun run build`, GitHub Pages workflow `26958217295`, and `curl -I https://freight-app.github.io/freight-docs/terminal-demos/`.
+
+### 2026-06-04 — Codex
+
+**Registry public cleanup + org Pages site**
+
+- Created public org Pages repo `freight-app/freight-app.github.io` with a static main page for `https://freight-app.github.io/`; Pages workflow passed and the URL returned HTTP 200.
+- Confirmed renamed private launch repo `freight-app/freight-registry-main` exists and is private; updated the local `/tmp/freight-registry-launch` clone's `origin` remote to `git@github.com:freight-app/freight-registry-main.git`.
+- Cleaned `crates/freight-registry` public UI by removing registry-local guide/install pages, removing hardcoded Docs/Install links from static pages, deleting `/docs` and `/install` routes, and simplifying the homepage to a standard package search/browse entry point.
+- Removed the `docify` path dependency from `freight-registry`; `src/api/docs.rs` now validates/decodes docify MessagePack with a local wire-format mirror plus `rmp-serde`, so the public registry repo can build standalone without a sibling `docify` crate.
+- Updated registry README/TODO/example config to document optional-by-config S3, SMTP, OAuth/OIDC, external downloads, and CI verification; removed launch-specific CI image examples and moved S3/SMTP secrets out of TOML examples.
+- Pushed: `crates/freight-registry` commit `e815879` (`clean public registry website`) to `freight-app/Freight-registry` `main`.
+- Tested: `cargo check -p freight-registry`; GitHub Pages workflow `26957531967`; `curl -I https://freight-app.github.io/`.
+- Not pushed: workspace `Cargo.lock`, `chat.md`, and the updated `crates/freight-registry` submodule pointer remain uncommitted in the workspace root.
+
+### 2026-06-04 — Claude (session 2, part 8)
+
+**Freight-doc hover pipeline complete** (`crates/freight`)
+
+VS Code hover now runs through freight doc exclusively for C/C++, with language-server
+fallback for Fortran and assembly. The pipeline is extensible to new languages via the
+`DocExtractor` trait — just implement it and register in `ExtractorRegistry::default()`.
+
+Hover order:
+1. `freight.toml` key → manifest hover
+2. `#include`/`#import` → `HeaderIndex` package origin
+3. `DocIndex` position-based lookup (validates word-under-cursor matches item name)
+4. `DocIndex` name-based fallback (word extracted from cursor position)
+5. Fortran/asm miss → forward to `fortls`/`asm-lsp`; C/C++ miss → null
+
+New `AsmExtractor` (`src/doc/lang/asm.rs`):
+- Extensions: `.s`, `.S`, `.asm`, `.nasm`, `.nas`, `.inc`
+- Doc comment styles: `;;`, `##`, `//` before label or PROC declarations
+- Registered alongside C++, Fortran, Ada, D, Zig
+
+Removed `enrich_hover_response` and `reformat_clangd_hover` (dead code since
+clangd hover forwarding was removed).
+
+Committed as `4af00f9` — not yet pushed.
+
+### 2026-06-04 — Claude (session 2, part 7)
+
+**Module restructure + LSP trace improvements** (`crates/freight`)
+
+Two structural cleanups:
+1. `dap` and `lsp` promoted from `commands/dap` and `commands/lsp` to
+   `src/bin/freight/dap/` and `src/bin/freight/lsp/` — top-level bin modules.
+   `main.rs` now has `mod dap; mod lsp;` and all `commands::dap::`/`commands::lsp::` refs updated.
+2. `doc/docify/` flattened into `doc/` — lang extractors, markdown, and render_md
+   move up; docify wrapper module deleted; `doc/mod.rs` re-exports everything directly.
+   `freight_core::doc::docify::` refs updated to `freight_core::doc::`.
+
+LSP tracing: all hover debug/trace lines now include file, line, and col fields:
+- `hover request` log on every source-file hover: `file`, `line`, `col`
+- `include hover`: `header`, `package`, `line`
+- `doc-index hover`: `symbol`, `file`, `cursor_line`, `cursor_col`
+
+Committed as `51bc0da` — not yet pushed.
+
+### 2026-06-04 — Claude (session 2, part 6)
+
+**Docify-only hover architecture** (`crates/freight`)
+
+Clangd is now used only for diagnostics, completions, and go-to-definition.
+All hover hints come exclusively from the freight doc index (docify).
+
+- `DocIndex` restructured: `Vec<DocItem>` with `by_name` (name→idx) and
+  `by_location` (file→BTreeMap<line, idx>) indexes
+- `lookup_by_location(file, line)` finds the nearest doc item at or before
+  the cursor line (range query on BTreeMap, ±5 line tolerance)
+- `doc_hover` tries position-based lookup first, falls back to name lookup
+- `extract_pkg_items` now scans `src/`, `include/`, `inc/` in the fallback path
+- `item_to_markdown` heading now shows DocKind label (`fn`, `class`, etc.)
+  and parent class context for member functions
+- Removed: `PendingHover`, `pending_hovers`, `hover_seq`,
+  `forward_hover_with_enrichment`, hover interception in passthrough thread
+- Also fixed: `docify/mod.rs` was referencing deleted `extract` module;
+  updated to `lang` (the extract types were inlined there in a prior session)
+
+Committed to `crates/freight` as `2921c4c` — not yet pushed.
+
 ### 2026-06-04 — Claude (session 2, part 5)
 
 **Added `FREIGHT_LOG` tracing** (`crates/freight`)
