@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude (session 2, part 2)
+
+**`freight package --installer` → native platform installers**
+
+- Linux: `.deb` built in pure Rust (no external tools). `ar` archive with `debian-binary`,
+  `control.tar.gz`, `data.tar.gz`. Files install to `/usr/local/bin` + `/usr/local/lib`.
+  Arch names mapped to Debian conventions (x86_64→amd64, aarch64→arm64, etc.).
+- macOS: `.dmg` via `hdiutil create -format UDZO`. dylibs bundled + install names rewritten
+  to `@executable_path/../lib/` via `install_name_tool`.
+- Windows: NSIS `.exe` — generates `.nsi` script with welcome/directory/install/finish pages,
+  desktop shortcut, Add/Remove Programs entry; runs `makensis`. Clear error if not installed.
+- Shared-lib bundling (ldd/otool/dumpbin) reused across all three formats.
+
+Pushed: `crates/freight` master, workspace pointer bumped.
+
 ### 2026-06-04 — Claude (session 2)
 
 **`freight package --installer` — self-contained bundles**
@@ -2122,3 +2137,35 @@ Pushed:
 Questions for next agent:
 - The private launch clone currently lives in `/tmp/freight-registry-launch`; clone it somewhere
   persistent if ongoing launch work should happen locally.
+
+## 2026-06-04 — Codex: Created public GitHub Pages docs site
+
+What changed:
+- Created public repo `freight-app/freight-docs` for the framework/docs website:
+  https://github.com/freight-app/freight-docs
+- Seeded it from the registry Docusaurus Markdown docs in `/tmp/freight-docs`.
+- Configured Docusaurus for GitHub Pages at:
+  https://freight-app.github.io/freight-docs/
+- Added `.github/workflows/pages.yml` using Bun and GitHub Pages deployment.
+- Enabled GitHub Pages for the repo with workflow deployment.
+- Updated `freight-registry` nav/footer Docs links to
+  `https://freight-app.github.io/freight-docs/`.
+- Updated Install links and the legacy `/install` redirect to
+  `https://freight-app.github.io/freight-docs/install/`.
+- Removed the registry-local Docusaurus source/generated docs that I had added earlier.
+
+Tested:
+- Ran `bun install --frozen-lockfile` in `/tmp/freight-docs`; it passed.
+- Ran `bun run build` in `/tmp/freight-docs`; it passed.
+- Pushed `freight-app/freight-docs` and reran the Pages workflow after enabling Pages; it passed.
+- Verified `curl -I https://freight-app.github.io/freight-docs/` returns `HTTP/2 200`.
+- Verified `curl -I https://freight-app.github.io/freight-docs/install/` returns `HTTP/2 200`.
+- Ran `cargo check -p freight-registry`; it passed after the registry route/link changes.
+
+Pushed:
+- Pushed `freight-app/freight-docs` main branch.
+- Did not push the `freight-registry` link/redirect cleanup.
+
+Questions for next agent:
+- The docs source clone currently lives at `/tmp/freight-docs`; clone it somewhere persistent for
+  ongoing docs work.
