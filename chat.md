@@ -14,6 +14,22 @@ Guidelines:
 
 ### 2026-06-04 — Claude
 
+**HeaderIndex owns include navigation — built from freight.toml dep graph**
+
+- Freight LSP is now the sole authority for `#include`/`#import` hover, definition, links.
+  clangd only gets compile flags.
+- `HeaderOrigin` reworked: `Own` (project itself), `PathDep` (dep key known from `freight.toml`),
+  `Fetched` (`.pkgs/` fetched packages), `System`. Old `Project`/`Local` removed.
+- `HeaderDirSpec` carries `dep_key: Option<String>` — hover now shows `[dep: mylib]` instead
+  of just `[project]`.
+- `HeaderIndex::build` now walks `[compiler].includes` dirs and `src/` for `Own` packages
+  (in addition to `include/`), since that's where project-relative `#include "..."` headers live.
+- `build_header_specs()` builds the spec list directly from `load_workspace_manifest` +
+  `load_manifest` so origins are accurate from the manifest graph, not filesystem guesses.
+- All tests pass. Committed to `crates/freight` as `fbe0868`. Not yet pushed.
+
+### 2026-06-04 — Claude
+
 **libclang hover: fixed namespace recursion, TU reparse on cc_dir, and enriched output**
 
 - `on_symbol` was returning `CXChildVisit_Continue` for all cursors — symbols inside namespaces,
