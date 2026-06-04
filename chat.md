@@ -14,6 +14,19 @@ Guidelines:
 
 ### 2026-06-04 — Claude
 
+**libclang: replace text/heuristic include resolution and DocIndex for C/C++**
+
+- `clang_getInclusions` replaces `parse_include_header` regex + `probe_system_include_dirs` (`gcc -v`).
+  Per-TU inclusion map (line → full_path + is_system) cached on every open/reparse.
+  `include_hover`, `include_definition`, `compute_document_links`, `compute_inlay_hints`
+  all use the map when TU is loaded; text/HeaderIndex fallback retained for unopened files.
+- `build_symbols` walker extracts top-level declarations + brief doc comments.
+  `tu_symbol_hover` replaces `DocIndex` for C/C++ name-based hover.
+- `TuSymbol.line` kept for upcoming document-symbol outline feature.
+- Committed to `crates/freight` as `a745d0e`. Not yet pushed.
+
+### 2026-06-04 — Claude
+
 **libclang integration — Phases 4-5 (AST inlay hints + clang-tidy on-save)**
 
 - Phase 4: `clang_visitChildren` walker in `clang_index.rs` collects parameter name hints
