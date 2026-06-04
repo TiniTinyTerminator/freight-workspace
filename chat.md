@@ -14,6 +14,78 @@ Guidelines:
 
 ### 2026-06-04 — Claude
 
+**libclang hover: fixed namespace recursion, TU reparse on cc_dir, and enriched output**
+
+- `on_symbol` was returning `CXChildVisit_Continue` for all cursors — symbols inside namespaces,
+  classes, and structs were never indexed. Fixed: returns `CXChildVisit_Recurse` for container
+  kinds (`Namespace`, `ClassDecl`, `StructDecl`, `ClassTemplate`, etc.) so nested declarations
+  are captured.
+- `set_cc_dir` had no effect on TUs already parsed before `compile_commands.json` was found
+  (common on first `didOpen`). Fixed: now re-opens all live TUs when `cc_dir` changes.
+- `hover()` now skips `CXCursor_TranslationUnit` cursors (returned when nothing meaningful is
+  under the point) in addition to the null cursor.
+- Enriched `HoverInfo`: added `display_name` (`clang_getCursorDisplayName`, includes param types),
+  `source_file`/`source_line` for declaration origin, and raw comment fallback with comment-marker
+  stripping when `clang_Cursor_getBriefCommentText` returns empty.
+- `hover_info_to_markdown` now renders `returnType displayName(params)`, doc comment, and
+  `*file:line*` origin footer.
+- Committed to `crates/freight` as `a846afc`, `3755d6d`. Not yet pushed to remote.
+- **Current state**: Codex subsequently rolled back `mod.rs` to pre-libclang wiring (keeping
+  `clang_index.rs` dormant on disk) and further expanded `clang_index.rs` with rich doxygen
+  parsing, pretty-printer, compiler include probing, and relative path rendering — but this is
+  **uncommitted**. `cargo check` passes on the uncommitted tree.
+- **Next**: commit or integrate Codex's uncommitted `clang_index.rs` expansion and re-wire
+  `mod.rs` to use the new `TuCache`.
+
+### 2026-06-04 — Codex
+
+**Moved LSP compile database into `.freight`**
+
+- Changed `freight lsp` compile database generation to write
+  `.freight/lsp/<profile>/compile_commands.json` under the active package/workspace instead of
+  using a hashed temp directory.
+- Added profile-path sanitizing so unusual profile strings cannot create nested paths, plus unit
+  tests for the `.freight` location and sanitizer fallback.
+- Updated the LSP docs to describe the new `.freight/lsp/<profile>` path and noted that the
+  libclang prototype is currently paused/dormant after the active rollback.
+- Tested: `cargo test -p freight lsp_compile_commands`,
+  `cargo test -p freight lsp_profile_dir_is_path_safe`, `cargo test -p freight lsp::`, and
+  `cargo check -p freight` pass. Existing warnings remain in doc/lang, doc_index, make tests, and
+  publish.
+- Not pushed.
+
+### 2026-06-04 — Codex
+
+**Rolled active LSP back to pre-libclang behavior**
+
+- Restored active `freight lsp` wiring in `src/lsp/mod.rs` and `Cargo.toml` to the last pre-libclang state (`49d9d4d`): no `clang_index` module import, no `TuCache`, no libclang hover/definition/include resolution/inlay hints, no clang-tidy-on-save path, and no `clang-sys` dependency.
+- Kept `src/lsp/clang_index.rs` on disk for future work, but it is dormant/not compiled by the LSP module.
+- Kept the include/import hover path improvement in `doc_index.rs`, implemented locally there: include hovers display Freight/package-relative, `.pkgs/<package>`-relative, include-root-relative, or basename fallback paths instead of absolute paths.
+- Tested: `cargo test -p freight lsp::` and `cargo check -p freight` pass. Remaining check warnings are pre-existing: `sig_go`, `HeaderIndex::is_empty`, and `publish.rs` `project_dir`.
+- Not pushed.
+
+### 2026-06-04 — Codex
+
+**Expanded libclang hover detail**
+
+- Checked `crates/freight/src/lsp/clang_index.rs` and the official libclang docs for cursor/type/comment APIs.
+- Expanded hover extraction to use libclang's declaration pretty-printer, cursor result type, canonical type, params, semantic parent, access, availability, USR, definition/declaration status, and line/column.
+- Ported the old `doc_index.rs` hover behavior into the libclang path: raw Doxygen comments are parsed into brief/body plus params, tparams, returns, throws, notes, warnings, examples, see-also, since, and deprecated sections.
+- Suppressed noisy libclang type metadata when the pretty declaration already contains it, fixing hovers that showed `Type: int` / `Returns: int` for ordinary declarations.
+- Fixed libclang compile flag lookup for relative `compile_commands.json` entries (`directory` + `file`), including absolutizing relative include paths like `-Iinc`; this caused the `std::vector<double> data` hover to parse without `-std=c++20`/includes and show `int data = <recovery-expr>(...)`.
+- Added cached compiler include probing from the compile command's compiler executable (`clang++ -x c++ -E -v /dev/null`) and passes those paths as `-isystem` to libclang, so standard library headers like `<vector>` resolve outside clangd's driver emulation.
+- Added a recovery guard so pretty declarations containing `<recovery-expr>` fall back to the original source line instead of leaking bogus AST recovery output into hovers.
+- Trimmed libclang hover rendering to user-facing content only: concise declaration/prototype without class bodies or initializers, Doxygen docs, useful parameter/type tables, and source location. Removed rendered `Symbol`, `USR`, and `kind/access/parent/definition` debug metadata.
+- Raw comments now fall back through `clang_getCanonicalCursor` when the immediate referenced cursor has no Doxygen text; constructor/destructor hovers also try the owning class declaration, and trailing right-side comments such as `extern ostream cout; /// ...` are parsed.
+- Source footers are now hidden for namespaces and rendered relative to the nearest Freight package or `.pkgs/<package>` root instead of as absolute paths; fallback is just the basename.
+- Include/import hovers now use relative paths too: Freight package-relative, `.pkgs/<package>`-relative, include-root-relative for system headers, or basename fallback.
+- Updated TU symbol fallback hovers to reuse the rich hover renderer and record namespace/class/container symbols before recursing.
+- Enabled `clang-sys` `clang_7_0` feature in `crates/freight/Cargo.toml` so the pretty-printing APIs are available while retaining runtime dlopen behavior.
+- Tested: `cargo test -p freight lsp::` and `cargo check -p freight` pass. Tests cover Doxygen tag rendering, trailing right-side comments, concise declaration trimming, relative source/include footer rendering, namespace footer suppression, relative compile command flag extraction, compiler include-list parsing, and recovery-decl source fallback. Remaining check warnings are pre-existing: `sig_go`, `HeaderIndex::is_empty`, and `publish.rs` `project_dir`.
+- Not pushed.
+
+### 2026-06-04 — Claude
+
 **libclang: replace text/heuristic include resolution and DocIndex for C/C++**
 
 - `clang_getInclusions` replaces `parse_include_header` regex + `probe_system_include_dirs` (`gcc -v`).
