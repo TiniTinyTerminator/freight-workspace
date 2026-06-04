@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude (session 2, part 3)
+
+**MSIX installer for Windows sandbox**
+
+- `freight package --installer --installer-format msix` → `.msix` via `makeappx.exe`.
+  Works with Windows App Installer, Windows Sandbox, and the Microsoft Store.
+- `AppxManifest.xml`: Identity (four-part version, arch, publisher from authors),
+  FullTrustApplication entry point, VisualElements with logo paths.
+- Logo PNGs (44×44 + 150×150) generated in pure Rust via flate2 — no image crate.
+- Package is unsigned by default; prints `signtool sign` reminder. Sideloading
+  requires Developer Mode or a trusted cert.
+- `--installer-format nsis` remains the default on Windows.
+- New export: `WindowsInstallerFormat` enum from `freight_core::install`.
+- Pushed: crates/freight master, workspace pointer bumped.
+
 ### 2026-06-04 — Claude (session 2, part 2)
 
 **`freight package --installer` → native platform installers**
