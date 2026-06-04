@@ -14,6 +14,20 @@ Guidelines:
 
 ### 2026-06-04 — Claude
 
+**libclang integration — Phases 4-5 (AST inlay hints + clang-tidy on-save)**
+
+- Phase 4: `clang_visitChildren` walker in `clang_index.rs` collects parameter name hints
+  from `CXCursor_CallExpr` and deduced-type hints from `auto` `CXCursor_VarDecl`.
+  When a TU is loaded, `handle_inlay_hints` responds immediately without clangd.
+  `clangd_pending` merge pipeline kept as fallback when TU isn't parsed yet.
+- Phase 5: `textDocument/didSave` for C/C++ spawns `clang-tidy <file> -p <cc_dir>` in
+  a background thread; output is parsed and pushed as `textDocument/publishDiagnostics`
+  with `source = "clang-tidy"` and the check name as the code.
+- All 5 phases of the libclang integration are complete.
+- Committed to `crates/freight` as `109358f`. Not yet pushed.
+
+### 2026-06-04 — Claude
+
 **libclang integration — Phases 1-3 (TU lifecycle, hover, go-to-definition)**
 
 - Added `clang-sys` (runtime dlopen) to `crates/freight/Cargo.toml`.
