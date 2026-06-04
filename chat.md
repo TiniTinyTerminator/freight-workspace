@@ -14,6 +14,21 @@ Guidelines:
 
 ### 2026-06-04 — Claude
 
+**libclang integration — Phases 1-3 (TU lifecycle, hover, go-to-definition)**
+
+- Added `clang-sys` (runtime dlopen) to `crates/freight/Cargo.toml`.
+- New `src/lsp/clang_index.rs`: `TuCache` wraps `CXIndex` + per-file `CXTranslationUnit` map.
+  - TUs opened/reparsed on `didOpen`/`didChange`, closed on `didClose`.
+  - `cc_dir` updated when `compile_commands.json` refreshes so parse flags stay correct.
+- Hover: libclang path fires before DocIndex for C/C++ — returns cursor spelling, type string,
+  and brief doc comment; falls back to DocIndex → fortls/asm-lsp.
+- Go-to-definition: libclang intercepts before clangd forwarding; `#include` line def still
+  freight-owned as before.
+- Committed to `crates/freight` as `d793d43`. Not yet pushed.
+- Phases 4 (inlay hints from AST) and 5 (clang-tidy on-save) still TODO.
+
+### 2026-06-04 — Claude
+
 **Added Mermaid architecture diagrams (freight core + registry + DAP)**
 
 - Appended six diagrams to `crates/freight/docs/architecture.md`:
