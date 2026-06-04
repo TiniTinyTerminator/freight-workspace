@@ -12,6 +12,20 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude (session 2)
+
+**Registry test packages published; publish tarball bug fixed**
+
+- Fixed two bugs in `crates/freight` `src/cli/commands/publish.rs`:
+  1. `upstream_url` was being set to the checksum hash instead of `None`, causing registry to treat packages as metadata-only redirects → fetch would 302 to a bare hash string and 404.
+  2. Source tarballs had no top-level `{name}-{version}/` wrapper directory, so `--strip-components=1` extraction in `http.rs` stripped `include/` from all paths → headers not found at compile time.
+- Pushed fix to `crates/freight` master (`3bf3e3e`); workspace pointer bumped.
+- Published to local registry (`http://localhost:7878`):
+  - `mathlib@0.1.2` — C static lib, clamping/lerp/statistics helpers
+  - `vecmath@0.1.0` — C++17 vec2/vec3/mat3, depends on `mathlib >= 0.1.2`
+- Verified: `freight fetch` + `freight build` of vecmath succeeds end-to-end against local registry.
+- Registry yank API: use `DELETE /api/v1/packages/{name}/{version}/yank` to yank, `PUT` to unyank.
+
 ### 2026-06-04 — Claude
 
 **HeaderIndex owns include navigation — built from freight.toml dep graph**
