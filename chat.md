@@ -12,6 +12,19 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude (session 2, part 4)
+
+**Fixed C++ LSP hover rendering** (`crates/freight` → `src/bin/freight/commands/lsp/doc_index.rs`)
+
+Root cause: `reformat_clangd_hover` was splitting only on the *first* `---` separator in clangd's hover text. Clangd appends a second `---\n```lang...```\n` block (the declaration snippet) after the doc text, which bled into `@param` continuation parsing — the entire code block was appended to the last `@param`'s text. Additionally, clangd's auto-generated `Parameters:` + typed-bullet block was preserved as body text alongside the reformatted `**Parameters**` section.
+
+Changes:
+- Split off the trailing code block (last `\n---\n\`\`\`` pattern) before tag parsing; render it as a clean footer
+- After parsing, if `@param` tags exist, strip the `Parameters:` + typed-bullet lines from body
+- Suppress `→ type` brief line when `@returns` tags are present (redundant)
+
+All 7 hover probes verified clean: class, 2× member fn, pop (@throws), dot (@note+@warning), header declaration, and #include. Pushed to master; workspace pointer bumped.
+
 ### 2026-06-04 — Claude (session 2, part 3)
 
 **MSIX installer for Windows sandbox**
