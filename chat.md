@@ -12,6 +12,257 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude
+
+**credentials, config cleanup, docify inlined, debug flags**
+
+**What changed (crates/freight):**
+- `freight login`/`logout`: tokens now stored in OS keychain (macOS Keychain,
+  GNOME Keyring, Windows Credential Manager) via `keyring` + `keyring-core`.
+  `credentials.toml` removed. Env vars `FREIGHT_TOKEN_<NAME>` / `FREIGHT_TOKEN`
+  as CI fallback. New `freight logout` command.
+- GNU + Clang dev profile: added `-fno-omit-frame-pointer -fasynchronous-unwind-tables`
+  so stack unwinding works in debuggers. GAS assembler: `--gdwarf-2` → `--gdwarf-4`.
+- LSP `freight/workspaceInfo` (schemaVersion 2): now returns detected `toolchains`
+  array and current `sysroot` from the manifest.
+- LSP `freight/setConfig`: new handler; `set_manifest_config()` uses `toml_edit`
+  to write/clear `compiler.sysroot` in `freight.toml` without formatting loss.
+- `docify` git dep removed; extract + render_md inlined into `src/doc/docify/`
+  (dropped non-freight languages: Go, Java, Kotlin, Swift, Python, TS, C#, etc.)
+
+**What changed (crates/freight-registry):**
+- All secrets removed from config file: SMTP password, S3 key+secret, OAuth
+  `client_secret`. Now env-var only: `FREIGHT_SMTP_PASSWORD`, `FREIGHT_S3_KEY_ID`,
+  `FREIGHT_S3_SECRET`, `FREIGHT_OAUTH_<NAME>_CLIENT_SECRET`.
+
+**What changed (editors/vscode-freight):**
+- Status bar family picker filters to detected families from `workspaceInfo`.
+- `pickSysroot` persists to `freight.toml` via `freight/setConfig` LSP call.
+- `activeSysroot` seeded from manifest on first LSP connection.
+
+**Tested:** 629 unit tests pass. 4 pre-existing integration tests fail (tcc missing in env).
+**Pushed:** all committed in respective submodule repos.
+
+### 2026-06-04 — Codex
+
+**Additional DAP backend TODOs**
+
+**What changed:**
+- Added TODO coverage for future non-GDB/LLDB DAP backends.
+- `crates/freight/TODO.md` now tracks investigation for `rr`, Windows `cdb`,
+  and Windows `windbg` DAP support.
+- `editors/vscode-freight/TODO.md` now notes that only GDB-family, CUDA-GDB,
+  and LLDB DAP are supported for editor debugging today, with other debugger
+  templates pending Freight core support first.
+
+**Tested:** documentation-only change; no tests run.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-04 — Codex
+
+**DAP extra debugger args**
+
+**What changed:**
+- `freight dap` now appends native debugger adapter process args from the
+  effective Freight config (`[debugger.<name>].args` in global/project
+  `config.toml`) and from launch config `debuggerArgs`.
+- Merge order is Freight DAP defaults, config.toml debugger args, then
+  launch.json `debuggerArgs`.
+- VS Code schema/payload/docs now expose `debuggerArgs` for launch and attach
+  configurations.
+- Extended Freight DAP tests for GDB and LLDB arg merging, and VS Code payload
+  tests for serialized `debuggerArgs`.
+
+**Tested:** `cargo test -p freight commands::dap::server::tests`;
+`editors/vscode-freight/bun run test`; `node --check
+editors/vscode-freight/src/extension.js`; `editors/vscode-freight/bun run
+check`; `cargo build -p freight`.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-04 — Codex
+
+**DAP adapter test coverage**
+
+**What changed:**
+- Added Freight DAP unit tests in `crates/freight/src/bin/freight/commands/dap/server.rs`
+  using fake DAP-speaking executables. Coverage includes explicit GDB,
+  CUDA-GDB, explicit LLDB DAP, detected LLDB DAP, detected GDB probing,
+  `default_debugger` selection, non-DAP rejection, and release/profile fallback.
+- Added `editors/vscode-freight/tests/dap-config.test.js` plus a `bun run test`
+  script to verify VS Code debug config serialization without requiring the VS
+  Code runtime.
+- Factored VS Code DAP config serialization into a testable helper and updated
+  the README/TODO to mention the test coverage.
+
+**Tested:** `cargo test -p freight commands::dap::server::tests`;
+`editors/vscode-freight/bun run test`; `editors/vscode-freight/bun run check`;
+`cargo build -p freight`.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-04 — Codex
+
+**VS Code debug config handoff**
+
+**What changed:**
+- Wired `editors/vscode-freight` debug sessions to write the resolved launch
+  config to a temp JSON file and start `freight dap --config <file>` (plus
+  `--attach` for attach sessions), so Freight sees `bin`, `package`,
+  `features`, `debugger`, `debuggerPath`, profile/release, and related fields
+  before it builds and execs the native adapter.
+- Added resolved `profile` / `release` defaults from the VS Code status bar and
+  mapped `stopAtEntry` to `stopAtBeginningOfMainSubprogram` for native adapters.
+- Updated the VS Code debug schema/docs/TODO to describe the temp config
+  transport and remaining real Extension Development Host smoke test.
+- Updated `freight dap` build selection to honor `profile` from the launch
+  config, falling back to `release` or `dev`.
+
+**Tested:** `cargo build -p freight`; `editors/vscode-freight/bun run check`;
+`node --check editors/vscode-freight/src/extension.js`; `target/debug/freight
+dap --help`.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-04 — Codex
+
+**VS Code debug setup audit**
+
+**What changed:**
+- Inspected `editors/vscode-freight` debug provider/schema against the current
+  simplified `freight dap`.
+- Updated `editors/vscode-freight/README.md` and `TODO.md` to reflect the current
+  blocker: VS Code launch fields such as `bin`, `package`, `features`,
+  `debuggerPath`, `stopAtEntry`, and `env` are exposed by the extension but do
+  not reach Freight before `freight dap` builds and execs the native adapter.
+- Documented that the next implementation choice is either stable `freight dap`
+  CLI/config transport or a small DAP shim that reads `launch` / `attach` before
+  forwarding to GDB/LLDB.
+
+**Tested:** `editors/vscode-freight/bun run check` passed.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-04 — Codex
+
+**LSP docs path cleanup and workspace build**
+
+**What changed:**
+- Updated `AGENTS.md` to point at the current `freight lsp` module directory,
+  `crates/freight/src/bin/freight/commands/lsp/`, instead of the stale
+  `commands/lsp.rs` path.
+
+**Tested:** `cargo build` from the workspace root passed. It reported one existing warning:
+`crates/freight/src/bin/freight/commands/publish.rs` has an unused `project_dir`
+parameter in `run_pre_publish_pipeline`.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-04 — Codex
+
+**nvim-freight DAP and command pass**
+
+**What changed:**
+- Continued `editors/nvim-freight` after the `freight dap` simplification: the plugin now registers thin `Freight: Debug` and `Freight: Attach` `nvim-dap` configs, with attach starting `freight dap --attach`.
+- Kept `:FreightRun` as a normal terminal workflow and added reusable terminal support.
+- Added `:FreightAttach`, status/health helpers, extra Freight commands, root caching, `.freight/config.toml` watching, and command completion for target flags, binaries, packages, and dependencies.
+- Completion inventory now reads workspace member `freight.toml` files, not only the root manifest.
+- Updated `editors/nvim-freight/README.md` and `TODO.md` to match current behavior and remaining DAP limits.
+
+**Tested:** `editors/nvim-freight/scripts/test.sh`.
+**Pushed:** nothing pushed; nvim plugin changes remain uncommitted.
+
+### 2026-06-04 — Claude
+
+**DAP simplification, per-platform verify images, docify CI fix, org migration**
+
+**What changed:**
+- `freight dap` rewritten: dropped ~900-line proxy server; now just builds the project then `exec()`s into the native adapter (GDB `--interpreter=dap` or `lldb-dap`). Added `--attach` flag to skip build. `protocol.rs` deleted entirely.
+- `freight-registry`: added per-platform CI verify images — `[serve.verify]` TOML section with per-OS image keys (`linux`, `windows`, `freebsd`, `macos`, etc.) and matching CLI flags / env vars. `run_verification_pipeline` now returns `bool`; multi-platform dispatch uses `AtomicUsize` + `AtomicBool` vote counting — publishes only if all platforms pass.
+- `freight-registry`: added `[serve.scan]` TOML section with `backend` key → `FREIGHT_SCAN_BACKEND` env var.
+- `docify`: pushed `#[derive(Serialize, Deserialize)]` on `DocItem` (was only local); unblocked freight GitHub CI.
+- Org migration: `freight` and `freight-registry` repos moved to `freight-app` org. `cmake-lossless`, `docify`, and `vcpkg-converter` stay on `TiniTinyTerminator`. All Cargo.toml dep URLs updated accordingly.
+
+**Tested:** `cargo check --workspace`; `cargo build -p freight`; `cargo build -p freight-registry`; all passed.
+**Pushed:** all submodules pushed.
+
+### 2026-06-04 — Codex
+
+**Markdown documentation refresh**
+
+**What changed:**
+- Updated workspace and crate Markdown docs for the `freight-app` GitHub organization.
+- Replaced stale `.deps/` package-cache references with `.pkgs/` in active docs.
+- Corrected Cargo package references from `freight-core` to the current `freight` package while keeping the `freight_core` library name where appropriate.
+- Refreshed Freight example paths from the old flat example layout to the current grouped `examples/<group>/<name>` layout.
+- Removed stale `freight-registry-tui` architecture wording in favor of `freight tui`.
+
+**Tested:** Markdown-only changes; ran repository-wide `rg` checks for stale owner names, `.deps`, old example paths, and `freight-core` package commands.
+**Pushed:** nothing pushed; changes remain uncommitted.
+
+### 2026-06-03 — Codex
+
+**Freight DAP backend feature pass**
+
+**What changed:**
+- `freight dap` now honors `debuggerPath` as either an absolute path or command
+  name on `PATH`, probing it as GDB-style DAP or native adapter depending on
+  `debugger` / executable name.
+- DAP debugger selection now treats `cuda-gdb` like GDB for native DAP probing.
+- DAP debug builds now support workspace roots and launch `package` selection
+  through `build_workspace_with`; non-workspace launches reject `package`.
+- DAP run mode now drains stdout/stderr concurrently to avoid pipe deadlocks.
+- Launch forwarding now normalizes `args`, `env`, and maps `stopAtEntry` to
+  `stopAtBeginningOfMainSubprogram` for native adapters.
+- VS Code schema now exposes `cuda-gdb`, `stopAtEntry`, `env`, richer
+  `debuggerPath`, and an attach configuration shape; the provider no longer
+  rewrites `attach` to `launch`.
+
+**Still open:** terminal-backed DAP run/debug output is not implemented; quick-pick
+for multiple binaries is still editor-side TODO; preLaunchTask is still VS Code-native
+only and not interpreted by Freight.
+
+**Tested:** `cargo check -p freight`; `cargo build -p freight`; DAP initialize
+stdio smoke test; VS Code `bun run package`; package JSON parse check.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**nvim-freight TODO progress**
+
+**What changed:**
+- Made `require("freight").setup()` idempotent for commands, autocommands, and
+  Freight DAP configuration insertion.
+- Added `.freight/config.toml` watch notifications alongside `freight.toml`.
+- Added `M.status()`, `M.health()`, `:FreightLspStart`, `:FreightStatus`, and
+  `:FreightHealth`.
+- Added commands for `freight add`, `remove`, `update`, `check`, and `doc`.
+- Added `scripts/test.sh` and `tests/headless.lua` for headless Neovim checks,
+  including a stubbed `nvim-dap` registration/idempotency test.
+- Updated README and TODO checkboxes for completed items.
+
+**Tested:** `editors/nvim-freight/scripts/test.sh`.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**nvim-freight TODO**
+
+**What changed:** Added `editors/nvim-freight/TODO.md` covering DAP follow-ups,
+LSP improvements, command UX, documentation, and test harness work.
+
+**Tested:** documentation-only change.
+**Pushed:** pending.
+
+### 2026-06-02 — Codex
+
+**nvim-freight DAP smoke test**
+
+**What changed:** No new code changes beyond the pending `nvim-dap` integration in
+`editors/nvim-freight`. After Neovim became available locally, verified the
+plugin loads headlessly with DAP disabled and with DAP auto-detection enabled.
+`nvim-dap` is not installed here, so a stub `dap` module was used to verify that
+the plugin registers `dap.adapters.freight` and Freight run/debug configurations.
+
+**Tested:** `nvim --headless -u NONE -i NONE` plugin load checks with XDG dirs
+pointed at `/tmp`; stubbed `dap` registration assertion.
+**Pushed:** pending.
+
 ### 2026-06-02 — Claude (session 4)
 
 **DAP: fix breakpoints and variable readout**
@@ -1536,3 +1787,192 @@ Verification:
 - Committed `Cargo.lock` (rmp-serde + docify dep additions from session work)
 - Left `crates/freight/examples/with-deps/freight.toml` (4 dep removals) untouched — origin unclear
 - No open PRs on any submodule; all session work is pushed and clean
+
+## 2026-06-03 — Codex: editor-neutral Freight DAP contract
+
+What changed:
+- Generalized `freight dap` comments and relay docs away from VS Code-specific wording.
+- Added a `freight/dapInfo` custom DAP request that reports `schemaVersion`, supported
+  launch/attach requests, Freight config fields, forwarded standard fields, and detected
+  native DAP debuggers.
+- Made DAP launch/attach/run config reads prefer an editor-neutral `arguments.freight`
+  namespace, with backwards-compatible top-level fields still accepted.
+- Kept debugger execution as native-DAP passthrough for GDB/cuda-gdb and LLDB adapters.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight commands::dap::server::tests --bin freight`; it passed.
+- Ran `cargo check -p freight`; it passed with two unrelated LSP warnings.
+- Ran `cargo build -p freight`; it passed with the same unrelated LSP warnings.
+- Smoke-tested raw DAP frames through `target/debug/freight dap` for `initialize`,
+  `freight/dapInfo`, and `disconnect`; all returned valid DAP responses.
+
+Pushed:
+- Nothing pushed.
+
+Questions for next agent:
+- Consider adding a documented DAP config schema for IDE/MCP adapters once the exact
+  MCP surface is chosen.
+
+## 2026-06-03 — Codex: LSP workspace recognition start
+
+What changed:
+- Added LSP TODOs for workspace/package recognition and native Fortran support. `fortls` is now
+  documented as a temporary/reference passthrough, not the long-term dependency.
+- Added `load_workspace_manifest_str()` so LSP diagnostics can parse workspace manifests from
+  open editor text.
+- `freight lsp` diagnostics now treat `[workspace]` manifests as first-class and validate
+  member entries instead of reporting missing `[package]`/target errors.
+- `generate_lsp_compile_commands_at()` now detects workspace roots and writes one hidden merged
+  backend compile DB for all members under `/tmp/freight/lsp/...`.
+- Hidden LSP compile commands now keep include dirs from explicitly resolved Freight dependency
+  roots while still filtering broad system include dirs except stdc/stdc++ headers.
+- When the editor root is a workspace, watched member `freight.toml` changes refresh the
+  workspace compile DB instead of narrowing state to that member.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight commands::lsp::manifest::tests --bin freight`; it passed before
+  unrelated publish-manifest edits made the binary target fail to compile.
+- Ran `cargo test -p freight lsp_include_filter --lib`; it passed with one unrelated
+  make-migration test warning.
+- Ran `cargo check -p freight --lib`; it passed.
+- `cargo check -p freight --bin freight` is currently blocked by unrelated dirty
+  `publish.rs` changes referencing missing `PublishPolicy`, `package.publish`, and
+  package `include`/`exclude` fields.
+
+Pushed:
+- Nothing pushed.
+
+Questions for next agent:
+- Remaining LSP work: workspace target inventory for `[lib]`/`[[bin]]`, workspace-wide doc index,
+  and native Fortran indexing/completion to replace the fortls dependency over time.
+
+## 2026-06-03 — Codex: LSP workspace targets and docs
+
+What changed:
+- Added a `WorkspaceInventory` for `freight lsp` that records workspace member package names,
+  member paths, `[[bin]]` targets, and `[lib]` target presence/type.
+- Added `freight/workspaceInfo` custom LSP request returning the workspace inventory for editor
+  run/debug/build pickers.
+- Manifest completions in `[dependencies]` now suggest workspace libraries as explicit
+  `{ path = "..." }` dependencies, while binary-only workspace packages are not suggested as libs.
+- Workspace member completions are available in `[workspace]`.
+- The doc hover index now merges source docs from every workspace member instead of only the
+  nearest manifest's `src/` tree.
+- Removed the dead `DocIndex::build()` helper after switching to `build_many()`.
+- Updated `crates/freight/TODO.md` to mark workspace target inventory and workspace doc-index
+  refresh done; explicit path dependency doc indexing remains open.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight commands::lsp --bin freight`; it passed.
+- Ran `cargo check -p freight --bin freight`; it passed with one unrelated `publish.rs`
+  unused-variable warning.
+- Ran `cargo test -p freight lsp_include_filter --lib`; it passed with one unrelated
+  make-migration test warning.
+- Ran `cargo check -p freight --lib`; it passed.
+
+Pushed:
+- Nothing pushed.
+
+Questions for next agent:
+- Next LSP step is explicit path-dependency doc indexing plus native Fortran symbol support.
+
+## 2026-06-03 — Codex: LSP doc index follows freight doc rules
+
+What changed:
+- Updated the LSP doc hover index to use the same package extraction order as `freight doc` TUI:
+  `[lib].hdrs` first, then `[lib].srcs`, then `src/`, then package root.
+- Added explicit path dependency package dirs to the LSP doc index for single packages and
+  workspace members, including dev dependencies.
+- Added tests that path dependencies are included in doc indexing and that public headers win
+  over private source docs when `[lib].hdrs` is declared.
+- Marked the explicit path-dependency doc indexing TODO done.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight commands::lsp --bin freight`; it passed with one unrelated
+  `publish.rs` unused-variable warning.
+- Ran `cargo check -p freight --bin freight`; it passed with the same unrelated warning.
+- Ran `cargo check -p freight --lib`; it passed.
+- Ran `cargo test -p freight lsp_include_filter --lib`; it passed with one unrelated
+  make-migration test warning.
+
+Pushed:
+- Nothing pushed.
+
+Questions for next agent:
+- Native Fortran indexing/completion remains the main LSP gap now that workspace and explicit
+  path dependency docs are indexed.
+
+## 2026-06-03 — Codex: DAP breakpoint path fix for moved examples
+
+What changed:
+- Fixed `build::compile::is_up_to_date()` so a `.d` dependency file entry that no longer exists
+  marks the object stale. This prevents reused objects from carrying old `DW_AT_name` /
+  `DW_AT_comp_dir` debug paths after a project/example directory is moved.
+- Added a regression test for missing dependency entries triggering recompilation.
+- Rebuilt `examples/cpp/hello`; it recompiled both sources and now emits debug info for
+  `/home/max/freight/crates/freight/examples/cpp/hello/src/main.cpp` instead of the old
+  `/examples/hello-cpp/...` path.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight missing_dependency_entry_triggers_recompile --lib`; it passed with
+  one unrelated make-migration test warning.
+- Ran `cargo check -p freight --lib`; it passed.
+- Ran `cargo check -p freight --bin freight`; it passed with one unrelated `publish.rs`
+  unused-variable warning.
+- Ran `/home/max/freight/target/debug/freight build` in `examples/cpp/hello`; it compiled 2 files.
+- Verified `readelf --debug-dump` shows the current `examples/cpp/hello` path.
+- Verified `gdb --batch` can bind a breakpoint at `src/main.cpp:17`.
+
+Pushed:
+- Nothing pushed.
+
+## 2026-06-03 — Codex: DAP filters GDB pending-breakpoint noise
+
+What changed:
+- Fixed `freight dap` bootstrap waiting so the native adapter's initialize response is consumed
+  instead of occasionally leaking back to VS Code after a short timeout.
+- Kept GDB DAP's normal `initialized` / `setBreakpoints` / `configurationDone` flow intact and
+  filtered only GDB's transient console lines for pending source breakpoints:
+  `No source file named ...` and `Breakpoint ... pending.`
+- Added DAP frame-helper coverage for command matching and pending-breakpoint output filtering.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight commands::dap --bin freight`; it passed with one unrelated
+  `publish.rs` unused-variable warning.
+- Ran `cargo check -p freight --bin freight`; it passed with the same unrelated warning.
+- Ran `cargo build -p freight`; it passed with the same unrelated warning.
+- Ran a VS Code-like DAP smoke through `/home/max/freight/target/debug/freight dap` in
+  `examples/cpp/hello`; no pending-breakpoint output was relayed, and GDB still emitted verified
+  breakpoint events for `src/main.cpp:17` and `src/main.cpp:19`.
+
+Pushed:
+- Nothing pushed.
+
+## 2026-06-03 — Codex: DAP stop/disconnect exits promptly
+
+What changed:
+- Added an explicit DAP server exit flag so `disconnect` / `terminate` requests consumed inside
+  the native-adapter passthrough also make the outer `freight dap` process exit.
+- Replaced unbounded adapter `child.wait()` on shutdown with a short graceful drain and kill
+  fallback, while still forwarding final adapter output/responses.
+- Run mode now handles Stop by killing the spawned `freight run` child and returning a DAP
+  `terminated` event instead of waiting for the program to exit naturally.
+
+Tested:
+- Ran `cargo fmt -p freight`.
+- Ran `cargo test -p freight commands::dap --bin freight`; it passed with one unrelated
+  `publish.rs` unused-variable warning.
+- Ran `cargo check -p freight --bin freight`; it passed with the same unrelated warning.
+- Ran `cargo build -p freight`; it passed with the same unrelated warning.
+- Ran a VS Code-like DAP stop smoke through `/home/max/freight/target/debug/freight dap` in
+  `examples/cpp/hello`; after `disconnect`, Freight exited in about 49 ms and forwarded GDB's
+  disconnect response.
+
+Pushed:
+- Nothing pushed.
