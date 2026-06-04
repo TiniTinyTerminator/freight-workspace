@@ -12,6 +12,32 @@ Guidelines:
 
 ## Log
 
+### 2026-06-04 — Claude (session 2)
+
+**`freight package --installer` — self-contained bundles**
+
+**What changed (crates/freight):**
+- New `installer_project()` in `src/install.rs`: builds, installs to staging, then
+  collects transitive shared-lib dependencies (ldd/otool -L/dumpbin) and bundles
+  them into `lib/` alongside the binary.
+- System libs excluded from bundling: glibc family on Linux, `/usr/lib`+`/System/`
+  on macOS, system32 DLLs on Windows.
+- Launcher script written at the archive root (Linux/macOS) that sets
+  `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` to `$DIR/lib` before exec-ing the binary.
+- macOS: bundled dylibs get install names rewritten to `@executable_path/../lib/`
+  via `install_name_tool`.
+- Windows: DLLs copied into `bin/` (next to exe) — no wrapper script needed.
+- `PackageArgs` in `commands/install.rs` gets `--installer` flag; archive is named
+  `{name}-{version}-{arch}-{os}-installer.tar.gz` (or `.zip` on Windows).
+- Fixed: pushed earlier session commits (docify inlining etc.) that were never
+  pushed — that resolved the DocLanguage/DocItem CI failures.
+
+**Tested:** `cargo check` clean (2 pre-existing dead-code warnings unrelated).
+
+**Pushed:** `crates/freight` master, workspace pointer bumped.
+
+**Open questions:** None.
+
 ### 2026-06-04 — Claude
 
 **credentials, config cleanup, docify inlined, debug flags**
@@ -1976,3 +2002,123 @@ Tested:
 
 Pushed:
 - Nothing pushed.
+
+## 2026-06-04 — Codex: Registry profile, docs, and install pages
+
+What changed:
+- Updated `freight-registry` account/profile UI so it no longer fetches or renders active API
+  tokens from `/api/v1/me/tokens`; the account page now shows profile, package, security, and
+  developer-access sections, with CLI login guidance instead of token inventory.
+- Added top-level registry routes for `/docs`, `/docs/`, and `/install`; package source docs remain
+  on `/packages/:name/docs`.
+- Added a static Freight ecosystem guide and install page, updated registry nav/footer links to
+  point at those pages, and moved GitHub links to `freight-app/freight-registry`.
+- Added a Docusaurus docs source tree under `crates/freight-registry/docs-site/` with guide,
+  install, and publish pages; its build script targets `../static/docs`.
+
+Tested:
+- Ran `cargo check -p freight-registry`; it passed.
+- Ran `node --check docs-site/docusaurus.config.js`; it passed.
+- Ran `node --check docs-site/sidebars.js`; it passed.
+- Ran `rg` checks for stale external docs links, removed token UI functions, and the obsolete
+  `freight publish-docs` snippet; only backend `/api/v1/me/tokens` routes remain intentionally.
+
+Pushed:
+- Nothing pushed by Codex. The `freight-registry` submodule is clean at local commit `86517d8`
+  (`config: remove all secrets from config file`) and is ahead of `origin/main` by one commit;
+  that commit contains these web/docs changes plus pre-existing Docker/config changes.
+
+Questions for next agent:
+- Decide whether to split or push the local `freight-registry` commit as-is. I did not rewrite it.
+
+## 2026-06-04 — Codex: Expanded registry ecosystem docs tabs
+
+What changed:
+- Extended the served registry guide at `crates/freight-registry/static/docs/index.html` with tabs
+  and sections for `freight.toml`, `config.toml`, DAP, LSP, and Freight's DAG build system.
+- Mirrored those topics into Docusaurus source pages:
+  `docs-site/docs/freight-toml.md`, `config-toml.md`, `dap-lsp.md`, and `dag.md`.
+- Updated the Docusaurus sidebar and intro page to link the new docs.
+
+Tested:
+- Ran `node --check docs-site/docusaurus.config.js`; it passed.
+- Ran `node --check docs-site/sidebars.js`; it passed.
+- Ran `rg` checks to verify the new docs topics appear in the served static guide and Docusaurus
+  source.
+- The dev server session `29444` is still running; sandboxed `curl` could not connect to
+  `localhost:7878`, but the server log showed active localhost browser traffic.
+
+Pushed:
+- Nothing pushed.
+
+Questions for next agent:
+- Docusaurus dependencies are still not installed here, so `npm run build` has not been run.
+
+## 2026-06-04 — Codex: Cleaned registry docs navigation
+
+What changed:
+- Reworked `/docs/` navigation so top tabs are page-level only (`Guide`, `Install`) and the
+  sidebar is grouped by Start, Reference, Tooling, and Registry.
+- Added a compact topic shortcut grid under the docs intro for `freight.toml`, `config.toml`,
+  DAP, LSP, and DAG.
+- Grouped the Docusaurus sidebar into the same Start / Reference / Tooling / Registry structure.
+
+Tested:
+- Ran `node --check docs-site/sidebars.js`; it passed.
+- Ran `node --check docs-site/docusaurus.config.js`; it passed.
+- Ran `rg` checks for the new navigation classes and Docusaurus category sidebar entries.
+
+Pushed:
+- Nothing pushed.
+
+## 2026-06-04 — Codex: Markdown-first Docusaurus docs with Bun
+
+What changed:
+- Made `crates/freight-registry/docs-site/docs/*.md` the docs source of truth and generated
+  `static/docs/` with Docusaurus instead of maintaining the long-form docs in hand-written HTML.
+- Switched docs tooling to Bun: added `packageManager = bun@1.3.14`, `bun.lock`, and
+  `docs-site/README.md` with `bun install` / `bun run build`.
+- Removed the npm `package-lock.json` artifact and added `docs-site/.gitignore` for
+  `node_modules/`, `.docusaurus/`, `.bun-tmp/`, and local build output.
+- Updated registry nav/footer install links to `/docs/install/`; changed the backend `/install`
+  route to redirect there and deleted the obsolete hand-authored `static/install.html`.
+
+Tested:
+- Ran `bun install`; it completed and saved `bun.lock` after a long dependency-resolution phase.
+- Ran `env BUN_TMPDIR=... bun run build`; it generated `static/docs/` successfully from Markdown.
+- Ran `cargo check -p freight-registry`; it passed.
+- Ran checks confirming `bun.lock` exists and `package-lock.json` is absent.
+
+Pushed:
+- Nothing pushed.
+
+Questions for next agent:
+- Restart the registry server before testing the legacy `/install` redirect route; the running
+  server binary predates that route change. Direct `/docs/install/` works through static files.
+
+## 2026-06-04 — Codex: Created private launch registry repo
+
+What changed:
+- Created private GitHub repo `freight-app/freight-registry-launch` for the launch variant:
+  https://github.com/freight-app/freight-registry-launch
+- Seeded it from the current `freight-registry` checkout into `/tmp/freight-registry-launch`.
+- Configured launch clone remotes:
+  - `origin`: `git@github.com:freight-app/freight-registry-launch.git`
+  - `upstream`: `git@github.com:freight-app/Freight-registry.git`
+- Committed the launch seed as `940c16f seed private launch registry`.
+- Initial push warned about inherited `target/debug` artifacts, so I rewrote the private launch
+  branch history to remove `target/` and `__pycache__/`, then force-pushed the cleaned branch.
+
+Tested:
+- Verified with `gh repo view` that `freight-app/freight-registry-launch` exists and has
+  visibility `PRIVATE`.
+- Verified `git ls-remote origin refs/heads/main` returns `940c16f`.
+- Verified `git rev-list --objects main` in `/tmp/freight-registry-launch` has no `target/`,
+  `__pycache__/`, or `.pyc` paths.
+
+Pushed:
+- Pushed cleaned private launch branch to `freight-app/freight-registry-launch`.
+
+Questions for next agent:
+- The private launch clone currently lives in `/tmp/freight-registry-launch`; clone it somewhere
+  persistent if ongoing launch work should happen locally.
