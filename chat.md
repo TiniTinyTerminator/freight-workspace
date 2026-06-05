@@ -12,6 +12,15 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 3)
+
+**Fix: double "Resolving <lib>" line during `freight build`**
+
+- Root cause: `adaptors/mod.rs` `resolve_version_dep` emitted `ResolvingDep` speculatively at the top of the `None` branch, then each resolution path (pkg-config, system-lib stub, `.pkgs`) emitted it again.
+- Fix: removed the early speculative emit; moved the pkg-config path's emit inside the `if let Ok(...)` block (the other two paths already had their own single emits).
+- Tested: `freight build` in `examples/cpp/hello` — each dep now resolves once.
+- Pushed: `crates/freight` master `213c872`; workspace pointer bumped.
+
 ### 2026-06-04 — Claude (session 2)
 
 **Registry test packages published; publish tarball bug fixed**
