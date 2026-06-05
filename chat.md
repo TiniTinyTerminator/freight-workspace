@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 4)
+
+**PackageNode pipeline — unified dep tree struct**
+
+New file `src/build/pipeline.rs` introduces `PackageNode`: a single `Arc<PackageNode>` tree that represents both the root project and every transitive dep. Design:
+- `parent: Option<Weak<PackageNode>>` — Weak to break reference cycles; children hold strong refs
+- `children: RwLock<Vec<Arc<PackageNode>>>` — interior mutability for lazy append during dep resolution
+- `pkgs_root_dir()` walks parent links to root so every dep anchors its `.pkgs/` lookup to the top-level project dir
+
+Replaced the old `pkgs_root: Option<&Path>` parameter in `build_project_at` and `build_foreign_deps` with `parent_node: Option<&Arc<PackageNode>>` / `node: &Arc<PackageNode>`. The node carries profile, version, dir, and the full tree in one place.
+
+Profile bug fixed: dep source-builds now use `root_node.profile` ("dev"/"release") instead of the version constraint string ("0.1.0"). Integration test assertions updated accordingly.
+
+All 663 lib tests + 2 flat_pkgs tests pass. Pushed as `3ca6949`.
+
 ### 2026-06-05 — Claude (session 3)
 
 **Fixed root bug in flat .pkgs/ pool: pkgs_root was wrong in nested source builds**
