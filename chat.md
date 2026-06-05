@@ -12,6 +12,25 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 9)
+
+**Add `Project` struct; move `#[cfg(test)]` to end of `build/mod.rs`**
+
+`Project { dir, manifest, parent_graph }` in `src/build/mod.rs` is the new
+high-level handle to a freight project. Constructed via `Project::open(dir)`
+(loads + parses `freight.toml`) or `Project::from_cwd()`. Methods: `build`,
+`test`, `bench`, `run` (builds then execs a binary), `clean`,
+`generate_compile_commands`. All delegate to `run_pipeline_at`.
+
+`manifest` is eagerly loaded at `open()` time so callers can inspect package
+metadata without running a build. `parent_graph` anchors dep source-builds to
+the root `.pkgs/` pool.
+
+The `#[cfg(test)] mod tests { … }` block was moved from mid-file to the end so
+the file reads: types → pipeline → public API → helpers → tests.
+
+Pushed: `crates/freight` master → `772f033`; workspace → `cfec694`
+
 ### 2026-06-05 — Claude (session 8)
 
 **Unified pipeline: single `run_pipeline_at` entry point for build/test/bench**
@@ -2763,6 +2782,44 @@ What changed:
 
 Tested:
 - `cargo test -p freight lsp::tests`
+- `cargo check -p freight` (passed with existing warnings)
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-05 — Codex: Freight-only C/C++ hover contents
+
+What changed:
+- Adjusted the clangd-assisted C/C++ hover path so clangd is used only to resolve the symbol/range.
+- When Freight/docify docs are found, the hover popup now shows only Freight docs and discards clangd's
+  textual hover contents.
+- When no Freight docs resolve for a clangd-backed C/C++ hover, Freight returns no hover instead of
+  falling back to clangd's raw hover text.
+- Updated LSP tests to assert clangd text is suppressed.
+
+Tested:
+- `cargo test -p freight lsp::tests`
+- `cargo check -p freight` (passed with existing warnings)
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-05 — Codex: render stdlib docs in `freight doc`
+
+What changed:
+- Changed the doc browser so completed stdlib scans are appended to the visible package tree instead
+  of being stored as hidden link-only packages.
+- Allowed `freight doc` to open the browser even when the project/deps have no extracted docs, so
+  stdlib docs can load as the only documentation source.
+- Kept the hidden package/link machinery for future non-sidebar link targets.
+
+Tested:
 - `cargo check -p freight` (passed with existing warnings)
 
 Pushed:
