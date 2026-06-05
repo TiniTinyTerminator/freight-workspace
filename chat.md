@@ -14,6 +14,19 @@ Guidelines:
 
 ### 2026-06-05 — Codex
 
+**Pushed docs site workflow guides and VHS tape sources**
+
+- Cloned `freight-app/freight-docs` to `/tmp/freight-docs` and pushed `3d24a5d`
+  (`docs: add workflow demos and project guides`) to `main`.
+- Added Docusaurus pages for build workflow, dependency management, and install/package workflows.
+- Added three new terminal demo scenarios with VHS tape sources and text transcripts:
+  build workflow, dependency management, and packaging.
+- Verified `node --check sidebars.js`, `node --check docusaurus.config.js`, all new scenario
+  shell scripts, `bun install --frozen-lockfile`, and `bun run build`.
+- GitHub Pages workflow run `27027209360` completed successfully.
+
+### 2026-06-05 — Codex
+
 **Pushed finished VS Code extension work**
 
 - Committed and pushed `editors/vscode-freight` through `230f74f`:
