@@ -12,6 +12,48 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Codex
+
+**Added inline Freight task failure annotations in VS Code**
+
+- Updated `editors/vscode-freight/src/extension.js` so Freight build/run/test tasks use a
+  custom pseudoterminal execution instead of raw `ShellExecution`, preserving terminal output
+  while capturing stdout/stderr for post-run failure parsing.
+- Failed tasks now publish a separate `freight execution` diagnostic collection and render
+  inline after-text on the affected source line for GCC/Clang-style, Freight summary, and
+  MSVC-style diagnostics; runtime/startup failures fall back to the active source file or
+  `freight.toml` with the exit reason and last meaningful output line.
+- `freight run` / `freight test` failures that print C++ terminate output such as
+  `terminate called after throwing an instance of 'std::runtime_error'` now raise a VS Code
+  error notification with the exception type and `what():` text when available.
+- Added parser coverage in `editors/vscode-freight/tests/dap-config.test.js`.
+- Tested: `npm test` and `npm run check` in `editors/vscode-freight`.
+- Not pushed.
+
+### 2026-06-05 — Codex
+
+**Fixed LSP compile DB includes for cached registry deps**
+
+- Updated `crates/freight/src/build/mod.rs` so `generate_lsp_compile_commands_at()`
+  includes headers from manifest version deps already fetched under `.pkgs/`, including
+  transitive cached version deps found through fetched packages' `freight.toml` files.
+- This makes the hidden `.freight/lsp/<profile>/compile_commands.json` match the build
+  path for registry packages such as `vecmath` and `mathlib` in `examples/cpp/hello`.
+- Added regression tests for direct and transitive cached version dependency include dirs.
+- Tested: `cargo test -p freight lsp_compile_commands --lib`, `cargo check -p freight --lib`,
+  `cargo build -p freight`, and an LSP initialize smoke in `examples/cpp/hello` showing
+  `-I.pkgs/vecmath/include` and `-I.pkgs/mathlib/include` in `.freight/lsp/dev/compile_commands.json`.
+- Not pushed.
+
+### 2026-06-05 — Claude (session 3, part 2)
+
+**Registry gaps: E2 recovery codes, E3 org owner enforcement, E5 GC**
+
+- **E2 (TOTP recovery codes)**: new `totp_recovery_codes` table (migration 0010 for SQLite + PG); 8 codes generated on TOTP `confirm`, SHA-256 hashes stored; plaintext returned once in confirm response; login now accepts a recovery code as a one-time alternative to a live TOTP code.
+- **E3 (org owner enforcement)**: `set_package_org` was checking `is_org_member`; fixed to require `is_org_owner`.
+- **E5 (blob GC)**: `freight-registry gc` subcommand; dry-run by default; `--execute` removes all blobs for yanked versions (DB rows kept).
+- Pushed: `crates/freight-registry` main `298e67c`; workspace pointer bumped.
+
 ### 2026-06-05 — Claude (session 3)
 
 **Fix: double "Resolving <lib>" line during `freight build`**
