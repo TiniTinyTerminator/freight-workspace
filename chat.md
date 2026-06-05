@@ -46,7 +46,12 @@ Guidelines:
   or `module.exports` remain under `src/`.
 - Updated `package.json` so Bun builds `src/extension.ts` to CommonJS `dist/extension.js`
   for VS Code, and tests require a temporary bundled artifact.
-- Tested: `npm test`, `npm run check`, and `npm run compile` in `editors/vscode-freight`.
+- Added `tsconfig.json`, fixed strict TypeScript diagnostics, and added orienting comments to
+  the split modules so each VS Code surface is easier to follow.
+- Updated the extension debug setup so `bun run package` emits linked source maps and
+  `.vscode/launch.json` maps `dist/extension.js` back to `src/*.ts` for TypeScript breakpoints.
+- Tested: `BUN_TMPDIR=/tmp BUN_INSTALL=/tmp/bun-install bunx tsc --noEmit`, `npm test`,
+  `npm run check`, and `npm run compile` in `editors/vscode-freight`.
 - Not pushed.
 
 ### 2026-06-05 — Codex
@@ -63,6 +68,15 @@ Guidelines:
   `cargo build -p freight`, and an LSP initialize smoke in `examples/cpp/hello` showing
   `-I.pkgs/vecmath/include` and `-I.pkgs/mathlib/include` in `.freight/lsp/dev/compile_commands.json`.
 - Not pushed.
+
+### 2026-06-05 — Claude (session 3, part 4)
+
+**freight: source build fallback when no prebuilt triple available**
+
+- `adaptors/mod.rs`: after a `.pkgs` cache hit, if `lib/` has no binary artifacts but `freight.toml` exists (source tarball), calls `build_project_at` on the dep dir and links `target/{profile}/lib{name}.a`.
+- `fetch.rs`: when the host triple has no prebuilt, now prints an informational "will build from source" note.
+- P8 (server-side Docker prebuilt builds) deferred — client-side fallback is the intended long-term approach.
+- Pushed: `crates/freight` master `15bb7f0`; workspace pointer bumped.
 
 ### 2026-06-05 — Claude (session 3, part 3)
 
