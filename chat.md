@@ -12,6 +12,17 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 2)
+
+**Flat `.pkgs/` pool for transitive deps**
+
+Threaded `pkgs_root: Option<&Path>` through `build_foreign_deps` and `build_project_at`. When a dep is built from source, its own transitive deps now resolve to the root project's `.pkgs/` instead of nesting inside the dep's own `.pkgs/`. All call sites pass `None` (root = self) except the source-build fallback in `adaptors/mod.rs`, which passes `Some(project_dir)` to point transitive lookups at the real root.
+
+- Pushed to `freight` as `92545f4`; workspace pointer bumped to `9916c7f`.
+- No compile_commands or ratatui changes in this session.
+
+**Pending**: look at vscode-cpptools for DAP (debug) and live-reindex patterns.
+
 ### 2026-06-05 — Claude
 
 **Fixed double "Resolving" output in `freight build`**
