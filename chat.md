@@ -26,8 +26,27 @@ Guidelines:
 - `freight run` / `freight test` failures that print C++ terminate output such as
   `terminate called after throwing an instance of 'std::runtime_error'` now raise a VS Code
   error notification with the exception type and `what():` text when available.
+- The extension now detects that terminate output even when the `freight run` wrapper reports
+  a zero exit status, and marks the VS Code task failed in that case.
+- Added a Freight debug adapter protocol tracker so `Freight: Debug` sessions also watch DAP
+  `output` events for the same C++ terminate pattern and raise the popup.
 - Added parser coverage in `editors/vscode-freight/tests/dap-config.test.js`.
 - Tested: `npm test` and `npm run check` in `editors/vscode-freight`.
+- Not pushed.
+
+### 2026-06-05 — Codex
+
+**Split VS Code extension entrypoint into TypeScript modules**
+
+- Replaced the large `editors/vscode-freight/src/extension.js` with a small
+  `src/extension.ts` coordinator and split the implementation into `configuration.ts`,
+  `debug.ts`, `execution.ts`, `explorer.ts`, `lsp.ts`, `state.ts`, `status.ts`, and
+  `utils.ts`.
+- Converted the extension source to TypeScript with ES `import` / `export`; no `require()`
+  or `module.exports` remain under `src/`.
+- Updated `package.json` so Bun builds `src/extension.ts` to CommonJS `dist/extension.js`
+  for VS Code, and tests require a temporary bundled artifact.
+- Tested: `npm test`, `npm run check`, and `npm run compile` in `editors/vscode-freight`.
 - Not pushed.
 
 ### 2026-06-05 — Codex
@@ -44,6 +63,16 @@ Guidelines:
   `cargo build -p freight`, and an LSP initialize smoke in `examples/cpp/hello` showing
   `-I.pkgs/vecmath/include` and `-I.pkgs/mathlib/include` in `.freight/lsp/dev/compile_commands.json`.
 - Not pushed.
+
+### 2026-06-05 — Claude (session 3, part 3)
+
+**Registry: E4 org-scoped tokens + T1 integration test suite**
+
+- **E4 (org-scoped tokens)**: migration 0011 adds nullable `org_id` to `tokens`; `POST /api/v1/me/tokens` accepts `"org"` field (org owners only); publish enforces org ownership — org-scoped tokens can't publish to packages outside their org; new packages are auto-assigned to the token's org on first publish.
+- **T1 (integration tests)**: `tests/integration.rs` — 11 tests: publish→download→yank→unyank flow, duplicate/non-owner/pending-version rejection, TOTP login enforcement, recovery code login + replay protection, org role gating (add_member, set_package_org), org-scoped token enforcement.
+- All 123 tests pass (45 api + 11 integration + 17 db + 48 publish unit + 2 misc).
+- Pushed: `crates/freight-registry` main `fa35377`; workspace pointer bumped.
+- Only open item: P8 (server-side Docker prebuilt builds).
 
 ### 2026-06-05 — Claude (session 3, part 2)
 
