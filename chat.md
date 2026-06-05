@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 6)
+
+**PackageGraph: flat dep registry replaces tree**
+
+`src/build/pipeline.rs` completely rewritten:
+- `PackageGraph { root_name, root_dir, profile, packages: HashMap<name, Arc<PackageNode>> }`
+- `PackageNode.deps: HashMap<name, DepRef>` — typed edges with `version_req`, `features`, `defines`, `kind: Option<DepKind>`
+- `DepKind` enum: `Build | Dev` (replaces `is_build_dep: bool`)
+- `PackageGraph::insert` resolves at insertion: semver compat check, feature union, define-conflict detection, returns `ResolveError` on conflict
+- `PackageGraph::for_dep(pkg_dir, root_dir)` creates a dep-scoped mini-graph that inherits root's `.pkgs/` pool
+- `build_project_at` and `build_foreign_deps` accept `Option<&PackageGraph>` instead of `Option<&Arc<PackageNode>>`
+- `topo_order()` returns build order (leaves first)
+- All tests pass (663 unit + 2 flat_pkgs integration)
+
+Pushed: `crates/freight` master → `2ddd228`; workspace bumped → `00741ee`
+
+Note: `PackageGraph::insert` is not yet wired into the build pipeline — dep nodes are added via `add_dep_node` convenience method. Full resolution pass (walking manifest deps and calling `insert`) is a future step.
+
 ### 2026-06-05 — Claude (session 5)
 
 **Dep artifacts now go to root `target/deps/<name>/`; TCC ar fix**
