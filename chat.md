@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 7)
+
+**Fix: dep source-builds now apply their own `[compiler] includes`**
+
+`manifest.compiler.includes` was never injected into the compile include_dirs
+when building a project via `build_project_at` — only when building its
+*consumers*. This caused `freight test` in the cpp/hello example to fail with
+"file not found" for the dep's own headers (e.g. `mathlib/mathlib.h`).
+
+Fixed in `build_project_at`: call `manifest.build_settings_for(profile)` and
+prepend its `include_paths` (made absolute with `project_dir.join`) before the
+dep include dirs.
+
+Pushed: `crates/freight` master → `a620ca7`; workspace bumped → `8e766b4`
+
 ### 2026-06-05 — Claude (session 6)
 
 **PackageGraph: flat dep registry replaces tree**
@@ -2685,3 +2700,29 @@ Pushed:
 Questions for next agent:
 - The docs source clone currently lives at `/tmp/freight-docs`; clone it somewhere persistent for
   ongoing docs work.
+
+## 2026-06-05 — Codex: VS Code Freight tasks/debug build visibility
+
+What changed:
+- Used `/tmp/vscode-cpptools` as a reference for VS Code task/debug flow.
+- Switched `vscode-freight` Freight tasks from a custom pseudoterminal to normal
+  `ShellExecution` tasks so `freight build`, `run`, `test`, etc. show live output in the
+  integrated terminal with the existing `$freight` problem matcher.
+- Added a waitable task path for `Freight: Debug`: the extension now runs `freight build` as a
+  visible terminal task before starting DAP, then passes `noBuild` in the DAP config.
+- Added `freight dap` support for `noBuild`, resolving the already-built binary from the
+  manifest/workspace instead of silently building again inside the adapter process.
+- Kept TypeScript source maps / TS breakpoint support and the runtime C++ exception popup parser.
+
+Tested:
+- `BUN_TMPDIR=/tmp BUN_INSTALL=/tmp/bun-install bunx tsc --noEmit`
+- `npm test`
+- `npm run check`
+- `npm run compile`
+- `cargo check -p freight` (passed with existing warnings)
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
