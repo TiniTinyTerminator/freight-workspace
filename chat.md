@@ -12,6 +12,22 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 3)
+
+**Fixed root bug in flat .pkgs/ pool: pkgs_root was wrong in nested source builds**
+
+The previous session passed `Some(project_dir)` to the recursive `build_project_at` call inside `resolve_version_dep` (adaptors). When building a transitive dep (e.g., mathlib from within vecmath's source build), `project_dir` is vecmath's dir — so the inner build resolved mathlib's deps from `vecmath/.pkgs/` instead of the root pool, creating nested directories and re-downloading packages.
+
+Fix: changed `Some(project_dir)` → `Some(pkgs_root)` so all nested source builds always anchor dep lookups to the root flat pool.
+
+Added two integration tests in `tests/flat_pkgs.rs`:
+- `flat_pkgs_transitive_dep_at_root_level`: root → vecmath → mathlib; asserts mathlib builds in `root/.pkgs/mathlib/` and no `vecmath/.pkgs/` is created
+- `flat_pkgs_two_deps_share_transitive`: root → vecmath + geometry → shared mathlib; same assertions
+
+Both pass. Pushed as `958ecec` in freight, workspace bumped to `43e5515`.
+
+**Goal met**: flat .pkgs/ structure is verified — recursive packages across multiple deps are correctly reused from the root pool.
+
 ### 2026-06-05 — Claude (session 2)
 
 **Flat `.pkgs/` pool for transitive deps**
