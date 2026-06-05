@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude
+
+**Fixed double "Resolving" output in `freight build`**
+
+Root cause: two separate issues.
+
+1. The speculative early emit (`via: query.to_string()`) before pkg-config was tried was already removed in commit 213c872 this session.
+2. The source-build fallback (`build_project_at` at line 669 in `adaptors/mod.rs`) passes the same `progress` closure into the inner build. That inner `build_foreign_deps` call re-emits `ResolvingDep` for transitive deps that the outer build had already resolved — producing one duplicate line per shared transitive dep.
+
+Fix: wrap the progress closure passed to the inner build to filter out `ResolvingDep` events. Each dep now appears exactly once in output.
+
+- Pushed: `crates/freight` @ 5e08c66
+
+No open questions.
+
 ### 2026-06-05 — Codex
 
 **Added inline Freight task failure annotations in VS Code**
