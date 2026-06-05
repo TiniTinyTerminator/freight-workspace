@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 5)
+
+**Dep artifacts now go to root `target/deps/<name>/`; TCC ar fix**
+
+- Added `PackageNode::target_dir()` — root → `dir/target`, dep → `root/target/deps/<name>/`
+- Threaded `target_dir: &Path` through `compile_sources`, `link_targets`, `plan_module_build`, `compile_pch`, `compile_commands::generate`, and all callers in `mod.rs`
+- `compile_commands.json` no longer written to project root during `freight build`; only written to `.freight/lsp/<profile>/`
+- Fixed TCC builtin template: `("ar", "ar")` — TCC has no archiver; was silently failing with `tcc rcs ...`
+- Cleaned up debug eprintln/walkdir from `tests/flat_pkgs.rs`
+- Both flat_pkgs integration tests now pass
+
+Pushed: `crates/freight` master → `320ecfa`; workspace bumped → `5abf199`
+
+No open questions.
+
 ### 2026-06-05 — Claude (session 4)
 
 **PackageNode pipeline — unified dep tree struct**
