@@ -12,6 +12,18 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 11)
+
+**Remove PackageGraph; add Project::deps + Project::resolve()**
+
+`PackageGraph` deleted entirely — it was only used for `root_dir` path arithmetic. All callers now receive `project_dir: &Path` + `root_dir: &Path` directly.
+
+`Project` gains:
+- `pub deps: Vec<ResolvedDep>` — empty until `resolve()` is called
+- `pub fn resolve(&mut self, config, progress)` — runs pipeline stages 2–4 (features → fetch → resolve_dep_graph) without compiling; populates `self.deps`
+
+`graph.rs` deleted. `stage_build_deps` and `build_foreign_deps` signatures updated. 666 lib tests pass. Pushed to `Freight.git master` (0a756bb).
+
 ### 2026-06-05 — Claude (session 10)
 
 **Split pipeline.rs into graph.rs + pipeline.rs; Project uses parent_root**
