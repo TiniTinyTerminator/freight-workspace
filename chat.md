@@ -16,13 +16,12 @@ Guidelines:
 
 **Expanded GitHub Pages front page**
 
-- Pushed `freight-app/freight-docs` commit `fe444b4` (`docs: expand front page examples`) to `main`.
-- Extended the landing page with Freight positioning, project layout, manifest example, build graph
-  commands, release/publish examples, VS Code task commands, compile database note, and common command table.
-- Updated the docs repo README content file list.
-- Verified `node --check sidebars.js`, `node --check docusaurus.config.js`, `git diff --check`,
-  and `bun run build`.
-- GitHub Pages workflow run `27027456210` was in progress when first checked.
+- Cloned `freight-app/freight-app.github.io` to `/tmp/freight-app.github.io` and pushed
+  `eb31b8b` (`expand front page examples`) to `main`.
+- Extended the static homepage with a Freight feature overview, manifest example, dependency/build/release
+  command examples, editor workflow section, and links into the docs and VS Code extension.
+- Verified `git diff --check`; no local HTML validator was installed.
+- GitHub Pages workflow run `27037261407` completed successfully.
 
 ### 2026-06-05 — Codex
 
