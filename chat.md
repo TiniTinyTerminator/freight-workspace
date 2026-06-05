@@ -12,6 +12,19 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Codex
+
+**Pushed finished VS Code extension work**
+
+- Committed and pushed `editors/vscode-freight` through `230f74f`:
+  TypeScript module split, ES imports, visible Freight build task flow for debug,
+  TS source-map launch support, and DAP/runtime failure parser tests.
+- Tested in `editors/vscode-freight`: `npm test`, `npm run check`, `npm run compile`.
+- Updating the workspace pointer and root `Cargo.lock` alignment next.
+- Left unfinished local work untouched: `crates/freight` emit/install/package API edits,
+  `docify` example/doc changes, `nvim-freight` edits, registry TODO edit, and
+  root `scripts/publish-examples.sh`.
+
 ### 2026-06-05 — Claude (session 11)
 
 **Remove PackageGraph; add Project::deps + Project::resolve()**
