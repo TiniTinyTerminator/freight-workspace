@@ -12,6 +12,28 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 8)
+
+**Unified pipeline: single `run_pipeline_at` entry point for build/test/bench**
+
+`build_project_at`, `test_project_at`, and `bench_project_at` were all
+independent copies of the same ten stages. Collapsed them into one
+`run_pipeline_at(project_dir, &PipelineConfig, parent_graph, progress)` in
+`src/build/mod.rs`. `PipelineConfig` (already defined in `pipeline.rs`) carries
+the goal (`Build | Test { filter } | Bench { filter }`) plus profile, features,
+target/sanitize overrides. The three public functions are now thin wrappers.
+
+Side-effects fixed in the process:
+- `test_project_at` was missing the `[compiler] includes` fix from the previous
+  session (it didn't prepend `settings.include_paths`). Now unified, so it
+  inherits the fix automatically.
+- `bench_project_at` was using sanitize profile features as feature flags
+  (copy-paste bug). Dropped.
+
+Added `docs/pipeline.md` documenting all ten stages and the goal phase details.
+
+Pushed: `crates/freight` master → `e7e9e97`
+
 ### 2026-06-05 — Claude (session 7)
 
 **Fix: dep source-builds now apply their own `[compiler] includes`**
@@ -2708,8 +2730,9 @@ What changed:
 - Switched `vscode-freight` Freight tasks from a custom pseudoterminal to normal
   `ShellExecution` tasks so `freight build`, `run`, `test`, etc. show live output in the
   integrated terminal with the existing `$freight` problem matcher.
-- Added a waitable task path for `Freight: Debug`: the extension now runs `freight build` as a
-  visible terminal task before starting DAP, then passes `noBuild` in the DAP config.
+- Added a waitable task path for `Freight: Debug`: for dev/release profiles the extension now runs
+  `freight build` as a visible terminal task before starting DAP, then passes `noBuild` in the DAP
+  config. Custom profiles still use DAP's internal build path until `freight build` has a profile flag.
 - Added `freight dap` support for `noBuild`, resolving the already-built binary from the
   manifest/workspace instead of silently building again inside the adapter process.
 - Kept TypeScript source maps / TS breakpoint support and the runtime C++ exception popup parser.
@@ -2719,6 +2742,27 @@ Tested:
 - `npm test`
 - `npm run check`
 - `npm run compile`
+- `cargo check -p freight` (passed with existing warnings)
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-05 — Codex: clangd-assisted Freight hover hints
+
+What changed:
+- Changed C/C++ source hover routing so clangd owns symbol identity: Freight now sends clangd both
+  `textDocument/hover` and `textDocument/definition` under internal request IDs.
+- The clangd reader thread merges the semantic clangd hover with docify/Freight docs looked up from
+  clangd's resolved definition/declaration location, avoiding the previous word/location guess first.
+- Kept Freight-owned include/package hovers and include/import inlay hints; inlay hint merging now uses
+  the same generalized pending clangd request map.
+- Added tests for hover merge output and clangd `LocationLink` definition parsing.
+
+Tested:
+- `cargo test -p freight lsp::tests`
 - `cargo check -p freight` (passed with existing warnings)
 
 Pushed:
