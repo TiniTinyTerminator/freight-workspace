@@ -12,6 +12,18 @@ Guidelines:
 
 ## Log
 
+### 2026-06-05 — Claude (session 10)
+
+**Split pipeline.rs into graph.rs + pipeline.rs; Project uses parent_root**
+
+- `src/build/graph.rs` (new): all graph types (`PackageGraph`, `PackageNode`, `DepRef`, `DepKind`, `ResolveError`). `profile` field removed — it lives in `PipelineConfig`.
+- `src/build/pipeline.rs` (rewritten): stage functions (`stage_features`, `stage_fetch`, `stage_build_deps`, `stage_assemble_includes`, `stage_codegen`, `stage_header_units`, `stage_pch`) + `run_pipeline_at`. Imports use `super::` to access private helpers in `mod.rs`.
+- `src/build/project.rs`: `parent_graph: Option<PackageGraph>` → `parent_root: Option<PathBuf>`; `with_parent` → `with_parent_root(root: PathBuf)`.
+- `src/adaptors/mod.rs`: `PackageGraph` path fixed to `crate::build::graph::PackageGraph`; `profile` threaded into `resolve_version_dep`.
+- 666 lib tests pass. Pushed to `Freight.git master` (561956e) and workspace bumped.
+
+No open questions.
+
 ### 2026-06-05 — Claude (session 9)
 
 **Add `Project` struct; move `#[cfg(test)]` to end of `build/mod.rs`**
