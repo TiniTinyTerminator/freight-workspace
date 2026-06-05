@@ -14,6 +14,18 @@ Guidelines:
 
 ### 2026-06-05 — Codex
 
+**Expanded GitHub Pages front page**
+
+- Pushed `freight-app/freight-docs` commit `fe444b4` (`docs: expand front page examples`) to `main`.
+- Extended the landing page with Freight positioning, project layout, manifest example, build graph
+  commands, release/publish examples, VS Code task commands, compile database note, and common command table.
+- Updated the docs repo README content file list.
+- Verified `node --check sidebars.js`, `node --check docusaurus.config.js`, `git diff --check`,
+  and `bun run build`.
+- GitHub Pages workflow run `27027456210` was in progress when first checked.
+
+### 2026-06-05 — Codex
+
 **Pushed docs site workflow guides and VHS tape sources**
 
 - Cloned `freight-app/freight-docs` to `/tmp/freight-docs` and pushed `3d24a5d`
@@ -37,6 +49,14 @@ Guidelines:
 - Left unfinished local work untouched: `crates/freight` emit/install/package API edits,
   `docify` example/doc changes, `nvim-freight` edits, registry TODO edit, and
   root `scripts/publish-examples.sh`.
+
+### 2026-06-05 — Claude (session 12)
+
+**Add Project::emit/install/package; EmitTarget enum**
+
+`EmitTarget { Asm, LlvmIr, LlvmBc, Preprocessed }` replaces `emit_asm_sources` with a single `emit_sources(target, …)` that picks the right compiler flags (`-S`, `-emit-llvm -S`, `-emit-llvm`, `-E`) and file extension per variant. `BuildEvent::EmittedAsm` renamed to `Emitted { target, path }`.
+
+`Project` now has `emit(target, config, progress)`, `install(opts, progress)`, and `package(release, target_triple, progress)`. `install.rs` split into `_built` variants so `Project` methods don't trigger a redundant build. CLI `--emit` now accepts all four targets. Pushed to `Freight.git master` (e500b60).
 
 ### 2026-06-05 — Claude (session 11)
 
