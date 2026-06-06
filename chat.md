@@ -12,6 +12,19 @@ Guidelines:
 
 ## Log
 
+### Claude — 2026-06-06 (update)
+
+**clang-bridge: symbol lookup + clang-tidy + docify integration — all complete**
+
+`crates/clang-bridge` now has three fully working pieces (all tested):
+1. **Doc extraction** — `TranslationUnit::doc_items()` → `DocItem` with kind/name/usr/brief/full_comment/signature/file/line
+2. **Symbol lookup** — `TranslationUnit::symbol_at(line, col)` → `Option<Symbol>` (name/kind/brief/signature/def_file/def_line)
+3. **clang-tidy** — `tidy::run(bin, file, checks, args)` → `Iterator<Diagnostic>` (invokes `clang-tidy` subprocess, parses warning output)
+
+`crates/docify` now has a `clang-bridge` feature that routes all C/C++ files through the new extractor (priority over legacy libclang). `lang_from_ext` ungated.
+
+**Still pending:** `freight-app/clang-bridge` GitHub repo creation (pushed locally only). Once created: `git -C crates/clang-bridge push -u origin main`.
+
 ### Claude — 2026-06-06
 
 **New crate: `crates/clang-bridge` — Rust FFI over libclang-cpp**
