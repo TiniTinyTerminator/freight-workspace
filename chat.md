@@ -12,6 +12,109 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Codex
+
+**Removed clangd passthrough from `freight lsp`**
+
+- Removed clangd CLI args and startup from `crates/freight` LSP.
+- Made `clang-bridge` a default Freight feature; `--no-default-features` remains available for
+  builds that need to avoid LLVM.
+- Removed clangd-specific pending inlay merge state, diagnostic merge cache, shutdown, and kill paths.
+- C-family URIs no longer map to a passthrough server; they are handled by `ClangIndexer`
+  via `clang-bridge` only.
+- Source diagnostics are now published directly from native clang-bridge TU diagnostics.
+- Updated `crates/freight/TODO.md` and `docs/manifest-reference.md` to describe native
+  clang-bridge C-family support instead of clangd passthrough.
+
+Tested:
+- `cargo check -p freight`
+- `cargo check -p freight --no-default-features`
+- `cargo test -p clang-bridge`
+
+Not pushed. Existing dirty workspace/submodule state remains.
+
+### 2026-06-06 — Claude
+
+**clang-bridge API gap analysis**
+
+Audited the full C++ bridge (`bridge/clang_bridge.cpp` + `.h`) and all Rust surface modules.
+
+**What exists:** `Index::parse`, `TranslationUnit::reparse`, `doc_items`, `symbol_at`,
+`diagnostics`, `hover_markdown`, `goto_definition`, `complete`. Tidy was subprocess-based
+(now removed by Codex's latest pass).
+
+**Missing — high priority (block real LSP features):**
+
+1. **`SymbolLocator` is declaration-only** — only matches `NamedDecl` at its declaration site.
+   Doesn't resolve when cursor is on a *reference* (`DeclRefExpr`, `MemberExpr`, type mention).
+   Almost every real hover/goto case is a reference. Fix: expression-visitor to find innermost
+   `DeclRefExpr` / `MemberExpr` / `TypeLoc` at the cursor, then follow to its referenced decl.
+
+2. **`cb_document_symbols`** — `textDocument/documentSymbol` (editor outline panel). A visitor
+   that captures all NamedDecls (no doc-comment filter), returns name/kind/source-range/children.
+   Parent/child nesting via namespace/class scope tracking.
+
+3. **`CB_Diag` missing end ranges and fix-it hints** — only has a point location. Clang
+   diagnostics carry `SourceRange` (squiggle extent) and `FixItHint` (replacement range + text).
+   Adding these enables precise editor underlines and `textDocument/codeAction` quick fixes.
+
+4. **`cb_signature_help`** — `textDocument/signatureHelp` (parameter tooltip at call sites).
+   Uses `ASTUnit::CodeComplete` with a call context to return active parameter index + all
+   overload signatures.
+
+5. **`cb_hover_full`** — current `cb_hover_markdown` returns brief (first comment line) + signature.
+   Should traverse `clang::comments::FullComment` AST to render `@param`/`@returns`/`@throws`
+   sections, parent context, and definition location.
+
+**Missing — medium priority:**
+
+6. `cb_inlay_hints` — parameter names at `CallExpr` argument positions; deduced types for `auto` vars.
+7. `cb_type_at(line, col)` — full elaborated type string for any expression under cursor.
+8. `cb_parse_unsaved(buf, len, filename, args)` — parse from memory, no disk file required.
+9. `cb_inclusions` — `#include` graph from preprocessor for proper `documentLink` ownership.
+10. `cb_macro_at(line, col)` — macro definition hover (currently returns nothing for macros).
+
+**Missing — lower priority:**
+
+11. Semantic tokens (`cb_semantic_tokens`) — per-token classification for rich editor highlighting.
+12. Clang-format (`cb_format`) — in-process `textDocument/formatting`.
+13. `cb_references` — find all usages by USR via `clang::index::IndexingAction`.
+14. Error reporting for `cb_parse` — currently returns `nullptr` with no message.
+
+**Quality/correctness gaps:**
+
+- `SymbolLocator` is copy-pasted into `cb_hover_markdown`, `cb_goto_definition`, and `cb_symbol_at` — should be one shared helper.
+- Thread-safety invariant (no concurrent access per TU) is not documented.
+- `cb_complete` does not reparse with the unsaved buffer before running the completer.
+- Tidy cancellation: if save fires rapidly, old tidy threads overwrite new results (generation counter needed).
+
+No code changed in this session — analysis only.
+
+### 2026-06-06 — Codex
+
+**Cleaned up clang-bridge integration boundaries**
+
+- Made `crates/freight`'s native `clang-bridge` LSP path optional behind a `clang-bridge`
+  Cargo feature; default `cargo check -p freight` no longer builds LLVM/clang-bridge.
+- Kept feature-enabled C/C++ LSP behavior available via `--features clang-bridge`, including
+  source reparse and native TU diagnostics.
+- Moved `clang_bridge::TranslationUnit::reparse()` onto the core TU type and updated Freight to
+  call it directly.
+- Removed runtime clang-tidy command execution entirely; Freight now merges passthrough
+  diagnostics with native `clang-bridge` TU diagnostics instead of spawning a tidy process.
+- Removed the obsolete C++ tidy FFI declarations/implementation and the command-based Rust tidy
+  module/test.
+- Updated `clang-bridge/build.rs` to use `llvm-config --libdir` and `CLANG_BRIDGE_CLANGXX` /
+  `CLANG_BRIDGE_LLVM_CONFIG` env overrides instead of hardcoded `/usr/lib/llvm-22/lib`.
+
+Tested:
+- `cargo check -p freight`
+- `cargo check -p freight --features clang-bridge`
+- `cargo test -p clang-bridge`
+
+Not pushed. Workspace remains dirty with pre-existing edits in `crates/freight`,
+`crates/clang-bridge`, root `Cargo.lock`, and untracked media/log files.
+
 ### 2026-06-06 — Claude
 
 **LSP: publishDiagnostics — clangd + clang-tidy merged; reparse on didChange**
