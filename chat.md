@@ -12,6 +12,66 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude — clang-bridge: freight LSP 100% complete + intelligent rename
+
+**What changed** (`crates/clang-bridge` → `253d062`, workspace `ff17be5`):
+
+All remaining freight LSP bindings implemented. **43 tests passing.**
+
+- **`cb_index_last_error`** / **`cb_parse_unsaved`**: error reporting + parse from
+  in-memory buffer. Temp-file approach (extension-preserving, unique hash name);
+  `mapVirtualFile` caused `<built-in>` corruption — avoided.
+
+- **`cb_inclusions`**: `SourceManager` SLocEntry walk → `#include` graph.
+  LSP `textDocument/documentLink`. Rust: `src/inclusion.rs`.
+
+- **`cb_semantic_tokens`**: 9-type identifier classifier (namespace/type/fn/method/
+  property/var/param/enum-member/macro), sorted by position.
+  LSP `textDocument/semanticTokens/full`. Rust: `src/semtok.rs`.
+
+- **`cb_format`**: `clang::format::reformat` + `getStyle("file")` discovery.
+  LSP `textDocument/formatting`. Rust: `src/format.rs`.
+
+- **`cb_references`**: `indexASTUnit` + USR matching.
+  LSP `textDocument/references`. Rust: `src/refs.rs`.
+
+- **`cb_rename`** (user request: "intelligent rename — change all instances"):
+  `RefCollector` + `NameFinder` + `ConflictChecker` (AST visitor). Returns edit
+  list + conflict flag + conflict message when new name already exists in scope.
+  LSP `textDocument/rename` + `prepareRename`. Rust: `src/rename.rs`.
+
+**100% freight LSP coverage**: hover, definition, completion, diagnostics+fixits,
+documentSymbol, signatureHelp, inlayHint, semanticTokens, formatting, references,
+rename, documentLink, parse-from-memory, parse-error-reporting.
+
+Extra/broader API section (8 ideas) in TODO.md is the next frontier.
+
+---
+
+### 2026-06-06 — Codex
+
+**Started native Fortran LSP port**
+
+- Added new workspace member `crates/fortran-lsp` with a first Rust-native parser/indexer API.
+- First pass indexes modules, programs, submodules, subroutines, functions, interfaces,
+  derived types, `use` statements, and basic variable declarations.
+- Added workspace primitives for hover markdown, definition lookup, completions, and
+  duplicate-symbol diagnostics.
+- Cloned upstream `fortls` to `/tmp/fortls-reference` for parser/LSP behavior reference.
+- Checked `asm-lsp` 0.10.1 from crates.io: it is a usable library crate exporting parser and
+  LSP helper functions for hover/completion/document symbols/signature help/goto/references,
+  so Freight should embed it behind an assembly indexer rather than launching the binary.
+- Updated `crates/freight/TODO.md` with the new Fortran crate status and assembly embedding plan.
+
+Tested:
+- `cargo test -p fortran-lsp`
+- `cargo check -p fortran-lsp`
+- `cargo check -p freight --no-default-features`
+
+`cargo check -p freight` with default features currently fails in the dirty local
+`crates/clang-bridge` C++ bridge (missing/changed FFI declarations and LLVM API mismatch);
+left untouched. Not pushed.
+
 ### 2026-06-06 — Claude — clang-bridge medium-priority batch: inlay hints, type_at, macro_at
 
 **What changed** (`crates/clang-bridge` → `676dba9`, workspace `1c29f62`):
