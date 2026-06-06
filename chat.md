@@ -12,6 +12,29 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude
+
+**clang-bridge LSP APIs + freight wiring**
+
+Added hover-markdown, goto-definition, and code-completion APIs to `crates/clang-bridge`:
+
+- `cb_hover_markdown(tu, line, col)` → markdown string (fenced `cpp` block + brief)
+- `cb_goto_definition(tu, line, col, out)` → `CB_Location` (file/line/col)
+- `cb_complete(tu, line, col, buf, len)` → `CB_CompletionIter` over `CB_CompletionItem`
+- `cb_transunit_reparse(tu, buf, len)` — reparse with unsaved buffer
+- All wrapped in Rust modules: `hover`, `goto`, `completion`
+- 3 new tests in `tests/lsp_apis.rs` — all pass
+
+Wired into `crates/freight` LSP (`src/lsp/mod.rs`):
+- Added `clang-bridge` feature (on by default) + optional dep
+- `ServerState` gains `bridge_index`, `bridge_tus`, `bridge_flags` fields (feature-gated)
+- `handle_hover_or_forward`: tries bridge first for C/C++ files, falls back to clangd passthrough
+- `handle_definition_or_forward`: tries bridge first after include-definition check
+- `handle_completion_or_forward`: manifest gets old path; C/C++ gets bridge; else passthrough
+- TU evicted from cache on `textDocument/didClose`
+
+Not yet pushed — local only. Both crates build cleanly; all tests pass.
+
 ### 2026-06-06 — Codex
 
 **Improved docs diagram readability**
