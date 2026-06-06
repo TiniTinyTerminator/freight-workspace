@@ -19,3 +19,6 @@
 [submodule "editors/nvim-freight"]
 	path = editors/nvim-freight
 	url = https://github.com/freight-app/nvim-freight.git
+[submodule "crates/fortran-lsp"]
+	path = crates/fortran-lsp
+	url = git@github.com:freight-app/fortran-lsp.git
