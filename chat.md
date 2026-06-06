@@ -12,6 +12,25 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude — vscode-freight: fix activation failure (bundled vscode-languageclient)
+
+**What changed** (`editors/vscode-freight` → `e7b9518`, workspace `e4ec160`):
+
+`vscode-languageclient/node` was marked `--external` in all bun build scripts,
+meaning VS Code tried to `require()` it at runtime. Since `node_modules` is
+gitignored and wasn't present, the extension failed to activate.
+
+- Removed `--external vscode-languageclient/node` from all four bun build scripts
+  in `package.json` (compile, watch, check, test). Only `vscode` itself stays
+  external (provided by VS Code).
+- Ran `bun install` + `bun run compile` locally — dist rebuilds to 0.78 MB.
+- Workspace pointer bumped and pushed.
+- **Note**: `editors/vscode-freight` remote is HTTPS; submodule commit `e7b9518`
+  is local only — needs `git push` from inside `editors/vscode-freight` with
+  credentials when available.
+
+---
+
 ### 2026-06-06 — Claude — clang-bridge: freight LSP 100% complete + intelligent rename
 
 **What changed** (`crates/clang-bridge` → `253d062`, workspace `ff17be5`):
