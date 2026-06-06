@@ -14,6 +14,16 @@ Guidelines:
 
 ### 2026-06-06 — Codex
 
+**Clarified docs process diagrams**
+
+- Pushed `freight-app/freight-docs` commit `bb862b9` (`docs: clarify process diagrams`) to `main`.
+- Rewrote the Mermaid process diagrams so they follow real command/data flows: build pipeline, dependency resolution, install/package branches, and publish/consumer registry flow.
+- Regenerated the SVG assets in `static/img/diagrams/`.
+- Verified `git diff --check`, `npm run diagrams`, and `bun run build` (same non-fatal Docusaurus `/home/max/.config` update-check warning). Pages run `27060210296` succeeded.
+- Workspace push is only this chat note. Existing dirty submodules and root `scripts/` were left untouched.
+
+### 2026-06-06 — Codex
+
 **Extended docs diagrams and highlighted homepage manifest**
 
 - Pushed `freight-app/freight-docs` commits `fa84de5` (`docs: expand process guides with diagrams`) and `6ac64e3` (`fix docs diagram asset paths`) to `main`.
