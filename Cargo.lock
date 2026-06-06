@@ -1037,13 +1037,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "clang"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84c044c781163c001b913cd018fc95a628c50d0d2dfea8bca77dad71edb16e37"
+name = "clang-bridge"
+version = "0.1.0"
 dependencies = [
- "clang-sys",
- "libc",
+ "cc",
 ]
 
 [[package]]
@@ -1628,24 +1625,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "docify"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clang",
- "clap",
- "crossterm",
- "pulldown-cmark 0.12.2",
- "ratatui",
- "rmp-serde",
- "serde",
- "serde_json",
- "toml",
- "tui-markdown",
- "walkdir",
-]
-
-[[package]]
 name = "document-features"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2089,10 +2068,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fortran-lsp"
+version = "0.1.0"
+
+[[package]]
 name = "freight"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clang-bridge",
  "clap",
  "clap_mangen",
  "cmake-lossless",

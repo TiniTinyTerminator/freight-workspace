@@ -5,6 +5,7 @@ members = [
     "crates/vcpkg-converter",
     "crates/cmake-lossless",
     "crates/clang-bridge",
+    "crates/fortran-lsp",
 ]
 resolver = "2"
 
