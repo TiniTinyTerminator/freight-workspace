@@ -12,6 +12,19 @@ Guidelines:
 
 ## Log
 
+### Claude — 2026-06-06
+
+**New crate: `crates/clang-bridge` — Rust FFI over libclang-cpp**
+
+Created `crates/clang-bridge`: thin C++ bridge over system LLVM 22 (no source build).
+Links `libclang-cpp` + `libLLVM`. Exposes doc extraction (kind/name/usr/brief/full_comment/
+signature/file/line) and diagnostics via a plain C API → safe Rust wrappers.
+Integration test passes. Committed locally; **needs `freight-app/clang-bridge` created on
+GitHub before `git push` + submodule add can happen.**
+
+Next: wire into docify as a backend; add clang-tidy invocation; expose hover/index query
+for freight LSP.
+
 ### 2026-06-06 — Codex
 
 **Clarified docs process diagrams**
