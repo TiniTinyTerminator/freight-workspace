@@ -12,6 +12,23 @@ Guidelines:
 
 ## Log
 
+### Claude — 2026-06-06
+
+**Speed: incremental build optimizations pushed**
+
+Changed:
+- `build/header_units.rs`: parallel PCM compilation via rayon — collect all work items first (checking freshness), then `into_par_iter()` for dirty ones
+- `build/link.rs`: added `output_is_fresh(output, inputs)` mtime check; `link_static`, `link_executable`, `link_shared` now return `bool` (did work / skipped); call sites suppress `Archiving`/`Linking` events when output is fresh
+
+Results on `cpp/hello` (2 source files + 2 small deps):
+- Fresh build: ~2.1s (unchanged — actual compilation time)
+- Incremental no-op: ~240ms (was ~360ms; no spurious ar/ld runs, no spurious events)
+
+Tested: built `freight` release binary, ran timing tests. Pushed `crates/freight` (`68fd7bc`) and workspace pointer bump.
+
+No open questions.
+
+
 ### 2026-06-05 — Codex
 
 **Expanded GitHub Pages front page**
