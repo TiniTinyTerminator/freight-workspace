@@ -12,6 +12,35 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude — lsp: fix bits/requires_hosted.h not found; add clang-tidy runner
+
+**What changed:**
+
+`crates/clang-bridge` (`4fdf96d`):
+- Added `pub mod tidy` — subprocess `clang-tidy` runner that parses its text
+  output into `Diagnostic` items. `tidy::run(checks, file, config, flags)`.
+
+`crates/freight` (`09aaa0b`):
+- `lsp/index.rs`: made `probe_system_include_dirs()` `pub(crate)`.
+- `lsp/indexers/Clang.rs` `refresh_flags()`: calls `probe_system_include_dirs()`
+  and appends `-isystem <path>` for every GCC/C++ system include dir that
+  `clang++` auto-detects via `-v`. This fixes "bits/requires_hosted.h file not
+  found" on GCC 16 — the target-specific dir
+  (`/usr/include/c++/16.1.1/x86_64-pc-linux-gnu`) was missing from libclang's
+  search path because `FixedCompilationDatabase` does not reproduce `clang++`
+  driver-level GCC install detection.
+
+**Why the compile was broken:**
+`da335fb` (freight master) referenced `clang_bridge::tidy::run` which didn't
+exist in clang-bridge yet. Workspace was stale at `3e0186f`. Both submodules
+and the workspace pointer are now pushed and in sync.
+
+**Tested:**
+`cargo check -p freight` clean. Binary builds. Restart `freight lsp` to pick
+up the GCC path injection.
+
+---
+
 ### 2026-06-06 — Claude — vscode-freight: augment PATH + ~ expansion for freight binary
 
 **What changed** (`editors/vscode-freight` → `6ede9f2`, workspace `b952fd0`):
