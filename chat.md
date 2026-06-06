@@ -12,6 +12,17 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude (follow-up)
+
+**clang-bridge: flags from freight build context, not compile_commands.json**
+
+- Added `lsp_source_flags(project_dir, profile)` to `build/mod.rs` — returns
+  `HashMap<PathBuf, Vec<String>>` (file → compile flags) directly from the
+  freight build context, no disk write
+- `ServerState.bridge_source_flags` replaces the old global `bridge_flags: Vec<String>`
+- `bridge_ensure_tu` looks up per-file flags; `bridge_refresh_flags` clears TU
+  cache and reloads flags whenever `refresh_compile_commands` fires
+
 ### 2026-06-06 — Claude
 
 **clang-bridge LSP APIs + freight wiring**
