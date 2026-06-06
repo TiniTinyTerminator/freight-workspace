@@ -12,6 +12,38 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude — clang-bridge medium-priority batch: inlay hints, type_at, macro_at
+
+**What changed** (`crates/clang-bridge` → `676dba9`, workspace `1c29f62`):
+
+- **`cb_inlay_hints`** — `InlayHintVisitor` (RecursiveASTVisitor) emits two kinds of hints:
+  - kind=0: parameter-name hints (`"x:"`) before each positional argument at call sites,
+    suppressed when the arg expression already has the same name as the param.
+  - kind=1: deduced-type hints (`": int"`) after `auto`-declared variable names.
+  - Rust wrapper: `src/inlay.rs` → `inlay::InlayHintList`, `inlay::inlay_hints()`.
+  - 3 tests in `tests/inlay_hints.rs`.
+
+- **`cb_type_at`** — returns `QualType::getAsString` for `VarDecl` / `FieldDecl` at cursor.
+  Exposed as `hover::type_at()`. Useful for hover enrichment when no doc comment exists.
+
+- **`cb_macro_at`** — Markdown hover for macro use sites: `#define` spelling, parameter list
+  (if function-like), expansion tokens, definition-location footer. Exposed as
+  `hover::macro_hover()`. 4 tests in `tests/type_and_macro.rs`.
+
+**Bugs fixed**:
+- `locate_symbol_at` used before its definition → added forward declaration.
+- `Lexer::getSpelling(tok, SmallString, SM, LO)` wrong overload → `Lexer::getSpelling(tok, SM, LO)`.
+- `Token::getIdentifierInfo()` asserts on `tok::raw_identifier` → guard added.
+
+**Tested**: 27/27 tests pass.
+
+**TODO.md**: all medium-priority items done. Remaining: `cb_inclusions`, `cb_parse_unsaved`,
+`cb_semantic_tokens`, `cb_format`, `cb_references`, `cb_index_last_error`, plus new
+"Extra / broader API" section with 8 ideas (rename, call hierarchy, type hierarchy,
+code actions, highlight, folding ranges, workspace symbols, macro expand, AST dump).
+
+---
+
 ### 2026-06-06 — Codex
 
 **Removed clangd passthrough from `freight lsp`**
