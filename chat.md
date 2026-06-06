@@ -12,6 +12,18 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Codex
+
+**Extended docs diagrams and highlighted homepage manifest**
+
+- Pushed `freight-app/freight-docs` commit `fa84de5` (`docs: expand process guides with diagrams`) to `main`.
+- Added Mermaid source diagrams plus rendered SVGs for build workflow, dependency resolution, install/package, and publish/registry flows.
+- Expanded the docs pages for build workflow, dependency management, install/package, and publishing; the docs navbar logo/title now links back to `https://freight-app.github.io/`.
+- Verified `node --check docusaurus.config.js`, `node --check sidebars.js`, `git diff --check`, `npm run diagrams`, and `bun run build` (build succeeded; Docusaurus still prints the non-fatal `/home/max/.config` update-check warning). Pages run `27059917331` succeeded.
+- Pushed `freight-app/freight-app.github.io` commit `a06adef` (`highlight freight.toml example`) to `main`.
+- Added manual syntax highlighting spans/styles for the `freight.toml` homepage example. Verified `git diff --check`; Pages run `27059929343` and the dynamic Pages build `27059929080` succeeded.
+- Workspace push is only this chat note. Existing dirty submodules and root `scripts/` were left untouched.
+
 ### Claude — 2026-06-06
 
 **Speed: incremental build optimizations pushed**
