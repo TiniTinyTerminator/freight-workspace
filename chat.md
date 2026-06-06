@@ -12,6 +12,20 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude — vscode-freight: augment PATH + ~ expansion for freight binary
+
+**What changed** (`editors/vscode-freight` → `6ede9f2`, workspace `b952fd0`):
+
+VS Code desktop launchers inherit a bare system PATH that omits `~/.cargo/bin`,
+so `freight` spawned as a language server failed with ENOENT.
+
+- `buildEnv()` prepends `~/.cargo/bin`, `~/.local/bin`, `/usr/local/bin` to PATH
+  before passing to the child process
+- `resolveExePath()` expands a leading `~` in setting values (executablePath,
+  fortlsPath, asmLspPath)
+
+---
+
 ### 2026-06-06 — Claude — vscode-freight: start freight lsp instead of clangd
 
 **What changed** (`editors/vscode-freight` → `b840ff2`, workspace `1a5fa0a`):
