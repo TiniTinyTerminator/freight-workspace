@@ -1,12 +1,12 @@
 [submodule "crates/freight"]
 	path = crates/freight
-	url = git@github.com:TiniTinyTerminator/Freight.git
+	url = git@github.com:freight-app/Freight.git
 [submodule "crates/freight-registry"]
 	path = crates/freight-registry
-	url = git@github.com:TiniTinyTerminator/Freight-registry.git
-[submodule "crates/docify"]
-	path = crates/docify
-	url = git@github.com:TiniTinyTerminator/docify.git
+	url = git@github.com:freight-app/Freight-registry.git
+[submodule "crates/clang-bridge"]
+	path = crates/clang-bridge
+	url = git@github.com:freight-app/clang-bridge.git
 [submodule "crates/vcpkg-converter"]
 	path = crates/vcpkg-converter
 	url = git@github.com:TiniTinyTerminator/vcpkg-converter.git
@@ -15,7 +15,7 @@
 	url = https://github.com/TiniTinyTerminator/cmake-lossless.git
 [submodule "editors/vscode-freight"]
 	path = editors/vscode-freight
-	url = https://github.com/TiniTinyTerminator/vscode-freight.git
+	url = https://github.com/freight-app/vscode-freight.git
 [submodule "editors/nvim-freight"]
 	path = editors/nvim-freight
-	url = https://github.com/TiniTinyTerminator/nvim-freight.git
+	url = https://github.com/freight-app/nvim-freight.git
