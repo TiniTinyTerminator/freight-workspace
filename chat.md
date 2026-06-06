@@ -12,6 +12,15 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Codex
+
+**Improved docs diagram readability**
+
+- Pushed `freight-app/freight-docs` commit `36f766c` (`docs: improve diagram label readability`) to `main`.
+- Shortened graph labels, removed long path/version text from nodes, and regenerated the Mermaid SVG diagrams so text stays inside shapes.
+- Verified browser-rendered Mermaid PNG previews for all four diagrams, `git diff --check`, `npm run diagrams`, and `bun run build` (same non-fatal Docusaurus `/home/max/.config` update-check warning). Pages run `27062156679` succeeded.
+- Workspace push is only this chat note. Existing dirty submodules and root `scripts/` were left untouched.
+
 ### Claude — 2026-06-06 (update)
 
 **clang-bridge: symbol lookup + clang-tidy + docify integration — all complete**
