@@ -14,6 +14,33 @@ Guidelines:
 
 ### 2026-06-06 — Claude
 
+**LSP: publishDiagnostics — clangd + clang-tidy merged; reparse on didChange**
+
+- Switched to full-text sync (`change: 1`) so `reparse` always receives the full buffer
+- Fixed `handle_did_change` for C/C++ source files: now calls `ix.reparse()` before
+  forwarding to clangd (was only called for `freight.toml` files before this)
+- Added `diagnostics(&mut self, uri) -> Vec<Value>` and `flags_for(&self, path) -> Vec<String>`
+  to the `LanguageIndexer` trait (default no-ops)
+- `ClangIndexer` implements both: `diagnostics` pulls TU compiler diags via `tu.diagnostics()`,
+  `flags_for` exposes the per-file compile flags for external tools
+- Added `diag_to_lsp(d, source)` helper in `indexers/Clang.rs` (pub(crate), shared with tidy)
+- Added `DiagCache { clangd: Vec<Value>, tidy: Vec<Value> }` shared via
+  `Arc<Mutex<HashMap<String, DiagCache>>>` between main loop, clangd reader thread, and
+  background tidy threads
+- Clangd passthrough reader thread now intercepts `textDocument/publishDiagnostics` from clangd,
+  stores into `DiagCache.clangd`, and re-publishes merged (clangd + tidy) to the client
+- `spawn_tidy`: on `textDocument/didSave` for C/C++ files, spawns a thread that runs
+  `clang_bridge::tidy::run`, updates `DiagCache.tidy`, and re-publishes merged diagnostics
+
+Pushed: `crates/freight` `da335fb` → master; workspace pointer bumped `cbe6844`.
+
+**Remaining items:**
+- `freight-registry` has minor dirty state (`.gitignore` mod) — not a blocker
+- Fortran native LSP support (fortls is still the passthrough)
+- DAP additional backends (rr, cdb, windbg)
+
+### 2026-06-06 — Claude
+
 **Removed dead hover-enrichment pipeline from `crates/freight` LSP**
 
 Deleted `src/lsp/clang_index.rs` and stripped ~2350 lines of dead code from `lsp/mod.rs`:
