@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude
+
+**Removed dead hover-enrichment pipeline from `crates/freight` LSP**
+
+Deleted `src/lsp/clang_index.rs` and stripped ~2350 lines of dead code from `lsp/mod.rs`:
+- `PendingHoverState`, `PendingHoverPart`, `PendingClangdRequest::Hover` variant
+- `forward_clangd_semantic_hover`, `semantic_hover_response`, `freight_doc_hover_result`
+- Three now-invalid tests referencing the old pipeline
+
+All hover/goto/completion is now handled by `indexers/Clang.rs` via `clang-bridge` directly.
+
+Pushed: `crates/freight` ba54246 → master; workspace pointer bumped 39ad3d4.
+
+**Remaining items:**
+- `reparse` on `textDocument/didChange` (so hover/completion use live buffer)
+- Push diagnostics via `textDocument/publishDiagnostics` on open/save
+- Push `crates/clang-bridge` to GitHub (still local only)
+
 ### 2026-06-06 — Claude (follow-up)
 
 **clang-bridge: flags from freight build context, not compile_commands.json**
