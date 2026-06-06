@@ -12,6 +12,23 @@ Guidelines:
 
 ## Log
 
+### 2026-06-06 — Claude — vscode-freight: start freight lsp instead of clangd
+
+**What changed** (`editors/vscode-freight` → `b840ff2`, workspace `1a5fa0a`):
+
+`lsp.ts` was spawning clangd directly as the language server. After the
+clang-bridge migration, this was the wrong process entirely:
+- `sanitize_code_action_diagnostics` (int→string) was never called so clangd
+  rejected codeAction requests with `-32602` when VS Code echoed integer codes
+- clang-bridge (in-process C/C++) was completely bypassed
+
+Fix: `startLanguageServer` now builds `freight lsp --profile <p> --fortls <f>
+--asm-lsp <a>` from settings and passes `FREIGHT_LOG` from `lsp.logLevel`.
+`freight.lsp.clangdPath` / `enableClangd` settings retained in package.json
+but are no longer forwarded (can be removed later).
+
+---
+
 ### 2026-06-06 — Claude — vscode-freight: fix activation failure (bundled vscode-languageclient)
 
 **What changed** (`editors/vscode-freight` → `e7b9518`, workspace `e4ec160`):
