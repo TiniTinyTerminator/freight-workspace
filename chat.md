@@ -12,6 +12,27 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — lsp: fix stddef.h not found; fix clang-bridge test API
+
+**What changed:**
+
+`crates/clang-bridge` (`2954e8e`):
+- All 13 integration test files updated to new 3-arg `Index::parse(source_file, working_dir, args)` and 4-arg `Index::parse_unsaved(virtual_path, working_dir, contents, args)` signatures (previously broken after the `working_dir` API addition)
+
+`crates/freight` (`c5f3c3f`):
+- `ClangIndexer::refresh_flags` now probes `clang -print-resource-dir` and passes `-resource-dir <path>` to libclang for every compile command
+- `probe_clang_resource_dir()` added to `lsp/index.rs`
+
+**Root cause fixed:** When freight runs as an LSP server binary (at `target/debug/freight`), `ClangTool` computes its resource directory relative to the binary, producing a non-existent path like `target/lib/clang/22`. This prevented libclang from finding built-in headers like `stddef.h`, causing a cascade of fatal errors whenever `<iostream>` or anything including `<stddef.h>` was parsed. LSP features (hover, goto, etc.) were silently non-functional as a result.
+
+**Fix:** Probe `clang -print-resource-dir` once per `refresh_flags` call and inject `-resource-dir <result>` into every per-file flag set sent to libclang.
+
+**Tested:** `cargo check -p freight` clean; `cargo check -p clang-bridge --tests` clean. Rebuild of freight debug binary done.
+
+**Still needed:** Reload the freight LSP in VS Code to test (the new binary is at target/debug/freight). User should reload window or reopen a C++ file.
+
+---
+
 ### 2026-06-07 — Claude — lsp: fix <unnamed> types and false operator<< diagnostics
 
 **What changed:**
