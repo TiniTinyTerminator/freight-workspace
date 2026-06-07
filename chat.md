@@ -12,6 +12,22 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — clang-bridge: fix stddef.h via ArgumentsAdjuster END
+
+**What changed:**
+
+`crates/clang-bridge` (`1d37112`):
+- `cb_parse` and `cb_parse_unsaved` now call `tool.appendArgumentsAdjuster(getInsertArgumentAdjuster({"-resource-dir", s_resource_dir}, ArgumentInsertPosition::END))` after constructing `ClangTool`
+- `find_clang_resource_dir()` helper probes `clang -print-resource-dir` once (static local)
+
+**Root cause:** Passing `-resource-dir` through `FixedCompilationDatabase`'s compile flags was not enough — `ClangTool` has a built-in `ArgumentsAdjuster` that runs early and injects its own auto-computed resource dir, overriding ours. By appending our adjuster *after* construction with `ArgumentInsertPosition::END`, the correct installed path always comes last and wins in clang's arg processing.
+
+**Tested:** `cargo build -p clang-bridge` clean; all clang-bridge tests pass; `cargo build -p freight` clean. Workspace bumped to `cbcae37`.
+
+**Status:** The stddef.h fix should now be active. Reload VS Code window to pick up the new freight binary.
+
+---
+
 ### 2026-06-07 — Claude — lsp: fix stddef.h not found; fix clang-bridge test API
 
 **What changed:**
