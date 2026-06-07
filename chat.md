@@ -12,6 +12,27 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — clang-bridge: hover correctness (TerseOutput, DeclLocator precision, ident-token guard)
+
+**What changed:**
+
+`crates/clang-bridge` (`5eef57e`) pushed, workspace bumped (`889cc32`):
+
+- `prettySignature`: `PP.TerseOutput = 1` — function hover now shows prototype only, not the full body
+- `DeclLocator`: `shouldVisitTemplateInstantiations() = false` + `isImplicit()` + `isInSystemHeader()` guards; column check tightened from `ploc.col <= cursor` to `startCol <= cursor < startCol + name.size()` (matches `RefLocator`)
+- `locate_symbol_at`: clangd-style identifier-token guard via `Lexer::getRawToken` — hovering `::`, `(`, `*` etc. returns `nullptr` immediately instead of garbage from the DeclLocator fallback
+
+**Tested:**
+
+`/tmp/lsp_debug.py` with `--no-clangd`:
+- All 9 inlay hints correct (values: ×2, x: y: for Vec2 ctor, `: std::pair<double, double>` type, ← stdlib ×3, ← vecmath)
+- `mean()` hover: full doxygen including @param and @returns
+- `variance()` hover: same
+- `main()` hover: `int main()` proto only (no body)
+- `::` position: null (correct)
+
+**Pushed:** both submodule and workspace pointer
+
 ### 2026-06-07 — Claude — lsp: fix stats.hpp/package include dirs not found
 
 **What changed:**
