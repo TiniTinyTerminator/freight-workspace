@@ -12,6 +12,29 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — clang-bridge: full inlay-hint + prettySignature alignment with clangd
+
+**What changed:**
+
+`crates/clang-bridge` (`3cacb17`) pushed, workspace bumped (`a6db99a`):
+
+- **Structured bindings**: `auto [m,v]=...` now emits `: double` per binding (canonical type) instead of one `: std::pair<double,double>` on the whole declaration
+- **Type hint position**: placed after identifier name (`col + name.size()`), matching clangd's `HintSide::Right`
+- **PrintingPolicy**: starts from `Ctx.getPrintingPolicy()` (inherits `SuppressTagKeyword=true` for C++); adds `PolishForDeclaration`, `ConstantsAsWritten`, `SuppressTemplateArgsInCXXConstructors`; removes incorrect explicit `SuppressScope=0` / `SuppressTagKeyword=0` overrides
+- **Underscore params**: strips ALL leading underscores and shows hint (`__value → value:`), no longer skips the hint entirely
+- **Functor calls**: `operator()` (lambdas, `std::function`) now get hints
+- **Setter suppression**: single-param `setFoo(foo)` calls suppressed
+- **Simple builtin suppression**: `std::move/forward/addressof/as_const/move_if_noexcept` suppressed via `getBuiltinID()`
+- **UserDefinedLiteral**: suppressed
+- **Pack expansion guard**: stops hint loop at `PackExpansionExpr`
+- **Arg-name matching**: uses `IgnoreUnlessSpelledInSource()` + implicit `MemberExpr` check
+- **Hint deduplication**: sort + unique after collection
+- **ALIGNMENT_TODOS.md**: full gap analysis vs clangd `InlayHints.cpp` / `Hover.cpp`
+
+**Tested:** all clang-bridge tests pass; lsp_debug.py shows correct hints for hello example
+
+**Remaining gaps (see ALIGNMENT_TODOS.md):** return-type hints, block-end hints, designator hints, `/*paramName*/` suppression, constructor hover (SL-1/SL-2)
+
 ### 2026-06-07 — Claude — clang-bridge: hover correctness (TerseOutput, DeclLocator precision, ident-token guard)
 
 **What changed:**
