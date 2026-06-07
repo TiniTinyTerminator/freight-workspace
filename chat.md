@@ -12,6 +12,30 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — clang-bridge: alignment batches 3 & 4 (IH-8/13/15/16, SL-2, HV-1/2/3)
+
+**What changed:**
+
+Batch 3 (`crates/clang-bridge` `20315da`, workspace `210c2e2`):
+- **IH-8**: `isPrecededByParamNameComment` — suppress hint when `/* paramName */` precedes arg
+- **IH-13**: Deduced return-type hints via `VisitFunctionDecl` + `VisitLambdaExpr`
+- **HV-1**: `SuppressInitializers` in `prettySignature` for VarDecl init > 200 bytes
+- **HV-2**: `UsingShadowDecl` followed to `getTargetDecl()` in `RefLocator`
+- **SL-1**: `DeclLocator::VisitNamedDecl` fallback for ctor/dtor names
+- `AnonymousTagLocations = 0` in all type-hint `PrintingPolicy` instances
+
+Batch 4 (`crates/clang-bridge` `680d71a`, workspace `27f5d82`):
+- **IH-16**: `VisitTypeLoc` for `decltype(expr)` — emits `: T` hint
+- **SL-2**: `VisitCXXConstructExpr` in `RefLocator` — constructor call sites resolve
+- **HV-3**: `prettySignature` uses `getDescribedTemplate()` for template signatures
+
+Batch 5 (`crates/clang-bridge` `49afb42`, `crates/freight` `59510bc`, workspace `a629558`):
+- **IH-15**: Full block-end hints (`VisitForStmt`, `VisitCXXForRangeStmt`, `VisitWhileStmt`, `VisitSwitchStmt`, `VisitIfStmt` w/ else-chain, `VisitTagDecl`, `VisitNamespaceDecl`); 10-line minimum; kind 2 → LSP kind 4
+
+**Remaining gap**: IH-14 (designator hints) — requires clang-tidy dep or significant inline work
+
+---
+
 ### 2026-06-07 — Claude — clang-bridge: full inlay-hint + prettySignature alignment with clangd
 
 **What changed:**
