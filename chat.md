@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — freight lsp: remove dead DocIndex / hover-enrichment pipeline
+
+**What changed:**
+
+`crates/freight` `086a6f2`, workspace `46a04f9`:
+- Removed `DocIndex` struct, `extract_pkg_items`, `refresh_doc_index`, `doc_index_package_dirs`, `collect_path_dependency_doc_dirs`, `push_doc_package_dir`, `item_to_markdown`, `word_at`, `hover_signature`, `lang_id`, and all related helpers (~700 LOC)
+- Removed dead `freight/docIndexUpdated` client notification
+- Removed the `_doc_index` parameter from `start_passthrough_in` and stopped cloning it in `start_clangd`
+- `HeaderIndex` rebuild (previously bundled in `refresh_doc_index`) is now `refresh_header_index()` called from `refresh_compile_commands`
+- All docify-based hover machinery was dead since ClangIndexer took over C/C++ hover via clang-bridge
+
+**Pushed:** both freight and workspace
+
+---
+
 ### 2026-06-07 — Claude — clang-bridge: alignment batches 3 & 4 (IH-8/13/15/16, SL-2, HV-1/2/3)
 
 **What changed:**
