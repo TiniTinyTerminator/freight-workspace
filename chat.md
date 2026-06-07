@@ -12,6 +12,19 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — lsp: fix stats.hpp/package include dirs not found
+
+**What changed:**
+
+`crates/freight` (`b571a4c`):
+- `lsp_source_flags` now keys the returned HashMap by the **absolute** file path (`cmd.directory.join(&cmd.file)`) rather than the relative `cmd.file`.
+
+**Root cause:** `SourceFile.path` is always relative to the project root (e.g. `"src/main.cpp"`), so compile_commands entries have `"file": "src/main.cpp"`. `ClangIndexer::ensure_tu` receives an absolute path from `path_from_uri(uri)`. Every `source_data.get()` missed, so parsing used empty flags — no `-Iinc`, no `-I.pkgs/mathlib/include` etc. This caused every user header (e.g. `stats.hpp`) and all fetched-package headers to be `not found`.
+
+**Tested:** `cargo build -p freight` clean. Workspace bumped to `52a303a`.
+
+---
+
 ### 2026-06-07 — Claude — clang-bridge: fix stddef.h via ArgumentsAdjuster END
 
 **What changed:**
