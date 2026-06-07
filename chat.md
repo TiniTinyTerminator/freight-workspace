@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-07 — Claude — lsp: fix <unnamed> types and false operator<< diagnostics
+
+**What changed:**
+
+`crates/clang-bridge` (`1774c4c`):
+- `cb_parse` / `cb_parse_unsaved` now accept a `working_dir` parameter forwarded to `FixedCompilationDatabase` — fixes relative `-Iinc` path resolution
+- `Index::parse` and `Index::parse_unsaved` Rust API updated to accept `working_dir: &str`
+
+`crates/freight` (`c04c7f0`):
+- `lsp_source_flags()` now returns `HashMap<PathBuf, (String, String, Vec<String>)>` — `(compiler, working_dir, flags)`
+- `ClangIndexer::source_data` stores `(working_dir, flags)` per file and passes `working_dir` to `Index::parse`
+
+**Root cause fixed:** `FixedCompilationDatabase` was hardcoded to `"."` as working directory. When the LSP server's cwd differed from the project root, relative include paths like `-Iinc` didn't resolve, leaving user headers unfound. This caused structured-binding variables (e.g., `auto [m,v] = tada`) to have type `<unnamed>`, which then produced false "more than one operator<< matches these operands" diagnostics.
+
+**Tested:** `cargo check -p freight` clean.
+
+**Pushed:** workspace bumped to `0838ad1`.
+
 ### 2026-06-06 — Claude — lsp: fix bits/requires_hosted.h not found; add clang-tidy runner
 
 **What changed:**
