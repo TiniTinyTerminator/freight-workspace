@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-08 — Claude — clang-bridge: split into 13 per-feature files, 8 new LSP APIs, TODO complete
+
+**What changed:**
+
+`crates/clang-bridge` `46a1836`, workspace `59e005b`:
+- `clang_bridge.cpp` split into 13 focused files: `cb_core`, `cb_doc`, `cb_diag`, `cb_inlay`, `cb_symbol`, `cb_hover`, `cb_goto`, `cb_completion`, `cb_analysis`, `cb_refs`, `cb_workspace`, `cb_hierarchy`, `cb_extra`
+- Shared C++ types and helper declarations moved to `cb_internal.h`; `build.rs` updated with per-file `rerun-if-changed`
+- New C APIs: `cb_highlight`, `cb_folding_ranges`, `cb_code_actions`, `cb_workspace_index_add`, `cb_workspace_symbols`, `cb_call_hierarchy_prepare`, `cb_incoming_calls`, `cb_outgoing_calls`, `cb_type_hierarchy_prepare`, `cb_supertypes`, `cb_subtypes`, `cb_expand_macro`, `cb_ast_dump`
+- New Rust wrappers: `callhier.rs`, `codeaction.rs`, `folding.rs`, `highlight.rs`, `typehier.rs`, `workspace.rs`; all wired into `TranslationUnit`/`Index`
+- Thread-safety comment on `CB_TransUnit` in header; stale-completion caveat documented on `cb_complete`
+- `TODO.md` fully marked complete; `ALIGNMENT_TODOS.md` complete
+
+**Pushed:** clang-bridge and workspace
+
+**Questions/next:** None — all known TODO items done. `clang_bridge.cpp` still present in bridge/ but no longer compiled (kept as reference).
+
+---
+
 ### 2026-06-07 — Claude — freight lsp: remove dead DocIndex / hover-enrichment pipeline
 
 **What changed:**
