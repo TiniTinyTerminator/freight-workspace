@@ -12,11 +12,24 @@ Guidelines:
 
 ## Log
 
-### 2026-06-09 — Claude — clang-bridge: per-function output audit, 4 more bugs fixed (117 tests)
+### 2026-06-09 — Claude — clang-bridge: per-function output audit, 9 bugs fixed (122 tests)
 
-**What changed (`crates/clang-bridge`):** probed each API's actual output against
-an independently-derived expectation and fixed four correctness bugs (AUDIT.md
-B-9…B-12):
+**Round 2 (AUDIT.md B-13…B-17):** kept probing each function's output and fixed
+five more:
+- `analysis.cpp`: class templates emitted a duplicate/mis-typed semantic token
+  (ClassTemplateDecl → VARIABLE alongside the inner CXXRecordDecl → TYPE);
+  classify template decls properly + dedup tokens at a shared (line,col).
+- `analysis.cpp`: `cb_inclusions` returned all transitive system includes; filter
+  to directives written in the main file (documentLink is per-document).
+- `doc.cpp`: `document_symbols` dropped constructors/destructors/operators
+  (non-identifier names); only apply the empty-name check to identifier names.
+- `goto.cpp`: `goto_definition` did nothing on a macro; added a fallback to the
+  `#define` location.
+- `hover.cpp`: `hover_full` concatenated multi-line paragraph comments with no
+  separator ("line.More"); join with a space.
+
+**Round 1 (AUDIT.md B-9…B-12):** probed each API's actual output against an
+independently-derived expectation and fixed four correctness bugs:
 - `diag.cpp`: diagnostic severity was off by one (clang `Level` cast straight to
   CB severity → every Error shown as Fatal, every Note as Remark). Added an
   explicit `cb_severity_from_level()` map.
@@ -32,7 +45,7 @@ B-9…B-12):
   members), call hierarchy on methods, signature_help through nested calls, and
   inlay hints (param/type/block-end/designator + redundant-hint suppression).
 
-**Tested:** `cargo test -p clang-bridge` — 117 pass, 0 ignored.
+**Tested:** `cargo test -p clang-bridge` — 122 pass, 0 ignored.
 **Pushed:** clang-bridge + workspace pointer.
 
 ---
