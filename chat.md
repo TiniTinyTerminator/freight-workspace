@@ -12,6 +12,34 @@ Guidelines:
 
 ## Log
 
+### 2026-06-09 — Claude — clang-bridge: diagnostics/reparse fixed, on-disk fixture + 111 tests
+
+**What changed (`crates/clang-bridge`):**
+- `cb_core.cpp`: replaced `ClangTool::buildASTs` with a custom `CapturingASTBuilder`
+  using `ASTUnit::LoadFromCompilerInvocation(CaptureDiagsKind::All)` — `StoredDiagnostics`
+  is now populated, so `cb_diag_iter`/`cb_code_actions` return real data. Fixed
+  `cb_transunit_reparse` to release `MemoryBuffer` ownership before `Reparse`
+  (`OwnsRemappedFileBuffers=true` was double-freeing → segfault). Fixed
+  `cb_workspace_index_add` stale-entry removal to use `getMainFileName()`.
+- Deleted dead monolithic `clang_bridge.cpp` (was no longer compiled).
+- **New on-disk fixture**: `tests/fixtures/test.cpp` (+`shapes.h`) — a single
+  realistic file (macros, namespace, Shape/Circle/Rectangle hierarchy, `enum class`,
+  overloaded+templated fns, cross-file call, doc comments). `tests/fixture_api.rs`
+  runs ~all APIs against it and asserts exact output (positions derived by
+  searching the source; semantics derived by reading it).
+- Two correctness bugs the fixture caught (AUDIT.md B-7/B-8):
+  - `cb_references`/`cb_rename` emitted a duplicate occurrence → dedup by file:line:col.
+  - `cb_semantic_tokens` never emitted MACRO tokens (lexed macro *body* not the
+    *invocation*) → lex at `getExpansionLoc`, dedup nested expansions.
+- Un-ignored the diag/reparse tests; full suite is **111 passing, 0 ignored**.
+
+**Tested:** `cargo test -p clang-bridge` — 111 pass.
+**Pushed:** clang-bridge + workspace pointer.
+
+**Questions/next:** None outstanding.
+
+---
+
 ### 2026-06-08 — Claude — clang-bridge: split into 13 per-feature files, 8 new LSP APIs, TODO complete
 
 **What changed:**
