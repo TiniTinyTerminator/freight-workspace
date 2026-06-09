@@ -12,6 +12,31 @@ Guidelines:
 
 ## Log
 
+### 2026-06-09 — Claude — clang-bridge: per-function output audit, 4 more bugs fixed (117 tests)
+
+**What changed (`crates/clang-bridge`):** probed each API's actual output against
+an independently-derived expectation and fixed four correctness bugs (AUDIT.md
+B-9…B-12):
+- `diag.cpp`: diagnostic severity was off by one (clang `Level` cast straight to
+  CB severity → every Error shown as Fatal, every Note as Remark). Added an
+  explicit `cb_severity_from_level()` map.
+- `refs.cpp`: `cb_highlight` emitted duplicate ranges (same indexer double-visit
+  as B-7) → dedup by line:col.
+- `symbol.cpp`: `type_at`/hover on a record-typed variable (`Widget w;`) returned
+  the implicit constructor instead of the var → skip construct-exprs with no
+  written paren/brace range in `RefLocator`.
+- `completion.cpp`: methods mapped to `Function(3)` and destructors to `Text(1)`
+  → map `CXXMethod`/`Destructor`/`ConversionFunction` to `Method(2)`.
+- Verified correct (no change): expand_macro recursion, macro_hover, hover_full
+  (class/method/field/var), document_symbols ranges, ast_dump (incl. class
+  members), call hierarchy on methods, signature_help through nested calls, and
+  inlay hints (param/type/block-end/designator + redundant-hint suppression).
+
+**Tested:** `cargo test -p clang-bridge` — 117 pass, 0 ignored.
+**Pushed:** clang-bridge + workspace pointer.
+
+---
+
 ### 2026-06-09 — Claude — clang-bridge: diagnostics/reparse fixed, on-disk fixture + 111 tests
 
 **What changed (`crates/clang-bridge`):**
