@@ -12,6 +12,39 @@ Guidelines:
 
 ## Log
 
+### 2026-06-10 — Claude — clang-bridge: C / modern-C++ / templates / broken fixtures, 4 bugs fixed (144 tests)
+
+Added four fixtures (each with a test file) probing code shapes the C++-only
+`test.cpp` never covered, plus `test.c` from the prior session:
+- **test.c** (C) — `fixture_c_api.rs`
+- **modern.cpp** (C++20: concepts, structured bindings, lambdas, `if constexpr`,
+  fold expressions) — `fixture_modern.rs`
+- **templates.cpp** (variadic, full/partial specialisation, CRTP, alias) —
+  `fixture_templates.rs`
+- **broken.cpp** (malformed, mid-edit) — `fixture_broken.rs`
+
+Bugs the fixtures surfaced and I fixed (AUDIT B-25…B-28):
+- **B-25:** C `struct`/`union` is a `RecordDecl`, not `CXXRecordDecl`, so document
+  symbols dropped the struct and orphaned its fields to the top level.
+- **B-26:** class-template specialisations had the same orphaning (their members
+  floated up; the spec structs were missing).
+- **B-27:** C++20 `concept`s weren't indexed at all.
+- **B-28:** at a concept-constrained call, clang synthesises nodes
+  (`__builtin_addressof`, `std::size_t`) reported *at the call site*; goto/hover/
+  symbol_at resolved to them instead of the callee. Fixed by matching against the
+  identifier physically written under the cursor. (Sharp edge: `getPresumedLoc`
+  and `getDecomposedLoc` disagree for these nodes — don't trust source text at a
+  node's own location for constrained-template code.)
+
+The bridge handles **broken source gracefully** (TU returned, correct diagnostics,
+valid parts still queryable) and variadic templates / `if constexpr` / lambdas /
+enum classes correctly out of the box.
+
+**Tested:** `cargo test -p clang-bridge` — **144 pass, 0 failed**.
+**Pushed:** clang-bridge + workspace pointer.
+
+---
+
 ### 2026-06-10 — Claude — clang-bridge: clangd-oracle differential audit, 6 bugs fixed (128 tests)
 
 Used **clangd 22** (same LLVM the bridge links against) as an oracle: drove it
