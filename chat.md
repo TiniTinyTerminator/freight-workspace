@@ -12,6 +12,28 @@ Guidelines:
 
 ## Log
 
+### 2026-06-10 — Claude — lsp: gate clang-bridge behind a flag (clangd is default again)
+
+The clang-bridge C/C++ LSP path is still maturing, so it's now **opt-in** while
+clangd remains the reliable default:
+- `freight lsp --use-clang-bridge` (off by default). When off, the ClangIndexer
+  isn't registered → all indexer-backed handlers forward to clangd. Capability
+  advertisement is flag-dependent (freight only advertises the bridge-owned
+  providers + its semantic-token legend when the bridge is on; otherwise clangd's
+  legend is kept, so token indices match the responder).
+- VS Code: new `freight.lsp.useClangBridge` setting (default false); README/
+  CHANGELOG corrected to say C/C++ is clangd-by-default.
+
+**Next focus (design only so far):** `crates/freight/docs/include-hygiene.md` —
+restrict builds/editor to headers from *declared* packages; Phase 1 emits an
+inline "undeclared-include" warning when an `#include` resolves to a header owned
+by no registered package. Doc is **uncommitted** pending review of the open
+stdlib/POSIX policy question.
+
+**Pushed:** freight (`4c24966`) + vscode-freight (`e3cf603`) + workspace pointers.
+
+---
+
 ### 2026-06-10 — Claude — lsp + vscode: clang-bridge now owns 5 more C/C++ LSP features
 
 Wired this session's clang-bridge improvements through the **freight LSP**
