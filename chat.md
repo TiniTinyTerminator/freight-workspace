@@ -36,10 +36,21 @@ output against the bridge. Found and fixed 6 bugs (AUDIT.md B-18…B-23):
 Verified-correct against clangd (no change): references (overload-specific, 3
 sites for `add`), document highlight (read/write kinds), goto, folding regions.
 
-**Tested:** `cargo test -p clang-bridge` — **128 pass, 0 failed**.
+Then a position-level **semantic-token** diff against clangd (B-24): the bridge
+emitted token streams with **zero false tokens** but missed 18 identifier tokens
+clangd produces — it visited declarations and expression refs but never *type
+references*. Added `VisitTypeLoc` (base classes, variable/param type annotations,
+template-param uses), constructor names + ctor-init members, and macro-definition
+names. **18 missing → 3** (two `auto` placeholders + the `geo::` qualifier, both
+cosmetic; the latter no longer traversable after clang 22 dropped ElaboratedType),
+0 extras.
+
+**Tested:** `cargo test -p clang-bridge` — **129 pass, 0 failed**.
 **Pushed:** clang-bridge + workspace pointer.
 **Harness:** `/tmp/clangd_probe.py` is a reusable clangd JSON-RPC oracle client
-(initialize → didOpen → query) — handy for further differential testing.
+(initialize → didOpen → query) — handy for further differential testing. The
+semantic-token diff method (match positions, ignore operator/bracket/comment
+types the bridge doesn't model) is a good template for the remaining methods.
 
 ---
 
