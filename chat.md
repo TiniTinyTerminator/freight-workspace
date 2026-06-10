@@ -12,6 +12,48 @@ Guidelines:
 
 ## Log
 
+### 2026-06-10 — Claude — clang-bridge: per-function audit complete (122 tests, 0 fail) + next test targets
+
+**Final results.** The per-function output audit is done. Across the campaign
+**17 bugs** were fixed (AUDIT.md B-1…B-17) and every LSP method was verified to
+produce correct output against the on-disk `tests/fixtures/test.cpp` (+`shapes.h`)
+fixture. The last two probe rounds surfaced **zero** discrepancies, so the
+"output of each function acts as expected" goal is satisfied.
+- Suite: `cargo test -p clang-bridge` → **122 passing, 0 failed, 0 ignored**.
+- All fixes + AUDIT.md committed and pushed (clang-bridge + workspace pointer).
+- Methods verified: hover, hover_full, raw_comment, goto, completion (+`::`),
+  diagnostics, code actions, inlay hints, references, rename, highlight, folding,
+  call hierarchy, type hierarchy, semantic tokens, document/workspace symbols,
+  format, expand_macro, macro_hover, ast_dump, signature help, doc extraction.
+
+**Next: test targets that are NOT yet covered** (everything above is C++-only,
+well-formed, single-file). Prioritised for the next agent:
+
+1. **C language** — laid down `tests/fixtures/test.c` (structs, typedefs, enums,
+   function pointers, macros, `static`/`extern`, no namespaces/classes). Needs a
+   `tests/fixture_c_api.rs` asserting hover/goto/refs/document_symbols/semtok give
+   correct C output. Verify the parser actually treats `.c` as C, not C++ (check
+   how `cb_parse` picks the language from the extension/args).
+2. **Broken / incomplete source** — what an LSP sees mid-edit. Add a fixture with
+   an unterminated brace, a half-typed `obj.` member access, a missing `;`, and an
+   unknown identifier. Verify: parse still returns a TU, diagnostics report the
+   errors, and completion/hover/goto degrade gracefully (no crash, best-effort).
+3. **Position encoding (UTF-16 vs bytes)** — LSP columns are UTF-16 code units by
+   default; clang emits byte columns. Add a fixture line containing multi-byte
+   UTF-8 (e.g. `// café` then a symbol) and verify reported columns match whatever
+   contract the Rust LSP layer expects. Likely a real latent bug — flag if so.
+4. **Cross-file / multi-TU** — goto/references that resolve from `.cpp` into a
+   separate `.h`, and `cb_workspace_index_add` across two TUs. The current fixture
+   only crosses into `shapes.h` for one call; exercise reference collection that
+   must span files.
+5. **C++20 features** — concepts/`requires`, structured bindings, lambdas with
+   captures, `if constexpr`, fold expressions. Verify semantic tokens, hover and
+   document_symbols classify these (templates already covered; these are newer).
+
+See AUDIT.md for the per-bug detail. No questions outstanding.
+
+---
+
 ### 2026-06-09 — Claude — clang-bridge: per-function output audit, 9 bugs fixed (122 tests)
 
 **Round 2 (AUDIT.md B-13…B-17):** kept probing each function's output and fixed
