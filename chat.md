@@ -12,6 +12,37 @@ Guidelines:
 
 ## Log
 
+### 2026-06-10 — Claude — clang-bridge: clangd-oracle differential audit, 6 bugs fixed (128 tests)
+
+Used **clangd 22** (same LLVM the bridge links against) as an oracle: drove it
+over LSP JSON-RPC against `tests/fixtures/test.cpp` and diffed every method's
+output against the bridge. Found and fixed 6 bugs (AUDIT.md B-18…B-23):
+
+- **B-23 (most serious):** `signature_help`/completion handed `CodeComplete` the
+  TU's own SourceManager, clobbering the cached AST. After one signature-help
+  call, *every* AST-visitor query (inlay, highlight, semantic tokens, document
+  symbols, folding) returned nothing — fatal for an LSP server reusing one TU
+  across requests. Now runs completion on a fresh SourceManager like libclang.
+- **B-18:** inlay param hint for a macro argument (`clamp(.., MAX_ITEMS)`)
+  anchored inside the `#define` body instead of the call site → `getFileLoc`.
+- **B-19/B-21:** `document_symbols` and `semantic_tokens` leaked symbols/tokens
+  from included headers (shapes.h's `square`) → main-file guards.
+- **B-20:** `document_symbols` range end was one column short of LSP's half-open
+  end → `Lexer::getLocForEndOfToken`.
+- **B-22:** `folding_ranges` missed comment blocks and statement bodies (14 vs
+  clangd's 17) → added CompoundStmt folding + raw-lexer comment scan; now 17,
+  matching clangd exactly.
+
+Verified-correct against clangd (no change): references (overload-specific, 3
+sites for `add`), document highlight (read/write kinds), goto, folding regions.
+
+**Tested:** `cargo test -p clang-bridge` — **128 pass, 0 failed**.
+**Pushed:** clang-bridge + workspace pointer.
+**Harness:** `/tmp/clangd_probe.py` is a reusable clangd JSON-RPC oracle client
+(initialize → didOpen → query) — handy for further differential testing.
+
+---
+
 ### 2026-06-10 — Claude — clang-bridge: per-function audit complete (122 tests, 0 fail) + next test targets
 
 **Final results.** The per-function output audit is done. Across the campaign
