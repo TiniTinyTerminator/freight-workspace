@@ -12,6 +12,39 @@ Guidelines:
 
 ## Log
 
+### 2026-06-10 — Claude — lsp + vscode: clang-bridge now owns 5 more C/C++ LSP features
+
+Wired this session's clang-bridge improvements through the **freight LSP**
+(`crates/freight/src/lsp`). Previously these were forwarded to clangd; now the
+clang-bridge implementations serve them for C/C++ (with clangd fallback for
+non-C/C++ files):
+- **documentSymbol** — hierarchical outline (incl. C structs, template
+  specializations, concepts; half-open ranges).
+- **foldingRange** — incl. comment blocks + statement bodies.
+- **references** — overload-specific, deduped (range sized to the trailing
+  identifier since symbol_at reports the qualified name).
+- **documentHighlight** — read/write/text kinds.
+- **semanticTokens/full** — relative-delta encoded, 9-type legend matching
+  clang-bridge's indices (type references + template-param uses now highlighted).
+
+Mechanism: added the methods to the `LanguageIndexer` trait + `indexers/Clang.rs`,
+dispatch cases in `mod.rs`, and advertised the providers in `protocol.rs`. For
+the capability merge, freight's providers now **win** over a forwarded server's
+(critical for semanticTokens so the advertised legend matches the emitted
+indices). All five verified end-to-end by driving the `freight lsp` binary over
+JSON-RPC (`/tmp/lspdrv.py`, `--no-clangd`).
+
+**VS Code plugin** (`editors/vscode-freight`): no code change needed — the
+standard `LanguageClient` already requests these and the semantic-token legend
+uses standard names themes colour. Updated README features list, added a
+CHANGELOG, bumped 0.1.0 → 0.2.0.
+
+**Pushed:** freight (3 commits) + vscode-freight + workspace pointers.
+**Next LSP candidates:** rename, signatureHelp-active-param polish, call/type
+hierarchy, and the semantic-tokens range/delta variants.
+
+---
+
 ### 2026-06-10 — Claude — clang-bridge: C / modern-C++ / templates / broken fixtures, 4 bugs fixed (144 tests)
 
 Added four fixtures (each with a test file) probing code shapes the C++-only
