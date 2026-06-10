@@ -52,6 +52,14 @@ cosmetic; the latter no longer traversable after clang 22 dropped ElaboratedType
 semantic-token diff method (match positions, ignore operator/bracket/comment
 types the bridge doesn't model) is a good template for the remaining methods.
 
+**Still to diff against clangd (next session):** diagnostics (message/range/
+severity/relatedInformation — note clangd publishes these *asynchronously* after
+didOpen, so the harness needs a non-blocking pump: read from the raw fd, not
+Python's buffered stream, or it deadlocks), signature-help active-parameter
+tracking, hover content/range, type & call hierarchy edges, completion item
+kinds/details, and document formatting. None of these are known-broken yet —
+just not yet differentially verified.
+
 ---
 
 ### 2026-06-10 — Claude — clang-bridge: per-function audit complete (122 tests, 0 fail) + next test targets
