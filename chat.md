@@ -12,6 +12,147 @@ Guidelines:
 
 ## Log
 
+### 2026-06-11 — Claude — freight: include/import inlay hints — cleanup + undeclared marker + live buffer
+
+- **Live buffer**: include/import inlay hints, document links, and include-goto
+  now read the open editor buffer (kept in `state.docs` for C-family files),
+  falling back to disk — so a freshly-typed `import std;` gets its hint without
+  saving.
+- **Cleaner hints**: tooltips are now `**<source>**` + `` `<pkg>/<file>` `` (or
+  `<header>` for stdlib), dropping the old `[fetched]/vecmath::…` clutter; inline
+  label is `← stdlib` / `← <pkg>`. Named-module imports render properly:
+  `import std;` → `← stdlib` (tooltip "C++ standard-library module"),
+  `import foo;` → `← module`. `parse_include_header` now returns `is_module`.
+- **Undeclared as inlay**: an undeclared `#include`/`import` now also shows a
+  `⚠ undeclared` inlay hint (mirrors the diagnostic) and it takes precedence over
+  the package annotation, so `<pthread.h>` reads `⚠ undeclared`, not `← stdlib`.
+
+Commits: freight cf716e5 (live buffer), fa1c80d (cleanup + undeclared inlay).
+
+### 2026-06-11 — Codex — fortran-lsp: preprocessor condition evaluation
+
+Added active-branch evaluation for preprocessor conditionals in
+`crates/fortran-lsp`. The parser now evaluates simple `#if`/`#elif` expressions
+(`defined`, identifiers, integer constants, `!`, `&&`, `||`, `==`, `!=`), tracks
+branch activity through `#ifdef`/`#ifndef`/`#else`, skips inactive Fortran code,
+and ignores inactive `#include` directives. Kept directive/region recording and
+unbalanced-conditional diagnostics intact.
+
+Tested: `cargo test -p fortran-lsp` — 29 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: recursive include visibility
+
+Extended include symbol visibility to traverse nested includes recursively with
+cycle protection. Symbols from nested include files now participate in hover,
+definition, completion, and references from the including file. Added tests for
+nested include resolution and include cycles.
+
+Tested: `cargo test -p fortran-lsp` — 27 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: include symbol visibility
+
+Extended `Workspace` include handling so top-level symbols from resolved include
+files are visible in the including file for hover, definition, completion, and
+references. This mirrors fortls' include scope merging without mutating parsed
+ASTs; deeper/nested include merging remains a follow-up.
+
+Tested: `cargo test -p fortran-lsp` — 25 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: include resolution API
+
+Added include resolution to `Workspace`: include roots can be configured, parsed
+`include`/`#include` statements resolve against the including file directory and
+those roots, `resolved_includes()` exposes the mapping, hover on include paths
+shows resolved/unresolved state, and unresolved includes produce warning
+diagnostics. This mirrors fortls' parse-then-resolve shape without yet merging
+included scope objects into the parent scope.
+
+Tested: `cargo test -p fortran-lsp` — 23 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: preprocessor directives and regions
+
+Added preprocessor AST support to `crates/fortran-lsp`: directive records for
+`#if`/`#ifdef`/`#ifndef`/`#elif`/`#else`/`#endif`/`#define`/`#undef`/`#include`,
+macro definition tracking, conditional region ranges, and diagnostics for
+unmatched/unterminated conditionals. Preprocessor `#include` now also contributes
+to parsed include statements.
+
+Tested: `cargo test -p fortran-lsp` — 20 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: intrinsic symbols
+
+Added `intrinsics.rs` with a Rust intrinsic symbol table and wired it into
+`Workspace` for hover, completion, signature help, and `use, intrinsic` module
+diagnostics. Global intrinsics are visible everywhere; intrinsic-module exports
+such as `iso_fortran_env::int32` are only surfaced through matching `use`
+statements and respect `only:` filters.
+
+Tested: `cargo test -p fortran-lsp` — 18 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: split modules + import/type-bound metadata
+
+Refactored `crates/fortran-lsp/src/lib.rs` into `model.rs`, `parser.rs`,
+`workspace.rs`, and `tests.rs` so parser/workspace/model functions are easier to
+find. Kept `lib.rs` as the public facade/re-export point. Also added tests for
+interface `import`, derived-type `extends(...)`, abstract/deferred type-bound
+procedures, `pass(...)`, binding targets, and generic bindings; fixed unnamed
+`interface` blocks to open a scope.
+
+Tested: `cargo test -p fortran-lsp` — 15 pass. No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: visibility, declarations, fixed form
+
+Continued the fortls Rust port in `crates/fortran-lsp`. Added public/private
+visibility state, default-private module exports, declaration metadata
+(`type_spec`, attributes, parameter/external flags), function `result(...)`
+names, fixed-form parsing with column-six continuations, and include statement
+capture for both Fortran `include` and `#include`. Module `use, only:` diagnostics
+now respect private exports.
+
+Tested: `cargo test -p fortran-lsp` — 13 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: LSP-facing Rust port primitives
+
+Continued the native `crates/fortran-lsp` port. Added source-backed parsed files,
+selection/full ranges, hierarchical document symbols, `!!` / `!>` doc comments
+on the next scope, signature help from indexed procedure args, workspace semantic
+diagnostics for unresolved non-intrinsic `use` modules and bad `only:` imports,
+and reference lookup across used modules. Updated the crate README.
+
+Tested: `cargo test -p fortran-lsp` — 9 pass. No commits/pushes.
+
+---
+
 ### 2026-06-11 — Claude — freight: C++20 modules end-to-end (`import std;`, clangd flag, highlighting)
 
 Follow-on to the `import std;` work — now complete across build + editor:
