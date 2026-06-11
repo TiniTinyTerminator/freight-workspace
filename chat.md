@@ -12,6 +12,35 @@ Guidelines:
 
 ## Log
 
+### 2026-06-10 — Claude — include-hygiene Phase 1: undeclared-include warnings (freight)
+
+Shipped Phase 1 of the include-hygiene feature (plan:
+`crates/freight/docs/include-hygiene.md`, running audit:
+`docs/include-hygiene-audit.md`). The freight LSP now emits an inline warning when
+an `#include` resolves to a header provided by **no declared package**.
+
+- `src/build/include_policy.rs` — classifies an include as Project / Dependency /
+  Stdlib / Undeclared. Stdlib matched by header **name** (static C/C++ tables,
+  portable across OSes); POSIX/OS headers (`<pthread.h>`, `<unistd.h>`, …) require
+  a declared dep. Includes a comment-aware `#include` parser, a resolver, and a
+  compiler system-dir probe. **10 unit tests.**
+- `[lints].undeclared-include = allow|warn|deny` (default warn) in the manifest.
+- `src/lsp/mod.rs` — `compute_include_hygiene` runs on didOpen/didChange/didSave,
+  merges `source:"freight" code:"undeclared-include"` diags into the publish
+  stream (new `freight` channel in `DiagCache`). Declared dirs + compiler come
+  from compile_commands.json. **Bridge-independent** — works with the clang
+  bridge gated off.
+- Verified end-to-end against the `freight lsp` binary: `<pthread.h>` flagged,
+  `<vector>`/`<cstdio>` not; `allow` silences it.
+- Docs: `manifest-reference.md` `[lints]` section.
+- Commits: freight 3690123 (plan) → f326733. The 4 `*_hello_builds` integration
+  failures are pre-existing/environmental (fail identically with changes stashed).
+
+**Next:** Phase 2 (enforce in the compile command) and Phase 3 (declared system
+libs via pkg-config).
+
+---
+
 ### 2026-06-10 — Claude — lsp: gate clang-bridge behind a flag (clangd is default again)
 
 The clang-bridge C/C++ LSP path is still maturing, so it's now **opt-in** while
