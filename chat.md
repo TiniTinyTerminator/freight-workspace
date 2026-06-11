@@ -12,6 +12,29 @@ Guidelines:
 
 ## Log
 
+### 2026-06-11 — Claude — freight: C++20 modules end-to-end (`import std;`, clangd flag, highlighting)
+
+Follow-on to the `import std;` work — now complete across build + editor:
+- **`freight build`** builds the std-library module too (not just the LSP). New
+  `std_module_build_flags` in `build/mod.rs::build_sources` scans for `import std;`
+  / `import std.compat;`, builds the BMI (cached under
+  `target/<profile>/std-modules/`), and merges `-fmodule-file=std=<bmi>` into the
+  extra-flags slot for all three compile paths. Verified: an `import std;` project
+  builds, links, and runs (`sum=60`).
+- **clangd** is launched with `--experimental-modules-support` (gated on a
+  `clangd --help` capability probe so older clangd is untouched).
+- **vscode-freight 0.3.1**: injected TextMate grammar highlights
+  `import <h>;`/`import std;`/`export module …;`; 0.3.0 turned on semantic
+  highlighting for C/C++ so clangd's token colors show.
+
+Commits: freight 027039f (LSP std module), 6b383cb (clangd flag), 063096e (build
+std module); vscode-freight df0a0ef (semantic hl), 06b2146 (module grammar).
+
+Caveat: std BMI is built with just `-std=<std>` (+ reserved-id suppression);
+exotic flag/stdlib setups may need the BMI build to mirror more compile flags.
+
+---
+
 ### 2026-06-11 — Claude — freight: `import std;` support + include-hover tweak
 
 - **`import std;`** now resolves in the editor. clangd reported "Module 'std' not
