@@ -12,6 +12,98 @@ Guidelines:
 
 ## Log
 
+### 2026-06-11 — Claude — lsp: hygiene perf + scoped #include completion
+
+Two freight LSP changes, both pushed (freight `ba9c131`, `1303ae8`, audit
+`b90e631`; workspace bumped to `c56ba3e`):
+
+- **Per-keystroke perf**: include-hygiene re-loaded + canonicalized
+  `compile_commands.json` on every `didChange`, lagging the inlay hints. Now
+  the parsed directive list is memoized per document (whole pass skipped when
+  includes are unchanged) and declared dirs + compiler are cached per file;
+  both invalidated on `refresh_compile_commands`, dropped on `didClose`.
+- **Scoped completion**: completion inside `#include`/`#import`/`import` is
+  answered by freight, not clangd — only stdlib headers and declared-package
+  headers are offered (angled = stdlib + packages, quoted = packages only,
+  `import st…` = `std`/`std.compat`), each with the source library in the
+  item detail (`C++ standard library`, `<pkg> <version>`, `this project`).
+  Non-directive completions still forward to clangd.
+
+Tested: `cargo test -p freight --lib` 676 green (one flaky `dap::server`
+parallel-test race, passes alone/on rerun — unrelated). Uncommitted:
+`examples/cpp/hello` scratch edits used for live editor testing.
+See `crates/freight/docs/include-hygiene-audit.md` steps 7–8.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: submodule diagnostics
+
+Added workspace diagnostics for broken submodule links. The Fortran workspace
+now reports submodules whose ancestor module cannot be resolved and `module
+procedure` implementations that do not have a matching prototype in the
+ancestor module interface. Added regression coverage for both failure modes and
+kept the positive module-procedure linking test diagnostic-clean.
+
+Tested: `cargo test -p fortran-lsp` — 48 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: submodule module-procedure links
+
+Added explicit parsing for `submodule (ancestor) name`, `module subroutine` /
+`module function` interface prototypes, and `module procedure` implementation
+bodies. Submodule symbols now record their ancestor module, module-procedure
+symbols are flagged, and workspace hover/definition on an implementation links
+back to the ancestor module interface prototype.
+
+Tested: `cargo test -p fortran-lsp` — 46 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: use rename resolution
+
+Added `use` rename support (`local => remote`) to the Rust Fortran workspace.
+`UseStmt` now records rename pairs, parser `only:` handling keeps local aliases
+separate from remote exports, and workspace definition/hover/completion/
+diagnostics resolve aliases for both user modules and intrinsic modules.
+
+Tested: `cargo test -p fortran-lsp` — 45 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: generic binding diagnostics
+
+Added diagnostics for generic type-bound bindings whose procedure list names a
+method that is not present in the same derived-type scope. Valid generic
+bindings continue to pass, and invalid entries report the generic name plus the
+missing procedure. Added focused tests for valid and missing generic targets.
+
+Tested: `cargo test -p fortran-lsp` — 42 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-11 — Codex — fortran-lsp: type-bound target diagnostics
+
+Added diagnostics for non-deferred type-bound procedure declarations whose
+concrete subroutine/function target cannot be resolved. Deferred declarations
+remain accepted as abstract contracts, while concrete overrides now need a real
+implementation target. Updated the inheritance override regression to include a
+module procedure and added tests for missing targets and deferred bindings.
+
+Tested: `cargo test -p fortran-lsp` — 40 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
 ### 2026-06-11 — Claude — freight: include/import inlay hints — cleanup + undeclared marker + live buffer
 
 - **Live buffer**: include/import inlay hints, document links, and include-goto
@@ -773,6 +865,16 @@ Extra/broader API section (8 ideas) in TODO.md is the next frontier.
 
 Tested:
 - `cargo test -p fortran-lsp`
+- `cargo check -p fortran-lsp`
+- `cargo check -p freight --no-default-features` (passed with existing warnings)
+- `cargo check -p fortran-lsp`
+- `cargo check -p freight --no-default-features` (passed with existing warnings)
+- `cargo check -p fortran-lsp`
+- `cargo check -p freight --no-default-features` (passed with existing warnings)
+- `cargo check -p fortran-lsp`
+- `cargo check -p freight --no-default-features` (passed with existing warnings)
+- `cargo check -p fortran-lsp`
+- `cargo check -p freight --no-default-features` (passed with existing warnings)
 - `cargo check -p fortran-lsp`
 - `cargo check -p freight --no-default-features`
 
@@ -3887,6 +3989,102 @@ Tested:
 - `npm run check`
 - `npm run compile`
 - `cargo check -p freight` (passed with existing warnings)
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-11 — Codex: fortran-lsp declared derived-type diagnostics
+
+What changed:
+- Added workspace diagnostics for unresolved declared derived types in `type(name)` and
+  `class(name)` variable declarations.
+- Derived type lookup now treats enclosing scopes as visible, so contained procedures can resolve
+  host-associated module types.
+- Imported module types from `use ..., only:` resolve correctly, while unlimited polymorphic
+  `class(*)` is accepted without diagnostics.
+- Added regression tests for unresolved declarations, host-associated types, imported types, and
+  `class(*)`.
+
+Tested:
+- `cargo test -p fortran-lsp`
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-11 — Codex: fortran-lsp inherited object method lookup
+
+What changed:
+- Added parser helpers for member access and receiver-aware call context (`obj%method(...)`).
+- Workspace hover, definition, and signature help now prefer receiver-typed method resolution for
+  object member calls before falling back to global symbol lookup.
+- Receiver variables declared as `type(name)` / `class(name)` resolve to their derived type, then
+  direct and inherited type-bound methods are searched recursively.
+- Added regression coverage for a child type calling a method inherited from its parent type.
+
+Tested:
+- `cargo test -p fortran-lsp`
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-11 — Codex: fortran-lsp type-bound method implementation links
+
+What changed:
+- Linked `SymbolKind::Method` entries back to their concrete subroutine/function targets using
+  the type-bound procedure binding target (`procedure :: name => impl`) or the method name.
+- Hover on a type-bound method now renders the callable method signature and implementation docs.
+- Go-to-definition on a method binding returns the concrete implementation symbol.
+- Signature help for method calls uses the implementation arguments while dropping the implicit
+  passed-object argument, with `pass(name)`/`nopass` handling.
+- Added regression coverage for hover, definition, and signature help through a type-bound method.
+
+Tested:
+- `cargo test -p fortran-lsp`
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-11 — Codex: fortran-lsp interface import diagnostics
+
+What changed:
+- Added workspace diagnostics for interface `import, only:` statements.
+- Imported names are resolved against the interface host scope, walking outward through ancestor
+  scopes; missing names now report an error.
+- `import, all` and `import, none` remain accepted without requiring named host bindings.
+- Added regression tests for valid/missing import-only names and `import, none`.
+
+Tested:
+- `cargo test -p fortran-lsp`
+
+Pushed:
+- Nothing pushed; changes are left uncommitted.
+
+Questions for next agent:
+- None.
+
+## 2026-06-11 — Codex: fortran-lsp inherited deferred method diagnostics
+
+What changed:
+- Extended `fortran-lsp` workspace diagnostics with a fortls-style derived-type inheritance check.
+- Non-abstract types that extend a parent with deferred type-bound procedures now report missing
+  concrete overrides; abstract children may keep inheriting deferred bindings.
+- Recursive parent handling accounts for intermediate concrete overrides and avoids cycles.
+- Added regression tests for missing overrides, concrete overrides, and abstract descendants.
+
+Tested:
+- `cargo test -p fortran-lsp`
 
 Pushed:
 - Nothing pushed; changes are left uncommitted.
