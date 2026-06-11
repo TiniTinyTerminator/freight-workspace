@@ -12,6 +12,27 @@ Guidelines:
 
 ## Log
 
+### 2026-06-11 — Claude — freight: `import std;` support + include-hover tweak
+
+- **`import std;`** now resolves in the editor. clangd reported "Module 'std' not
+  found" because nothing built the C++23 std-library module. New
+  `src/build/std_module.rs` locates the toolchain module manifest
+  (`<cc> -print-file-name=libstdc++.modules.json` / libc++), precompiles the std
+  (+std.compat) BMI (cached by mtime under `.freight/lsp/<profile>/std-modules/`),
+  and the LSP compile-command generator appends `-fmodule-file=std=<bmi>` to C++
+  commands when sources import std. Verified: clangd stops flagging `import std;`
+  on the hello example. **Not yet wired into `freight build`** (follow-up).
+- **Include hover** now shows `<package>/<filename>` (e.g. `vecmath/vec2.h`,
+  `stdlib/vector`) instead of the resolved/absolute path.
+- Reminder: `import` needs `std = "c++20"`+ in `[language.cpp]`; freight passes
+  `-std=` from the manifest, so clangd only knows `import` when the project
+  declares C++20/23. (The Microsoft C/C++ IntelliSense extension conflicts with
+  freight's clangd — disable its IntelliSense.)
+
+Commits: freight 4a95f5c (hover), 027039f (import std).
+
+---
+
 ### 2026-06-10 — Claude — include-hygiene Phase 1: undeclared-include warnings (freight)
 
 Shipped Phase 1 of the include-hygiene feature (plan:
