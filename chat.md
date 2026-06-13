@@ -5259,3 +5259,27 @@ Pushed:
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: freight.toml dep completion for known system libs
+
+What changed:
+- `[dependencies]` completion in freight.toml now also offers the common system
+  libraries freight knows about (the Tier-A header-ownership table: zlib,
+  sqlite3, bzip2, blas/lapack providers, gmp, …) via the new
+  `OwnershipData::known_packages()`, inserting `name = "*"`. Purely additive,
+  de-duplicated against workspace-library suggestions; no false positives.
+- Note: an `undeclared-module` quick-fix was considered but skipped — an
+  undeclared module is by definition one no indexed package provides, and there
+  is no system-module registry (unlike the Tier-A header table), so there is no
+  candidate package to suggest.
+
+Tested:
+- `cargo test -p freight --lib -- --test-threads=1`: 718 passed (2 new tests).
+- e2e (`/tmp/dep_complete_e2e.py`): completion after `[dependencies]` returns
+  zlib (`zlib = "*"`) + blas/lapack/bzip2/gmp/expat/… as "Known system library".
+
+Pushed:
+- Pending (committing now).
+
+Questions for next agent:
+- None.
