@@ -12,6 +12,1025 @@ Guidelines:
 
 ## Log
 
+### 2026-06-14 — Claude — dedup: LSP reads package dirs from build, not its own walk
+
+The LSP's header/module indexes re-walked the manifest dep graph
+(`build_header_specs` + `collect_path_dep_specs` in `lsp/mod.rs`, ~95 lines, with
+a `Box::leak`) — a parallel of build's dep handling. Consolidated:
+
+- New canonical enumerator `build::source_package_dirs(base) -> [(dir,
+  PackageKind, dep_key)]` in `build/project.rs`: project + workspace members +
+  `path` deps (transitive, dedup by canon path), read-only and tolerant of
+  missing/unfetched deps (so it's safe on the LSP hot path, unlike
+  `resolve_dep_graph` which errors on absent deps). 2 unit tests.
+- `refresh_header_index` now maps that into `HeaderDirSpec` (PackageKind → 
+  HeaderOrigin) — **`Box::leak` gone** (specs borrow the owned Vec in-scope).
+- Deleted `build_header_specs` + `collect_path_dep_specs` from `lsp/mod.rs`.
+
+Behaviour preserved: e2e (path dep `vecmath@2.0.0`) shows identical hover
+(`**vecmath@2.0.0**/vec2.h` + brief) and `← vecmath` inlay tooltip (its
+freight.toml description/authors/license). `cargo test -p freight --lib` 710
+pass (lone fail = known flaky `dap::server` parallel race). Clippy clean.
+
+Follow-on dedup still on the table (from the earlier survey): one `src/` walk
+shared by discover/HeaderIndex/ModuleIndex; a manifest-load cache; LSP holding a
+`Project`. This change is the first/biggest piece (the dep-graph walk).
+
+### 2026-06-13 — Claude — clang-bridge: UTF-16 incoming column conversion
+
+Third clang-bridge fix (suite 146/146). The **incoming** half of the UTF-16
+position bug: the client sends UTF-16 columns but `locate_symbol_at` /
+`goto`/`inlay`/`extra` fed them to clang's `translateLineCol` as **byte**
+columns, so on a multi-byte line you'd click a symbol and resolve the wrong (or
+no) token. Added `utf16_to_byte_col` + `translate_line_col_utf16` (symbol.cpp);
+`locate_symbol_at` now converts `col` once at entry (covers hover, references,
+rename, call/type hierarchy, symbol_at) and the direct-translate fallbacks use
+the helper. Test `symbol_lookup::symbol_at_uses_utf16_columns` (a `/* ä */`
+before a `value` reference resolves at its UTF-16 column).
+
+Remaining UTF-16 work (now a precise TODO point in `clang-bridge/TODO.md` §1):
+**outgoing** result columns are still byte-based (hover range, goto target,
+references/rename/documentSymbol/folding/inlay positions) — add
+`byte_to_utf16_col(SM, loc)` and apply at each emission. Lower-impact (only when
+the *result* lands on a multi-byte line).
+
+### 2026-06-13 — Claude — clang-bridge: green suite + semantic-token UTF-16 columns
+
+Two fixes (uncommitted, `cargo test -p clang-bridge` 145/145):
+
+- **Failing test fixed (fixture drift):** `tests/hello_hints.rs` parsed the
+  `cpp/hello` example by absolute path, but that file now uses `import std;`
+  (needs a std-module BMI the bridge test can't supply) → every `std::` became
+  undeclared → 0 inlay hints → assertion failed. Rewrote it **hermetic** with an
+  inline source via `parse_unsaved`; still verifies user-fn `values:`/`n:` param
+  hints, `x:`/`y:` ctor hints, system-header (`std::sqrt`) filtering, and no
+  `__name` leaks.
+- **UTF-16 semantic-token columns** (a real correctness bug): `analysis.cpp::
+  emitToken` emitted clang **byte** columns + byte name length, but LSP wants
+  UTF-16. Added `utf16_len()` and convert both col and length; a `// café`-style
+  multi-byte char before a token no longer shifts the whole line's token stream.
+  Regression test `semtok::semantic_token_columns_are_utf16`.
+
+Semantic tokens is outgoing-only (no incoming position), so it's safely
+contained. The broader UTF-16 work (hover/goto/refs/rename outgoing **and** the
+incoming direction where `locate_symbol_at` reads client UTF-16 cols as bytes)
+is still open — see `clang-bridge/TODO.md` §1.
+
+### 2026-06-13 — Claude — freight lsp: consolidate include hints into two renderers
+
+Cleaned up the three overlapping include-hover renderers into a clear split:
+- **Hover** (over `#include` *or* the header name — already one line-based path
+  in `include_hover_result`): the compact `**pkg@version**/header` + `@brief` +
+  author hint. Unchanged behaviourally.
+- **Inlay tooltip** (`← pkgname`): now shows that package's **`freight.toml`
+  `[package]` metadata** — version, description, authors, license, repository —
+  instead of repeating the header info. New `index::package_tooltip` /
+  `module_tooltip` load the manifest from a new `HeaderEntry.pkg_dir` /
+  `ModuleEntry.pkg_dir` (the package root, threaded through
+  `HeaderIndex`/`ModuleIndex` build). Falls back to `**name@version**` /
+  stdlib note when there's no manifest.
+- Removed the now-dead `include_hover_markdown`, `module_hover_markdown_for`,
+  `package_qualified_name`.
+
+e2e (path dep `vecmath@2.0.0`): hover over `#include` and over the filename are
+identical (`**vecmath@2.0.0**/vec2.h` + brief + author); the `← vecmath` inlay
+tooltip shows vecmath's freight.toml description/authors/license/repository.
+Tests updated; `cargo test -p freight --lib` 708 pass (+ the known flaky
+single-threaded-only `dap::server` race). Binary rebuilt.
+
+### 2026-06-13 — Claude — fix: clangd "Unknown argument: '-fmodules-ts'"
+
+GCC's base C++ flags add `-fmodules-ts` unconditionally
+(`template.rs:867`, `ModuleStyle::Gcc.enable_flag`). That lands in the generated
+`compile_commands.json`, which clangd (clang) reads — and modern clang dropped
+`-fmodules-ts`, so it errored on every GCC project. The build still needs it for
+g++, so I left `assemble_flags` alone and instead strip clang-incompatible flags
+**only from the clangd-facing compile_commands** in
+`compile_commands::write_to` (the single chokepoint for all generated/
+incremental/retained entries — self-heals stale on-disk entries on next write).
+`CLANGD_INCOMPATIBLE_FLAGS = ["-fmodules-ts"]`, extensible. Unit test +
+e2e-verified (g++ 16 project → 0 `-fmodules-ts` in the clangd DB, other flags
+intact). `cargo test -p freight --lib` 708/708 (the 1 fail is the known flaky
+`dap::server` race). Binary rebuilt.
+
+### 2026-06-13 — Claude — freight lsp: compact include-hover format
+
+Per request, the `#include`/`import` hover is now a compact three-part hint
+instead of the verbose provenance+banner blocks:
+
+```
+**pkg@version**/header      (pkg@version bold, header plain)
+brief
+Author Name (contact)
+```
+
+- `index::include_hint_line` / `module_hint_line` build the bold title
+  (`**stdlib**/vector`, `**vecmath@0.2.0**/vec2.h`, `**proj**/util.h` when no
+  version). `doxygen::FileDoc::brief_line` (explicit `@brief` else first
+  sentence of the prose) and `author_line` (`@author` with `<…>`/`(…)` or a
+  separate `@contact`/`@email` → `Name (contact)`). `contact`/`email` added to
+  `KNOWN_TAGS`.
+- Undeclared include/module hovers keep their actionable warning unchanged.
+- The `← pkg` inlay-hint tooltip still uses the old verbose renderer (separate
+  surface) — can unify on request.
+- e2e (clangd running): `#include "mathutil.h"` →
+  `**widget@0.1.0**/mathutil.h` / `Small numeric helpers.` /
+  `Jane Doe (jane@example.com)`. `cargo test -p freight --lib` 708/708.
+
+### 2026-06-13 — Claude — freight lsp: recognise prose-only header banners
+
+Follow-up to the banner feature: `doxygen::extract_file_doc` required an explicit
+`@`/`\` command, so the most common header style — a `/**`-doc comment with no
+tags, just prose — wasn't recognised and the hover showed no docs. Now a doc
+comment (`/**`, `/*!`, `///`, `//!`) at the top is a banner regardless of tags
+(its prose becomes the description); a *plain* `/* */`/`//` comment still needs a
+Doxygen command, so licences stay excluded. `leading_comment_blocks` now tracks
+the doc-comment style per block. 3 new tests; e2e verified with clangd running.
+`cargo test -p freight --lib` 707/707. Binary rebuilt.
+
+### 2026-06-13 — Claude — freight lsp: header Doxygen banner in include hover + completion panel
+
+Hovering an `#include`/`import` now shows the target file's top-of-file Doxygen
+banner, and scrolling the include completion list renders `@brief`/`@author`/…
+in the doc panel. Uncommitted; binary rebuilt.
+
+- New `src/lsp/doxygen.rs`: `extract_file_doc` finds the leading banner block
+  (skips `#pragma once`, include guards, and a licence comment that has no
+  Doxygen commands), parses `@brief`/description/`@author`/`@date`/`@version`/…
+  (block `/** */` and line `///`/`//!` styles, multi-line tag values);
+  `render_markdown` + `file_doc_markdown(path)`. 6 unit tests.
+- **Hover** (`include_hover_result`): resolves the backing file independently of
+  declared/undeclared status (header_index → lookup_system → quote-include
+  next to the source; modules → interface unit) and appends the banner under a
+  `---`.
+- **Completion panel** (`completionItem/resolve`): include/module items now
+  carry `data` (`freightInclude` + `path`/`header`); freight advertises
+  `completionProvider.resolveProvider = true` and resolves its own items lazily
+  to attach the banner as `documentation`. Non-freight items forward to clangd.
+- e2e verified through `freight lsp`: hover shows brief+author+version; resolving
+  the `mathutil.h` completion item fills the panel with the same. `cargo test -p
+  freight --lib` 704/704.
+
+Aside: a project's own `src/` header can still read as "⚠ undeclared" in the
+hover when no compile_commands exist (LSP project-roots gap, pre-existing) — the
+banner now shows regardless. Worth fixing separately.
+
+### 2026-06-13 — Claude — freight lsp: clean shutdown on client disconnect (no "Broken pipe")
+
+`freight lsp` printed `freight lsp: Broken pipe (os error 32)` to stderr (shown
+as an error in the editor) whenever the client closed the connection — a window
+reconnect, server restart, or `cargo run` rebuild. That's a normal shutdown, not
+an error. `Args::run` now swallows `BrokenPipe`/`UnexpectedEof` from
+`Server::run()` and exits 0 silently. Reproduced and verified: empty stderr,
+exit 0. Uncommitted; binary rebuilt.
+
+Also chased the stray `true` line from the user's Output panel: **not freight**
+(stdout is fully framed, stderr clean — confirmed by capture) and **not the
+vscode-freight extension** (no logging in src). It's vscode-languageclient /
+host-channel noise in a combined log view — cosmetic. `cargo test -p freight
+--lib` 698/698.
+
+### 2026-06-13 — Codex — fortran-lsp: passed-object interface compatibility
+
+Tightened explicit-interface diagnostics for type-bound procedures in
+`fortran-lsp`. `procedure(interface_name)` compatibility now checks the
+passed-object dummy instead of ignoring it: matching declarations still pass,
+`class(*)` remains permissive, target receivers may be the concrete bound type
+when it extends the interface receiver type, and unrelated receiver types are
+reported as interface mismatches. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+type_bound_procedure`; full `cargo test -p fortran-lsp` — 102 pass; `cargo
+check -p freight --no-default-features` — passes with existing warnings. No
+commits/pushes.
+
+---
+
+### 2026-06-13 — Codex — fortran-lsp: generic interface link diagnostics
+
+Ported another standalone generic-interface diagnostic into `fortran-lsp`.
+`Workspace::diagnostics` now reports `interface name; module procedure ...`
+entries that do not resolve to a concrete procedure in the enclosing scope. The
+generic-interface call resolver also skips unresolved `module procedure` stubs
+instead of treating them as argument-less procedures, so signature help and call
+diagnostics only use real implementations or explicit interface bodies. Updated
+README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+generic_interface`; full `cargo test -p fortran-lsp` — 100 pass; `cargo check
+-p freight --no-default-features` — passes with existing warnings. No
+commits/pushes.
+
+---
+
+### 2026-06-13 — Claude — vscode-freight: diagnosed EPIPE noise + 2 fixes
+
+Investigated the `write EPIPE` / `ERR_STREAM_DESTROYED` "rejected promise not
+handled" spam in the extension host. **Benign**: bundled `vscode-jsonrpc`'s
+`WriteableStreamMessageWriter.doWrite` handles a write error via its `onError`
+event **and** re-rejects the returned promise; the connection layer consumes the
+event but not the promise, so VS Code's host rejection tracker logs it. Fires
+when the `freight lsp` stdin closes — window reconnect, server exit, or a
+dev-mode `cargo run` rebuild restart. Not cleanly suppressible from extension
+code (a `process.on('unhandledRejection')` listener can't stop the host
+tracker). Fix forward = window reload for a stable server.
+
+Fixed two real bugs found while looking (uncommitted, dist rebuilt):
+- `lsp.ts` startup error handler referenced an **undefined `freight`** var
+  (`tried: ${freight}`) → ReferenceError that masked the real start error. Now
+  `serverOptions.command`.
+- Stale comment "fortls and asm-lsp are not yet implemented" — both are native
+  in-process indexers now (default-on); corrected.
+
+Confirmed the document selector already routes `.s/.f90/...` to the server.
+
+### 2026-06-13 — Codex — fortran-lsp: generic interface call resolution
+
+Ported standalone generic interface call resolution into `fortran-lsp`.
+`Workspace` now resolves calls to generic interfaces such as `set(...)` through
+their linked `module procedure` implementations, preferring the implementation
+whose visible argument count matches the call. The resolved implementation now
+drives signature help, parameter-name inlay hints, and call-argument
+diagnostics, so generic interfaces no longer look like argument-less symbols at
+call sites. Freight needs no new LSP wiring because `FortranIndexer` already
+uses the same workspace APIs. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+generic_interface_calls_use_linked_module_procedure_signatures`; full `cargo
+test -p fortran-lsp` — 99 pass; `cargo check -p freight --no-default-features`
+— passes with existing warnings. No commits/pushes.
+
+---
+
+### 2026-06-13 — Codex — fortran-lsp: callable call completions
+
+Ported another fortls completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects bare `call ...` statements and returns
+callable symbols only: visible local/included subroutines, public imported
+subroutines, generic interfaces, `use` renames, and global/intrinsic-module
+subroutines. It filters variables, derived types, functions, and private module
+procedures, and falls back to normal expression completions once the cursor is
+inside an argument list. Freight needs no new LSP wiring because
+`FortranIndexer::completion` already calls the same workspace completion API.
+Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_after_call_offer_callable_symbols_only`; full `cargo test -p
+fortran-lsp` — 98 pass; `cargo check -p freight --no-default-features` —
+passes with existing warnings. No commits/pushes.
+
+---
+
+### 2026-06-13 — Codex — fortran-lsp: type-name completions
+
+Ported another fortls completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects `type(...)`, `class(...)`, and
+`extends(...)` contexts and completes visible derived types only. It includes
+types from the current scope, resolved includes, and imported public module
+exports while excluding hidden/private types and unrelated variables. Freight
+needs no new LSP wiring because `FortranIndexer::completion` already calls the
+same workspace completion API. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_offer_visible_types`; full `cargo test -p fortran-lsp` — 97 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-13 — Claude — include hygiene Phase 3: system-library header ownership
+
+Declared `system`/pkg-config deps can now own their headers, so a legit
+`<zlib.h>`/`<cblas.h>` is no longer flagged under `deny`. New module
+`src/build/header_ownership.rs`. Uncommitted.
+
+- **Tier A** — `OwnershipData`: package/slot → header globs, keyed by freight
+  package name (distro-portable). In-core per-OS `seed()` (Linux libs + BLAS &
+  LAPACK **slots** with interchangeable providers) + optional downloaded
+  override `~/.config/freight/header-ownership-<os>.toml` (merged over seed,
+  fail-open). Shared header = OR (declare any BLAS provider → `cblas.h` owned).
+- **Tier B** — `pkg_config_dedicated_dirs`: a declared dep's pkg-config dirs
+  minus default roots (no `/usr/include` over-allow).
+- Wired into **build** (`validate_include_hygiene`: Tier-B dirs → allowlist,
+  Tier-A globs suppress owned headers, diagnostics name candidates) and **LSP**
+  (`compute_include_hygiene`: Tier-A suppression + candidate naming; subdir libs
+  already arrive via compile_commands, hot path avoids per-keystroke pkg-config).
+  Build and editor now agree.
+- Guards: (1) Tier B never folds a default system root; (2) absent data
+  attributes nothing — can only *add* "declared", never invent a finding.
+- Tests: 4 unit + integration `declared_owner_suppresses_system_header`
+  (`examples/broken/undeclared-include-owned/`). E2e verified build **and** LSP:
+  declaring `zlib` suppresses `<zlib.h>`, `<pthread.h>` stays flagged, undeclared
+  `<zlib.h>` reports "provided by zlib". `cargo test -p freight --lib` green
+  except the known flaky `dap::server` race.
+
+Remaining Phase 3 (audit Step 11): host/generate the per-OS Tier-A file (via the
+vcpkg/registry scraper + registry `provides-headers`); lazy `pkg-config
+--list-all` reverse index for naming owners of headers not in Tier A;
+macOS/Windows seeds.
+
+### 2026-06-13 — Codex — fortran-lsp: declaration keyword completions
+
+Ported fortls-style declaration keyword completions into `fortran-lsp`.
+`Workspace::completions_at` now detects declaration attribute contexts before
+`::` and completes attributes/prefixes such as `optional`, `intent`,
+`allocatable`, `pointer`, `deferred`, `pass`, visibility keywords, and procedure
+prefixes. Completion falls back to normal symbol completion after `::`, so
+declared names remain available where variables are expected. Freight needs no
+new LSP wiring because `FortranIndexer::completion` already calls the same
+workspace completion API. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_offer_declaration_keywords`; full `cargo test -p fortran-lsp` — 96
+pass; `cargo check -p freight --no-default-features` — passes with existing
+warnings. No commits/pushes.
+
+---
+
+### 2026-06-13 — Codex — fortran-lsp: use-statement completions
+
+Ported fortls-style `use` completion contexts into `fortran-lsp`.
+`Workspace::completions_at` now completes user/intrinsic module names while
+typing `use ...`, and completes public module members after
+`use module, only:`. This respects module visibility and includes intrinsic
+module exports such as `iso_fortran_env` constants. Freight needs no new LSP
+wiring because `FortranIndexer::completion` already calls the same workspace
+completion API. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_offer_modules`; full `cargo test -p fortran-lsp` — 95 pass; `cargo
+check -p freight --no-default-features` — passes with existing warnings. No
+commits/pushes.
+
+---
+
+### 2026-06-13 — Codex — fortran-lsp: member completions
+
+Ported fortls-style member completion into `fortran-lsp`. `Workspace::completions_at`
+now detects `%`/`.` member-access contexts, resolves the receiver's declared
+type, and returns type-bound method/generic completions instead of unrelated
+globals. It includes inherited public bindings, excludes private bindings, and
+uses concrete target signatures/docs when available. Freight needs no new LSP
+wiring because `FortranIndexer::completion` already calls the same workspace
+completion API. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_after_member_access`; full `cargo test -p fortran-lsp` — 94 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-13 — Claude — include hygiene Phase 2: build-time enforcement (+ crash fix)
+
+The undeclared-include check now runs in `freight build`, not only the LSP.
+Uncommitted.
+
+- **`build::validate_include_hygiene`** runs at the top of `build_sources`
+  (before any compile). Re-runs Phase-1 `include_policy::check_includes` over
+  each C-family source; declared include dirs are the allowlist, system dirs are
+  probed per compiler (`select_compiler`, cached). Per
+  `[lints].undeclared-include`: `deny` → `FreightError::UndeclaredInclude` (new
+  variant, build fails with a `path:line: <header>…` list); `warn` →
+  `BuildEvent::Warning` per finding; `allow` → skipped.
+- **Crash fixed (affected build *and* LSP):** `parse_includes` computed the
+  directive column via `raw.len() - rest.len()`, but `rest` slices the
+  comment-stripped `line`. A non-ASCII char after the directive (e.g. an em-dash
+  in a comment) made the byte index land mid-char and **panic**. Now computed
+  against `line`. Regression test added.
+- **Fixture + tests:** `examples/broken/undeclared-include/`; integration tests
+  `undeclared_include_blocks_build_under_deny` /
+  `undeclared_include_names_the_header`; verified all three lint levels e2e with
+  a real toolchain. `cargo test -p freight --lib` 694/694.
+
+**Phase 3 left open with a clear constraint** (see audit Step 10): folding
+pkg-config `--cflags` `-I` dirs into the allowlist naively is unsafe because
+pkg-config often returns `/usr/include` → would mark everything there declared.
+Phase 3 must add only dep-specific subdirs + honour `include = [...]`. Until
+then `deny` can false-positive on pkg-config/`system` deps; default `warn` is
+unaffected.
+
+### 2026-06-12 — Codex — fortran-lsp: missing required call args
+
+Extended the native Fortran call-argument diagnostics. `Workspace` now keeps
+private call-parameter metadata so diagnostics can distinguish required and
+optional dummy arguments for regular procedures, intrinsics, and type-bound
+methods. It now reports missing required arguments while respecting
+`optional` dummy declarations and fortls intrinsic labels such as `kind=kind`;
+it also avoids cascading missing-argument diagnostics on calls that already have
+unknown/repeated/too-many argument errors. Empty calls are now scanned so
+`call foo()` can be diagnosed. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+diagnostics_report_`; full `cargo test -p fortran-lsp` — 93 pass; `cargo check
+-p freight --no-default-features` — passes with existing warnings. No
+commits/pushes.
+
+---
+
+### 2026-06-12 — Claude — freight lsp: native assembly indexer finished
+
+Completed the native asm LSP (`src/lsp/indexers/Asm.rs`) started earlier today.
+Single-file GAS+NASM model; `--no-native-asm` falls back to the `asm-lsp`
+passthrough. Uncommitted.
+
+Now implemented beyond the first pass:
+- **Constants** (`.equ`/`.set`/`.equiv`, GAS `name = …`, NASM `name equ …` /
+  `%define` / `%assign`) and **macros** (`.macro`/`%macro`) as first-class
+  symbols — documentSymbol (kinded), goto, references, hover, completion.
+- **Numeric local labels** `1:` with directional `1f`/`1b` goto.
+- **Hover** dispatches by cursor context: symbol → provenance; mnemonic slot →
+  curated x86-64 **instruction** / **directive** help; operand → **register**
+  help. New rewritten tokenizer handles `%`-registers and strips GAS `$`
+  immediate / `@` type sigils (so `$WIDTH` resolves to constant `WIDTH`).
+- **`.include "file"`** goto opens the included file.
+- **Folding** for `.macro`/`.rept`/conditional blocks and per-label regions.
+- **`--no-native-asm`** CLI flag + gating (mirrors clang-bridge/native-fortran).
+
+12 unit tests; clippy-clean; end-to-end verified through `freight lsp`
+(symbols, all hover kinds, directional + symbol + include goto, refs, folding,
+completion). `cargo test -p freight --lib` green except the known flaky
+`dap::server` parallel race. Remaining work (cross-file symbol resolution,
+macro-param awareness, broader instruction DB) is in `crates/freight/TODO.md`.
+
+Note to Codex: `fortran-lsp` failed to compile a few more times while I built
+(`current_scope`, `signature_active_parameter` missing mid-edit) — it gates
+`cargo build -p freight`. All cleared on retry.
+
+### 2026-06-12 — Codex — fortran-lsp: call argument diagnostics
+
+Ported another fortls-style diagnostic pass into `fortran-lsp`. Workspace
+diagnostics now validate arguments for resolvable procedure, intrinsic, and
+type-bound method calls, reporting too many positional arguments, unknown
+keywords, and repeated keywords. The pass reuses the same parameter resolution
+path as signature help/inlay hints, including passed-object elision for
+type-bound procedures and intrinsic display labels such as `kind=kind`.
+Freight needs no new LSP wiring because `FortranIndexer::diagnostics` already
+publishes `Workspace::diagnostics`. Updated the README coverage list.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+diagnostics_report_bad`; full `cargo test -p fortran-lsp` — 90 pass; `cargo
+check -p freight --no-default-features` — passes with existing warnings. No
+commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: native parameter inlay hints
+
+Added native Fortran parameter-name inlay hints. `fortran-lsp` now exposes
+`Workspace::inlay_hints(...)`, returning parameter labels for positional
+arguments in resolvable procedure, intrinsic, and type-bound method calls while
+skipping already named arguments. Freight's embedded `FortranIndexer` now serves
+`textDocument/inlayHint` through that API. Also fixed the dirty-tree native asm
+gate type typo (`LspArgs` -> `Args`) that was blocking `cargo check`. Updated
+the README coverage list.
+
+Tested: `cargo fmt -p fortran-lsp -p freight`; focused `cargo test -p
+fortran-lsp inlay_hints`; focused `cargo test -p fortran-lsp
+type_bound_methods_link_to_implementation_for_hover_definition_and_signature`;
+full `cargo test -p fortran-lsp` — 87 pass; `cargo check -p freight
+--no-default-features` — passes with existing warnings. No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: keyword-aware signature help
+
+Ported fortls-style keyword argument handling into `fortran-lsp` signature
+help. The parser now records the active `name=` argument in call contexts, and
+workspace signature help maps that name to the matching dummy argument for
+regular procedures, intrinsics, and type-bound methods after passed-object
+argument elision. Positional signature behavior is unchanged. Added regressions
+for regular procedure keyword calls, intrinsic keyword calls, and type-bound
+method keyword calls, and updated the README coverage list.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+signature_help`; focused `cargo test -p fortran-lsp
+type_bound_methods_link_to_implementation_for_hover_definition_and_signature`;
+full `cargo test -p fortran-lsp` — 85 pass; `cargo check -p freight
+--no-default-features` — passes with existing warnings. No commits/pushes.
+
+---
+
+### 2026-06-12 — Claude — freight lsp: native assembly indexer (first pass)
+
+Started the native asm LSP — `src/lsp/indexers/Asm.rs`, a new `AsmIndexer`
+(`LanguageIndexer`) for `.s`/`.S`/`.asm`/`.nasm`. Replaces the external
+`asm-lsp` passthrough: `native_asm_enabled()` is `true`, so `start_asm_lsp` is
+gated off and asm requests route to the indexer. Uncommitted.
+
+Single-file label model (GAS + NASM). Parser is comment-aware (`#`/`;`/`//`,
+`/* */` across lines) and string-aware, excludes `%`-prefixed registers, and
+records label defs + all identifier occurrences. Features: documentSymbol (label
+outline), goto-definition, references (honours `includeDeclaration`), hover
+(label "defined at line N" + a ~45-entry directive-help table), completion
+(labels + directives), and a duplicate-label diagnostic. 6 unit tests; verified
+end-to-end through `freight lsp` (symbols, hover on label + `.global`, goto,
+refs incl/excl declaration, completion, duplicate diag all correct).
+
+Wiring mirrors the Fortran/clang gating: `AsmIndexer` registered in the indexer
+vec under `native_asm_enabled()`; no semantic-tokens legend advertised (avoids
+the legend clash — left to TextMate for now). Next steps (cross-file
+`.include`, `.equ` constants, macro awareness, instruction/register DB) are in
+`crates/freight/TODO.md` → "LSP: native assembly support".
+
+Note to Codex: `fortran-lsp` was mid-refactor and didn't compile twice while I
+was building (`current_scope` scope error at workspace.rs:201, earlier
+`push_unique_method`/`declared_type_is_class`) — it blocks `cargo build -p
+freight` since freight depends on it. Both cleared on retry; just a heads-up to
+land compiling checkpoints. `cargo test -p freight --lib` 687/687 except the
+known flaky `dap::server` parallel race.
+
+### 2026-06-12 — Codex — fortran-lsp: literal hover support
+
+Ported fortls-style literal hover summaries into `fortran-lsp`. Hover now
+returns simple Fortran markdown type summaries for integer, real, logical, and
+character literal constants, including `CHARACTER(LEN=...)` for quoted strings.
+This flows through Freight's existing native Fortran hover path without extra
+LSP plumbing. Added regression coverage and updated the README coverage list.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+hover_reports_fortran_literal_types`; full `cargo test -p fortran-lsp` — 83
+pass; `cargo check -p freight --no-default-features` — passes with existing
+warnings. No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: scope-aware completions
+
+Added cursor-position-aware completion support to `fortran-lsp` and wired the
+embedded Freight `FortranIndexer` to use it. Completions now respect the current
+local scope, scoped include grafting, module export visibility, `use only`
+lists, and scoped intrinsic-module imports instead of offering symbols from
+sibling scopes or private module internals. Kept the old prefix-only API as a
+compatibility wrapper. Added regressions for local-scope filtering, private
+module exports, and `use only` filtering, and updated the README coverage list.
+
+Tested: `cargo fmt -p fortran-lsp -p freight`; focused `cargo test -p
+fortran-lsp completions_`; full `cargo test -p fortran-lsp` — 82 pass; `cargo
+check -p freight --no-default-features` — passes with existing warnings from the
+dirty tree. No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: richer type-bound interface checks
+
+Extended explicit type-bound procedure compatibility diagnostics beyond
+procedure kind and argument list shape. `fortran-lsp` now resolves dummy
+argument declarations for `procedure(interface_name) :: binding => target` and
+compares non-passed dummy argument type specs plus key attributes such as
+`intent`, `optional`, `pointer`, `allocatable`, `target`, `value`, and
+`dimension`. The passed-object dummy is still treated specially so an abstract
+interface using `class(*)` remains compatible with a concrete `class(type)`
+receiver implementation. Added regressions for dummy type mismatch, attribute
+mismatch, and matching attributes, and updated the README coverage note.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+type_bound_procedure_interface`; focused `cargo test -p fortran-lsp
+explicit_interface`; full `cargo test -p fortran-lsp` — 79 pass; `cargo check
+-p freight --no-default-features` — passes with existing warnings. No
+commits/pushes.
+
+---
+
+### 2026-06-12 — Claude — freight lsp: include/import hover is now freight-owned (was clangd)
+
+`textDocument/hover` on an `#include` / `import` directive line was being
+forwarded to clangd, so hovering a header/module showed clangd's path-only hint
+instead of freight's package-provenance hover (the `include_hover_markdown` /
+`module_hover_markdown_for` text was only used for the inlay tooltip). Now
+freight intercepts it.
+
+- New `Server::include_hover_result` (`src/lsp/mod.rs`), called at the top of
+  `handle_hover_or_forward` **before** the indexer loop and the clangd forward,
+  so it wins in both clangd-default and `--use-clang-bridge` modes. Scoped to
+  C-family files (`source_server_for_uri == Clangd`).
+- Reuses the same classification as the inlay path: stdlib / declared-package /
+  project / `⚠ undeclared` for headers, and stdlib-module / declared-module /
+  `⚠ undeclared module` for `import …;`. Unknown quoted headers fall through to
+  clangd (it may resolve them).
+- Verified end-to-end against clangd 22: hovering `import std;`,
+  `import vm.core;` (declared path dep), `import boost.json;` (undeclared),
+  `#include <vector>`, `#include <pthread.h>` (undeclared) all return freight's
+  markdown, none from clangd.
+
+Also fixed earlier this session (same uncommitted batch): the undeclared
+include/diagnostic wording ("add **the dependency that provides it**", not "add
+it") and the C/C++ semantic-token legend regression. `cargo test -p freight
+--lib` 681/681. Uncommitted.
+
+### 2026-06-12 — Codex — fortran-lsp: scoped include grafting
+
+Ported another fortls-style include behavior into `fortran-lsp`: symbols from
+resolved include files now carry an effective scope based on where the include
+statement appears, including nested includes. This makes declarations from
+internal subroutine/block includes visible for hover/definition/references in
+that scope without leaking them to sibling scopes. Tightened fallback workspace
+symbol resolution so variables and type-bound methods no longer become
+accidental workspace-global symbols, and made member-access detection work when
+the cursor is inside the member token rather than only at its end. Updated the
+README coverage/gap notes.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+include_symbols`; focused `cargo test -p fortran-lsp
+object_member_lookup_finds_inherited_type_bound_methods`; full `cargo test -p
+fortran-lsp` — 76 pass; `cargo check -p freight --no-default-features` —
+passes with existing warnings. No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: conservative polymorphic dispatch
+
+Extended `fortran-lsp` member resolution for `class(parent)` receivers. When the
+declared parent binding is deferred, the workspace now searches descendant types
+and resolves hover/definition/signature help to a concrete override only if there
+is exactly one possible non-deferred implementation; ambiguous descendant
+overrides continue to fall back to the parent binding instead of guessing. Added
+regression coverage for both the unique and ambiguous cases and updated the
+README coverage/gap notes.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+polymorphic_class_receiver`; full `cargo test -p fortran-lsp` — 74 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: type-bound interface compatibility diagnostic
+
+Added a focused fortls-parity diagnostic for concrete type-bound procedures
+with explicit interfaces. `fortran-lsp` now resolves `procedure(interface_name)
+:: binding => target`, finds the interface prototype in the enclosing module's
+abstract/interface scope, resolves the concrete target, and reports an error
+when procedure kind or argument list differs. While adding this, fixed parsing
+of `abstract interface` so it opens a real interface scope instead of leaving
+`end interface` unmatched. Added passing/failing regression tests and updated
+the README coverage list.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+type_bound_procedure_`; full `cargo test -p fortran-lsp` — 72 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: intrinsic table from fortls JSON
+
+Replaced the small hand-written Fortran intrinsic table with a JSON-backed
+loader using the vendored fortls `intrinsic.procedures.json` and
+`intrinsic.modules.json` data under `crates/fortran-lsp/src/data/`. The public
+lookup/completion APIs still return stable intrinsic symbols, but now cover the
+full fortls procedure list plus intrinsic module exports for OpenMP, OpenACC,
+ISO, and IEEE modules. Added tests proving entries absent from the old table
+(`achar`, `openacc::acc_get_num_devices`) are available for hover, completion,
+and intrinsic-module diagnostics. Marked the intrinsic-table TODO done and
+removed the stale README gap.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 70 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Claude — freight lsp: fix scrambled C/C++ semantic-token colours (legend mismatch)
+
+Heads-up to Codex: the native-Fortran capability change broke C/C++ syntax
+highlighting in the default (clangd) configuration. Fixed; uncommitted.
+
+Root cause: `freight_capabilities` advertised freight's own 9-type
+`semanticTokensProvider` legend whenever `use_clang_bridge || use_native_fortran`,
+and `initialize` passes native-fortran as a hardcoded `true`. So with the clang
+bridge **off** (clangd is the default C/C++ backend), clangd emits semantic
+tokens against its own 25-type legend while the client was told to use freight's
+9-type legend → every C/C++ token mapped to the wrong type/colour.
+
+Fix (`src/lsp/protocol.rs` + `src/lsp/mod.rs`): the global semantic-token legend
+is now advertised **only when `use_clang_bridge`** (freight is then the actual
+token responder for C/C++ and Fortran). With the bridge off, clangd's legend is
+kept via the capability merge and all `semanticTokens/full` requests forward to
+clangd; `handle_semantic_tokens` correspondingly only serves from freight's
+indexers when the bridge is on, so the Fortran indexer no longer injects
+freight-legend tokens into a clangd-legend stream. The other native providers
+(documentSymbol/folding/references/highlight, +codeAction/rename for Fortran)
+are unchanged — they have no shared global legend to clash over.
+
+Consequence: native-Fortran **semantic tokens** only render when the clang
+bridge is on (otherwise Fortran falls back to TextMate, as before). If you want
+Fortran semantic highlighting in the default clangd config, the real fix is to
+remap freight's token types onto clangd's advertised legend at serve time — left
+as a follow-up.
+
+Verified by driving `freight lsp` against a C++ project with clangd 22:
+default mode now advertises clangd's 25-type legend; `--use-clang-bridge`
+advertises freight's 9-type legend. `cargo test -p freight --lib` 681/681.
+
+### 2026-06-12 — Codex — fortran-lsp: fortls-style macro expansion
+
+Ported another fortls preprocessor behavior into `fortran-lsp`: active
+object-like and function-like `#define` macros are now expanded before Fortran
+statement parsing. This covers fortls' `WRAP(PROCEDURE)`-style macro expansion
+for `module procedure` / generic declarations, including `/**/` token-paste
+removal, and object-like macros that expand into declarations. While doing this,
+fixed parsing of `module procedure a, b` lists inside `interface` scopes so each
+prototype becomes its own symbol instead of only the first name being indexed.
+Updated `crates/fortran-lsp/README.md` to remove stale rename status and clarify
+remaining preprocessor gaps.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 68 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — freight lsp: Fortran include roots from manifest/deps
+
+Made the embedded Freight `FortranIndexer` manifest-aware for include
+resolution. It now seeds `fortran_lsp::Workspace` with the project root,
+conventional `include`/`inc`/`src` dirs, platform/profile-merged
+`[compiler].includes`, path dependency roots/exported include dirs/explicit
+`include = [...]` dirs, transitive path deps, and cached `.pkgs/<dep>` version
+dependency include dirs. Added a focused Freight unit test for those roots and
+marked the include-root integration TODO done in `crates/fortran-lsp/TODO.md`.
+
+Tested: `cargo fmt -p freight`; focused `cargo test -p freight
+--no-default-features
+lsp::indexers::Fortran::tests::fortran_include_roots_follow_manifest_and_dependencies`
+— passes; `cargo check -p freight --no-default-features` — passes with existing
+warnings; `cargo test -p fortran-lsp` — 66 pass. No commits/pushes.
+
+---
+
+### 2026-06-12 — Claude — freight lsp: named C++20 module imports resolved to packages
+
+Finished the last open piece of the freight-handled include/import hints:
+`import foo;` named modules are now classified exactly like header `#include`s
+(previously hardcoded to a generic `← module`). Uncommitted; all in
+`crates/freight`.
+
+- New `lsp::index::ModuleIndex` (module name → owning package), built next to
+  `HeaderIndex` by scanning declared packages' `src/` for `export module …;`
+  (reuses `build::modules::parse_export_module`, now `pub(crate)`).
+- `include_policy::IncludeDirective` gained `DirectiveKind` (Header|Module);
+  `parse_includes` emits module directives (so module-line edits invalidate the
+  hygiene fast-path); `check_includes` skips modules.
+- Inlay hints: `← stdlib` / `← <pkg>` / `← module` (own) / `⚠ undeclared`.
+  Diagnostics: `undeclared-module` (parity with `undeclared-include`).
+  Completion: `import …;` lists std + declared modules. Goto: jumps to the
+  `export module` interface unit.
+- Tests added (parse, index-scan, label/hover, completion) + existing updated;
+  end-to-end driven through the `freight lsp` binary on a temp project
+  (declared dep module, undeclared `boost.json`, completion, goto — all correct).
+  `cargo test -p freight --lib` green except the known flaky `dap::server` race.
+
+Docs: `docs/include-hygiene.md` + `-audit.md` Step 9, `TODO.md`, `AGENTS.md`
+updated. The module→package map item is now closed.
+
+Open question for next agent: should Phase 2 (build-time enforcement) also fail
+the build on an undeclared *module* import, or only headers? The LSP now flags
+both; the build pass doesn't exist yet.
+
+### 2026-06-12 — Codex — freight lsp: native Fortran actions and rename
+
+Extended Freight's `LanguageIndexer` surface and the embedded `FortranIndexer`
+to serve native Fortran folding ranges, document highlights, code actions, and
+rename through `fortran-lsp` instead of falling through to `fortls`. Freight now
+dispatches `textDocument/rename` to indexers, handles Fortran code actions
+before passthrough forwarding, and advertises native Fortran code-action/rename
+capabilities plus Fortran-friendly completion/signature trigger characters.
+Updated `crates/fortran-lsp/TODO.md` to reflect the wider integration surface.
+
+Tested: `cargo fmt -p freight`; `cargo check -p freight --no-default-features`
+— passes with existing warnings; `cargo test -p fortran-lsp` — 66 pass.
+No commits/pushes. Remaining integration work: manifest/dependency include roots
+for Fortran include resolution and fortls differential tests on real projects.
+
+---
+
+### 2026-06-12 — Codex — freight lsp: native Fortran indexer wired
+
+Wired `fortran-lsp` into `freight lsp` as an embedded `FortranIndexer`.
+Freight now registers the native Fortran indexer by default, reparses live
+Fortran buffers, publishes native diagnostics on open/change/save, serves
+hover/definition/completion/signature help/document symbols/references/semantic
+tokens through the shared `LanguageIndexer` interface, and skips launching the
+`fortls` subprocess while native Fortran is enabled. Added the `fortran-lsp`
+dependency to `freight` and updated capability merging so Freight advertises the
+rich providers when native Fortran is active.
+
+Tested: `cargo fmt -p freight`; `cargo check -p freight --no-default-features`
+— passes with existing warnings; `cargo test -p fortran-lsp` — 66 pass.
+`cargo test -p freight --no-default-features` ran the unit tests successfully
+but failed in `tests/build_examples.rs` because this environment has no Fortran
+or ASM compiler (`no compiler found for language 'fortran'/'asm'`).
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: line-handler property coverage
+
+Added deterministic property-style parser coverage for free-form and fixed-form
+logical line handling. The generated fixtures vary continuation placement and
+comment placement across many small subroutines, then assert each subroutine and
+argument list survives parsing. This covers the TODO's fuzz/property requirement
+without introducing a new test dependency. Marked the free/fixed line-handler
+robustness TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 66 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: mid-edit parser diagnostics
+
+Made the parser more robust for editor-time broken sources. Unterminated
+Fortran scopes now produce diagnostics while preserving best-effort symbols,
+half-typed `use` statements report an invalid-use diagnostic instead of being
+silently ignored, and unsupported `end ...` constructs such as `end do` no
+longer close the nearest real scope. Added regression coverage for unterminated
+module/subroutine input, half-typed `use`, and `end do` inside a subroutine.
+Marked the broken/mid-edit robustness TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 64 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: type-bound generic call resolution
+
+Added call-site resolution for type-bound generic member calls such as
+`obj%render(...)`. The workspace now falls back from direct method lookup to
+type-bound generic bindings on the receiver type and its ancestors, selecting
+the bound procedure whose visible call-argument count matches the current call
+when possible. `CallContext` now tracks argument count, and signature help uses
+the selected concrete bound method. Added regression coverage for overloaded
+generic signature help and marked the type-bound generic resolution TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 61 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: operator and assignment interfaces
+
+Added parsing/indexing for standalone `interface operator(...)` and
+`interface assignment(=)` scopes, plus type-bound `generic :: operator(...) =>
+proc` and `generic :: assignment(=) => proc` bindings. `GenericBinding` now
+records whether a binding is named/operator/assignment, and existing generic
+diagnostics cover missing type-bound operator targets. Added regression coverage
+for document symbols, binding metadata, and missing operator target diagnostics,
+and marked the operator/assignment TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 60 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: construct scopes
+
+Added native parsing/indexing for `block`, `associate`, and `select type`
+construct scopes. Construct scopes are represented as public `SymbolKind`
+variants with line-qualified internal names; `associate(name => expr)` aliases
+are indexed as local variables inside the associate scope. Tightened symbol
+resolution so block-local declarations shadow outer declarations only while the
+cursor is inside that construct. Added regression coverage for construct
+symbols, associate alias definition, and block-local shadowing, and marked the
+construct-scope TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 57 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: semantic tokens
+
+Added `SemanticToken`, `semantic_token_type` constants matching Freight's
+clang-bridge legend, `Workspace::semantic_tokens(path)`, and
+`Workspace::semantic_token_data(path)` for LSP delta-encoded output. The
+classifier resolves identifier occurrences through the workspace and covers
+modules/namespaces, derived types, functions, type-bound methods, components,
+dummy arguments, variables, and preprocessor macros. Added regression coverage
+for the shared legend mapping and marked the semantic-token TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 55 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: workspace rename edits
+
+Added a transport-neutral `Workspace::rename(...)` API backed by the existing
+definition/reference resolver. It returns per-file `TextEdit`s for workspace
+renames and rejects unresolved symbols, invalid Fortran identifiers, and
+same-scope symbol conflicts via the new public `RenameError` enum. Added
+regression coverage for cross-file edits and conflict/identifier failures, and
+marked the rename TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 54 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: UTF-16 cursor columns
+
+Adjusted Fortran cursor/query helpers to treat `Position.character` as a UTF-16
+column, matching LSP transport semantics. Added regression coverage for hover,
+signature help, and reference ranges on a line with a non-BMP character before
+the queried call site. Marked the UTF-16 robustness TODO done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 52 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: workspace document symbols
+
+Added `Workspace::document_symbols(path)` so Freight can request the existing
+hierarchical Fortran document-symbol tree without reaching into `ParsedFile`.
+Added regression coverage for the workspace API and marked the TODO item done.
+
+Tested: `cargo fmt -p fortran-lsp`; `cargo test -p fortran-lsp` — 51 pass;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Codex — fortran-lsp: deferred procedure quick fixes
+
+Added a transport-neutral code-action primitive to `fortran-lsp`: `Workspace`
+now exposes quick-fix `CodeAction` values with `TextEdit`s for concrete types
+that inherit deferred type-bound procedures without implementing them. The edit
+inserts a `contains` section when needed and adds `procedure :: name => name`
+bindings before the concrete type's `end type`, so `freight lsp` can later map
+these directly into LSP code actions.
+
+Tested: `cargo test -p fortran-lsp` — 50 pass; `cargo check -p fortran-lsp`;
+`cargo check -p freight --no-default-features` — passes with existing warnings.
+No commits/pushes.
+
+---
+
+### 2026-06-12 — Claude — clang-bridge: TODO expanded — broken/UX/missing-features road map
+
+Expanded `crates/clang-bridge/TODO.md`'s "Remaining" section into a five-part
+road map to default-on, grounded in source inspection (not just the audit docs):
+
+- **Still broken/risks:** preamble precompilation is *disabled*
+  (`PrecompilePreambleAfterNParses=0` in `core.cpp` → every keystroke re-parses
+  all headers — the #1 latency gap vs clangd); synchronous undebounced reparse
+  on the LSP loop (`mod.rs` didChange); in-process clang crash kills the whole
+  multi-language server; header-caused diagnostics silently dropped by the
+  `d.file == main` filter in `Clang.rs` (clangd shows "In included file…");
+  UTF-16 columns; B-24 cosmetic token gaps; Q-4 lambdas.
+- **Verification:** unchanged clangd-oracle checklist + a recorded-session soak
+  test.
+- **UX:** completion latency budget, TU LRU memory cap, zero-width goto ranges,
+  `$/progress` during first parse, refresh_flags evicting only changed TUs.
+- **Missing features:** stock code actions (add-missing-#include pairs with
+  include-hygiene), completion include-insertion scoped to declared packages,
+  snippet completions, semanticTokens range/delta, inactive regions,
+  selectionRange/linkedEditingRange, onTypeFormatting, manifest-driven
+  background project index, IH-14 designator hints.
+- **Test debt:** encoding fixture, multi-TU fixture, preamble regressions,
+  latency micro-bench.
+
+Docs only, uncommitted. Next agent: §1 items are the highest-leverage starting
+points (preamble enable + debounce are both small and measurable).
+
+---
+
+### 2026-06-12 — Claude — docs: TODO/AGENTS refresh — end goals + how-to-solve per open item
+
+Restructured the open-work tracking so every active item states its **end
+goal** and **how to solve it**. No code changes.
+
+- `AGENTS.md`: workspace layout + crate graph now include `clang-bridge`,
+  `fortran-lsp`, and `editors/`; per-crate TODO table updated; item 9 rewritten
+  as five tracks (9a clang-bridge parity→default, 9b fortran-lsp embed,
+  9c include-hygiene Phases 2–3, 9d editor surfaces, 9e DAP backends), each
+  with end goal / current state / concrete finish steps.
+- `crates/freight/TODO.md`: replaced the stale paused-libclang section with
+  "clang-bridge to parity, then default-on" (the clang-bridge crate superseded
+  that prototype); added an include-hygiene Phases 2–3 section; rewrote the
+  native-Fortran section around embedding `fortran-lsp` as a `FortranIndexer`.
+- `crates/fortran-lsp/TODO.md`: **new** — integration plan into `freight lsp`,
+  language-feature parity gaps vs fortls, robustness items.
+- `crates/clang-bridge/TODO.md`: appended the remaining differential-
+  verification checklist (async diagnostics, sig-help active param, hover,
+  hierarchies, completion kinds, formatting, UTF-16 encoding, multi-TU) as the
+  gate for flipping the default.
+
+Tested: docs only. Uncommitted — left for review alongside the dirty
+`crates/freight` / `crates/fortran-lsp` work already in the tree.
+
+---
+
 ### 2026-06-11 — Claude — lsp: hygiene perf + scoped #include completion
 
 Two freight LSP changes, both pushed (freight `ba9c131`, `1303ae8`, audit
@@ -4150,3 +5169,64 @@ Pushed:
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: manifest-load cache (LSP/build dedup)
+
+What changed:
+- Added `manifest::load_manifest_cached` — mtime-validated memoized loader for read-heavy callers.
+  Re-parses whenever `freight.toml`'s mtime changes; build/compile path stays on uncached
+  `load_manifest` to avoid mtime-granularity staleness after a write.
+- Switched LSP read sites to the cached loader: `lsp/index.rs` (header/module index refresh,
+  package/module tooltips) and `lsp/mod.rs` (4 read-only sites: include hover, inlay hints).
+  `build/project.rs::source_package_dirs` (read-only enumerator) also uses it; `Project::open`
+  stays uncached.
+
+Tested:
+- `cargo test -p freight` lib suite: 712 passed; 0 failed (incl. new
+  `cache_tests::cached_loader_reloads_on_mtime_change`).
+- e2e inlay-tooltip check confirmed metadata still renders through the cached loader:
+  `INLAY ← vm -> **vm@3.1.0** | | cached vectors | | *License:* BSD`.
+
+Pushed:
+- Nothing pushed; changes left uncommitted.
+
+Remaining dedup (build/ ↔ LSP), in priority order:
+- Single `src/` walk shared by discover / HeaderIndex / ModuleIndex (currently 3 walks).
+- ServerState holding a `Project` outright rather than re-deriving package dirs.
+
+Questions for next agent:
+- None.
+
+## 2026-06-14 — Claude: LSP ↔ build/ dedup, items 1 & 2
+
+What changed:
+- Single src/ walk per package: new `lsp::index::build_source_indexes` walks each
+  package's `src/` tree exactly once, classifying headers and `export module`
+  declarations in the same pass (new `walk_src_tree` folds in the former
+  `scan_module_dir` and the Own-package header walk). Removed `HeaderIndex::build`
+  and `ModuleIndex::build`; `refresh_header_index` calls the combined builder.
+  `build::discover` left alone — it's the compile-path walk (different scope:
+  one project, template-keyed langs, conditional [os.*]/[arch.*] globs).
+- ServerState owns a project model: new `active_manifest` + `package_dirs` fields,
+  recomputed once per manifest-set change in `refresh_project_model` (driven from
+  `refresh_compile_commands`). `refresh_header_index`, `undeclared_include_level`,
+  `declared_dep_names`, and the sysroot read now consume the owned model instead
+  of reloading the manifest / re-deriving `source_package_dirs` per call. The
+  build's `Project` is deliberately NOT held (it implies fetch/resolve).
+
+Tested:
+- `cargo test -p freight --lib`: 712 passed; 0 failed.
+- e2e (`/tmp/item_e2e.py`, app + path-dep providing a header and a C++20 module):
+    L0 #include <vecmath/vec.h> -> `← vecmath`, tooltip = dep's full freight.toml
+       (**vecmath@3.1.0** / cached vectors / Authors / License) + header hover
+       shows the Doxygen brief.
+    L1 import vecmath.core;     -> resolved to the dep's src/core.cppm module.
+    L2 #include <vector>        -> `← stdlib`.
+  Confirms the combined walk indexes a non-Own package's modules and that the
+  owned model populates package_dirs/active_manifest at refresh time.
+
+Pushed:
+- Nothing pushed; changes left uncommitted.
+
+Questions for next agent:
+- None — the build/↔LSP dedup survey items are all closed.

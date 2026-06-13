@@ -2070,6 +2070,9 @@ dependencies = [
 [[package]]
 name = "fortran-lsp"
 version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
 
 [[package]]
 name = "freight"
@@ -2083,6 +2086,7 @@ dependencies = [
  "crossterm",
  "curl",
  "flate2",
+ "fortran-lsp",
  "git2",
  "glob",
  "image",

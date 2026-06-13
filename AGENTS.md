@@ -31,11 +31,16 @@ freight/                         ← workspace root (this repo)
 ├── AGENTS.md                    # this file
 ├── chat.md                      # shared agent handoff/chat log
 ├── crates/
+│   ├── clang-bridge/            # in-process clang AST bridge (C++ FFI + Rust API) for the LSP
 │   ├── cmake-lossless/          # lossless CMake parser (library)
+│   ├── fortran-lsp/             # native Rust Fortran indexer/LSP primitives (fortls port)
 │   ├── freight/                 # core build tool — library + CLI binary
 │   ├── freight-registry/        # self-hosted package registry server
 │   ├── docify/                  # doc-comment extractor (library + binary)
 │   └── vcpkg-converter/         # vcpkg → freight migration tool
+├── editors/
+│   ├── vscode-freight/          # VS Code extension (LSP client + tasks + grammar)
+│   └── nvim-freight/            # Neovim plugin (lazy.nvim, auto-starts freight lsp)
 ```
 
 **Package cache layout** (written by `freight fetch`):
@@ -64,11 +69,14 @@ workspace root.
 cmake-lossless  ←── freight (migration module)
 cmake-lossless  ←── vcpkg-converter (cmake_probe module)
 docify          ←── freight (freight doc command)
+clang-bridge    ←── freight (LSP ClangIndexer; default feature, runtime-gated by --use-clang-bridge)
+fortran-lsp     ←── freight (planned: native Fortran indexer behind freight lsp; not yet wired)
 freight-registry    (standalone; no internal deps)
 ```
 
 Changes to `cmake-lossless`'s public API will require updates in both `freight`
-and `vcpkg-converter`.
+and `vcpkg-converter`. Changes to `clang-bridge`'s Rust API surface require a
+matching `freight/src/lsp/indexers/Clang.rs` update in the same logical change.
 
 ---
 
@@ -78,8 +86,10 @@ Each crate has its own `TODO.md` with detailed items. Start there:
 
 | Crate | TODO | Top open item |
 |---|---|---|
+| `clang-bridge` | [`TODO.md`](crates/clang-bridge/TODO.md) | Differential verification vs clangd (diagnostics, hover, hierarchies, completion) |
 | `cmake-lossless` | [`TODO.md`](crates/cmake-lossless/TODO.md) | `include()` following; `add_subdirectory()` following; `MATCHES` regex |
-| `freight` | [`TODO.md`](crates/freight/TODO.md) | `add_compile_options` / `target_compile_options` migration |
+| `fortran-lsp` | [`TODO.md`](crates/fortran-lsp/TODO.md) | Wire into `freight lsp` as a native indexer replacing the fortls passthrough |
+| `freight` | [`TODO.md`](crates/freight/TODO.md) | Include-hygiene Phase 2 (enforce in build); clang-bridge default-on; fortran-lsp embed |
 | `freight-registry` | [`TODO.md`](crates/freight-registry/TODO.md) | Real SMTP delivery; TOTP recovery codes; org role enforcement; server-side prebuilt builds |
 | `docify` | [`TODO.md`](crates/docify/TODO.md) | CUDA/ISPC/HIP/Python extractors; HTML output |
 | `vcpkg-converter` | [`TODO.md`](crates/vcpkg-converter/TODO.md) | `add_subdirectory()` following; failure analysis subcommand |
@@ -186,62 +196,106 @@ library (not a subprocess), so API changes there are caught at compile time.
 - **Sidebar header**: package name + version + source link (derived via `repoUrl()` from `upstream_url` in the latest version entry) + owner chips (from `/api/v1/packages/:name/owners`, using the `login` field).
 - **Wire format quirks fixed**: item `kind` is `DocKind::label()` lowercase (`"fn"`, `"class"`, `"mod"`); `lang` is `DocLanguage::label()` string (`"C++"`, `"Rust"`); tag `Other` uses Debug format not JSON object.
 
-### 9. IDE plugins
+### 9. IDE plugins / `freight lsp`
 
-**Status:** In progress. `freight lsp` now exists as a first-pass stdio server in
-`crates/freight/src/bin/freight/commands/lsp.rs`; first-pass VS Code and Neovim
-wrappers live in `editors/vscode-freight/` and `editors/nvim-freight/`; JetBrains
-is still planned.
+**End goal:** `freight lsp` is the *only* language server a freight project needs —
+manifest intelligence plus native, manifest-aware C/C++/Fortran/asm source
+intelligence — consumed identically by VS Code, Neovim, and JetBrains, with no
+external server (clangd/fortls) required in the default configuration.
 
-#### Two-component architecture
+**Status:** In progress. `freight lsp` is a working stdio server
+(`crates/freight/src/lsp/`, entry in `src/bin/freight/commands/lsp.rs`); VS Code
+(`editors/vscode-freight/`) and Neovim (`editors/nvim-freight/`) wrappers ship;
+JetBrains is still planned. Manifest diagnostics/completion/hover, source
+passthroughs (clangd / fortls / asm-lsp), include-hygiene Phase 1 warnings,
+scoped `#include` completion, include/import inlay hints, `import std;` support
+(BMI build shared with `freight build`), and the DAP subcommand are all live.
 
-**Component A — `freight lsp` subcommand** (Rust, manual stdio LSP bridge)
-A language server for `freight.toml` that runs over stdio from
-`crates/freight/src/bin/freight/commands/lsp.rs`.
+Remaining work, by track — each says what the end state is and how to get there:
 
-Capabilities:
-- **Diagnostics** — first pass implemented: parse + manifest validation + path-dep compatibility
-- **Completion** — first pass implemented: known manifest sections/keys and dependency forms
-- **Hover** — first pass implemented: manifest section help, including explicit-dep semantics
-- **source passthroughs** — first pass implemented: `freight lsp` starts clangd for C-family
-  files, fortls for Fortran, and asm-lsp for assembly; it refreshes `compile_commands.json`
-  from explicitly declared Freight targets/deps and forwards source-file LSP traffic by extension
-- **Go to definition** — for `path = "../foo"` deps, open that `freight.toml`
-- **Code actions** — "Update to latest version", "Add missing section"
+#### 9a. C/C++: clang-bridge to parity, then default-on
 
-**Component B — `vscode-freight`** (TypeScript VS Code extension)
-Shell that wires the LSP and provides IDE-native features.
+- **End goal:** the in-process `clang-bridge` indexer replaces the clangd
+  subprocess as the default C/C++ backend (no clangd install needed; freight
+  controls flags, modules, and include policy directly).
+- **Now:** bridge is feature-complete API-wise (all LSP methods implemented, 144
+  tests) but opt-in via `freight lsp --use-clang-bridge`; clangd is the default.
+- **How to finish:**
+  1. Complete the clangd-oracle differential audit (see
+     `crates/clang-bridge/TODO.md`): diagnostics (async publish — pump the raw
+     fd), signature-help active-parameter, hover content/range, call/type
+     hierarchy edges, completion item kinds/details, formatting.
+  2. Fix the known risk areas: UTF-16 vs byte column encoding on multi-byte
+     lines; cross-file/multi-TU reference collection via
+     `cb_workspace_index_add`.
+  3. Run the bridge as daily driver on the example projects; when no
+     regressions vs clangd remain, flip the default (clangd becomes the
+     escape hatch) and update vscode-freight/nvim-freight settings + docs.
 
-| Feature | How |
-|---|---|
-| `freight.toml` syntax highlighting | TextMate grammar (TOML base + freight-specific scopes) |
-| Validation + completion + hover | delegates to `freight lsp` via `vscode-languageclient` |
-| Build tasks | VS Code task provider — `build`, `build --release`, `test`, `run`, `clean`, `fetch` |
-| Inline diagnostics | Problem matcher on freight's stderr (`error:`, `warning:`, file:line) |
-| Status bar | Current profile (dev/release), last build result |
-| Keybinding | `Ctrl+Shift+B` → `freight build` |
-| clangd integration | Auto-detect `compile_commands.json` generated by freight |
+#### 9b. Fortran: native indexer replaces fortls
 
-**Phase 1 — VS Code MVP** (no LSP yet)
-- TextMate grammar for `freight.toml`
-- JSON Schema for `freight.toml` → free validation via VS Code's TOML extension
-- Task provider with standard commands + problem matcher
-- Status bar item
+- **End goal:** Fortran files are served by `crates/fortran-lsp` embedded as a
+  `LanguageIndexer` (like ClangIndexer), scoped by freight's manifest source
+  graph; fortls passthrough survives only behind a flag until removal.
+- **Now:** the crate covers parsing (free/fixed form, preprocessor, includes),
+  indexing, hover, definition, completion, signature help, references, and a
+  growing diagnostic set (48 tests) — but **nothing in `freight lsp` calls it yet**.
+- **How to finish:**
+  1. Add a `FortranIndexer` in `freight/src/lsp/indexers/` wrapping
+     `fortran_lsp::Workspace`; feed it the manifest's source roots + include
+     dirs; route `.f90`/`.f`/etc. URIs to it behind a `--use-native-fortran`
+     flag (mirror the clang-bridge gating pattern).
+  2. Map `fortran-lsp` model types to LSP responses for the methods it already
+     supports; forward the rest to fortls while gaps remain.
+  3. Differential-test against fortls on real projects (same oracle technique
+     as clang-bridge vs clangd), close gaps, then flip the default.
 
-**Phase 2 — Language server**
-- `freight lsp` subcommand implementing LSP over stdio — first pass done
-- Plugged into the VS Code extension via `vscode-languageclient` — scaffold done
-- Diagnostics, hover, completion using the local registry msgpack cache
+#### 9c. Include hygiene: enforce, not just warn
 
-**Phase 3 — Rich features + other IDEs**
-- Dependency tree panel (codelens / tree view)
-- Inline "newer version available" codelens
-- JetBrains (CLion) plugin — reuses the same `freight lsp` binary, Kotlin wrapper
-- Neovim — minimal `lazy.nvim` plugin that auto-starts `freight lsp` — scaffold done
+- **End goal:** `#include`/`import` of headers from undeclared packages is a
+  *build* error under `deny`, the compile command itself only exposes declared
+  dirs, and declared system libs resolve via pkg-config.
+- **Now:** Phases 1–3 (first cut) done. Phase 1 — LSP warnings,
+  `[lints].undeclared-include`, scoped include completion. Phase 2 —
+  `build::validate_include_hygiene` enforces at build time. Phase 3 —
+  `build::header_ownership` attributes system headers to declared packages/slots
+  (Tier A ownership table + Tier B pkg-config dedicated dirs), in both build and
+  LSP, with candidate-naming diagnostics; BLAS/LAPACK are slots (shared header =
+  OR). The module→package map is also done. See `docs/include-hygiene.md` +
+  `-audit.md` (Step 11).
+- **How to finish:** Phase 3 remaining — host + generate the per-OS Tier-A data
+  file (hook the vcpkg/registry scraper; registry stubs carry `provides-headers`);
+  a lazy `pkg-config --list-all` reverse index to name owners of headers not in
+  Tier A; macOS/Windows seeds; finalize the POSIX/OS-header policy. Optional
+  stronger Phase 2: hermetic includes (stop relying on the compiler's default
+  search paths).
 
-**Key decisions:**
-- LSP is a `freight lsp` subcommand in the main binary, not a standalone crate.
-- Registry queries: always from local msgpack cache; never block on network in the LSP hot path.
+#### 9d. Editor surfaces
+
+- **End goal:** feature-parity wrappers for VS Code, Neovim, and JetBrains that
+  are thin clients — all intelligence lives in `freight lsp`.
+- **How to finish:**
+  - VS Code: dependency-tree panel, "newer version available" codelens (read
+    the local registry msgpack cache — never network on the hot path), remove
+    the dead `clangdPath`/`enableClangd` settings.
+  - Neovim: bring the scaffold to parity (tasks, DAP wiring).
+  - JetBrains/CLion: Kotlin LSP-client wrapper around the same binary — start
+    after 9a flips the default, so it never has to know about clangd.
+
+#### 9e. DAP backends
+
+- **End goal:** `freight dap` debugs on every platform freight builds for.
+- **Now:** GDB-family (`gdb`, `cuda-gdb`) and LLDB-family (`lldb-dap`) work.
+- **How to finish:** investigate `rr` (replay through GDB-DAP), `cdb`/`windbg`
+  (needs a Windows machine — same blocker as MSVC support). Fake-adapter unit
+  tests + real smoke notes before exposing any new backend in the editors.
+
+**Key decisions (unchanged):**
+- LSP is a `freight lsp` subcommand in the main binary, not a standalone crate;
+  language backends are crates (`clang-bridge`, `fortran-lsp`) embedded as
+  `LanguageIndexer` implementations, not subprocesses.
+- Registry queries: always from local msgpack cache; never block on network in
+  the LSP hot path.
 
 ---
 
