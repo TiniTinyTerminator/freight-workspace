@@ -5230,3 +5230,32 @@ Pushed:
 
 Questions for next agent:
 - None — the build/↔LSP dedup survey items are all closed.
+
+## 2026-06-14 — Claude: undeclared-include quick-fix code action
+
+What changed:
+- LSP now serves a freight-native quick-fix. On an `undeclared-include`
+  diagnostic, `textDocument/codeAction` offers "Add dependency `<pkg>` to
+  freight.toml" for each Tier-A header owner (header_ownership.candidates_for_header),
+  skipping already-declared deps. The edit inserts `<pkg> = "*"` into
+  `[dependencies]` via toml_edit (comments/formatting preserved), creating the
+  section if absent, as a whole-document WorkspaceEdit.
+- When clangd is the backend its actions are preserved: freight intercepts the
+  forwarded request (rewritten id + new `PendingClangdRequest::CodeAction`) and
+  the reader thread merges freight actions ahead of clangd's
+  (`merge_clangd_codeaction_response`), mirroring the inlay-hint merge.
+- `undeclared-module` has no owner map yet → no fix offered there.
+
+Tested:
+- `cargo test -p freight --lib -- --test-threads=1`: 716 passed (4 new helper
+  tests: insert_dependency_toml add/create, lsp_end_position utf16, merge order).
+  (Parallel run flakes only on the known dap::server test.)
+- e2e (`/tmp/qf_e2e.py`, C file `#include <zlib.h>` with no dep): diagnostic
+  "<zlib.h> is provided by zlib …" → code action "Add dependency `zlib` to
+  freight.toml" producing a valid freight.toml with `[dependencies]\nzlib = "*"`.
+
+Pushed:
+- Nothing pushed yet; committed locally pending review.
+
+Questions for next agent:
+- None.
