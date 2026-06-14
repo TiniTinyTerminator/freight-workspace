@@ -5318,3 +5318,34 @@ Pushed:
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: more dedup + code/test cleanup
+
+What changed (freight crate):
+- Directory walk: extracted one `visit_files` recursive walker behind
+  `walk_headers` and `walk_src_tree` (drops duplicated read_dir recursion + the
+  redundant root/dir param pair).
+- Dead code removed: `sig_go` (no DocLanguage::Go — freight doesn't target Go),
+  `HeaderIndex::is_empty` (no callers), `HeaderOrigin::Workspace` variant (never
+  constructed; members map to Own), unused `project_dir` param in publish.
+  `HeaderEntry::dep_key` marked reserved; `ProjectContext` + pipeline `stage_*`
+  made pub(crate) (clears privacy warnings). Lib + bin now build warning-free.
+- Tests made hermetic: replaced `env::temp_dir()/PID + manual remove_dir_all`
+  with `tempfile::tempdir()` in include_policy (×3), lsp/index, autotools, and
+  doc/lang clang tests (×2).
+- Clippy: applied ~67 machine-applicable fixes + crate-wide `cargo fmt`; fixed
+  the one closure clippy mis-rewrote (compile.rs) and a vestigial peekable
+  (autotools). Collapsed three "identical if blocks" smells (protocol,
+  doc/lang/common, render_md — the last dropped a dead arm).
+
+Remaining (left intentionally): ~24 `too_many_arguments` (build pipeline
+legitimately threads params), a few `type_complexity`/`collapsible_if`/doc-
+overindent — low value, judgement calls. Other submodules have a couple of their
+own clippy warnings (fortran-lsp, cmake-lossless) — not touched.
+
+Tested: cargo test -p freight --lib -- --test-threads=1 → 718 passed throughout.
+
+Pushed: crates/freight master a666b58..4582d20.
+
+Questions for next agent:
+- None.
