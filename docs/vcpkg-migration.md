@@ -65,8 +65,8 @@ fmt     = "11.1.4"
 [os.windows.dependencies]
 boost-filesystem = "1.87.0"
 
-[os.linux.dependencies]
-linux = { features = ["pthread"] }
+[os.linux]
+features = ["pthread"]
 ```
 
 5. The generated file has a `# TODO: Add [[bin]] / [[lib]] sections`

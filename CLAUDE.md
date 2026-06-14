@@ -103,8 +103,9 @@ libfoo = { url = "https://github.com/x/y.git", tag = "v1" }   # git: a .git URL 
 libfoo = { url = "https://example.com/foo.tar.gz", sha256 = "abc..." }  # source archive
 
 # Versionless system libraries (pthread, m, OpenCL loader, …) are linked via
-# platform features, not a dependency entry:
-unix = { features = ["pthread", "m"] }                   # -lpthread -lm on Unix
+# `[os.*]/[arch.*] features`, NOT a dependency entry:
+#   [os.unix]
+#   features = ["pthread", "m"]                           # -lpthread -lm on Unix
 ```
 
 `DetailedDep` fields (all optional unless noted):
@@ -130,11 +131,11 @@ unix = { features = ["pthread", "m"] }                   # -lpthread -lm on Unix
 | `channel` | `String` | Registry channel (e.g. `"stable"`, `"experimental"`) |
 | `unity` | `bool` | Override dep's unity-build setting |
 
-**Dep type mutual exclusivity**: at most one of `path`, `url` (both combine with `version`). Git ref: at most one of `branch`, `tag`, `rev`. A versionless system library is linked via platform features (`unix = { features = [...] }`), not a dependency entry.
+**Dep type mutual exclusivity**: at most one of `path`, `url` (both combine with `version`). Git ref: at most one of `branch`, `tag`, `rev`. A versionless system library is linked via `[os.*]/[arch.*] features = [...]`, not a dependency entry (OS-family dep keys like `unix = {...}` are a validation error).
 
 **Resolution chain** for a version dep (no `path`/`url`):
 1. **pkg-config** — query system `pkg-config` for `{name}` with version constraint
-2. **System stubs** — hardcoded map of common libs (pthread, ws2_32, m, …)
+2. **System stubs** — data-driven table in bundled `src/toolchain/system-libs.toml` (pthread, ws2_32, m, …); user-extensible via `$FREIGHT_HOME/toolchains/system-libs/*.toml`
 3. **`.deps/` cache** — populated by `freight fetch` from registry
 
 **Conditional dependency sections** — merged on top of `[dependencies]` for the current host:

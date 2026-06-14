@@ -12,6 +12,38 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — system libs as `[os.*] features`; `[os.*] version`; data-driven stubs
+
+Reworked how system/OS libraries are declared so the manifest shows platform
+requirements honestly instead of disguising them as deps.
+
+- **`[os.<os>]/[arch.<arch>] features = [...]`** — link versionless system libs
+  per platform; resolved to `-l<lib>` via the stub table (`collect_system_lib_flags`,
+  which also does macOS `-framework` + MSVC `<name>.lib`). `Manifest::system_features()`
+  merges them family-first across host sections.
+- **Removed the OS-family dep mechanism** (`OS_FAMILIES`/`expand_os_family_dep`).
+  `unix = { features = [...] }` as a dependency key is now a **validation error**
+  pointing at `[os.unix] features`. Migrated all examples + docs.
+- **`[os.<os>] version`** — minimum target OS/SDK version → Apple deployment-target
+  flag (`-mmacosx-version-min`/`-miphoneos-version-min`) + a `-DFREIGHT_OS_VERSION="<v>"`
+  define on every build.
+- **Data-driven stubs**: the hardcoded stub table moved to bundled
+  `src/toolchain/system-libs.toml` (embedded via include_str!), parsed at load,
+  with user overrides from `$FREIGHT_HOME/toolchains/system-libs/*.toml` (verified
+  end-to-end: a custom stub → `-lfoobar`). Each entry stores link name, `supports`,
+  and the headers it provides. Makes the prior `~/.freight/toolchains/system-libs/`
+  doc claim real.
+- LSP `[os.*]/[arch.*]` completion now offers `features` and `version`.
+
+Tests: `cargo test -p freight --lib` 736 ok; error_examples 11; all example
+manifests validate; migrate + platform-deps build & link.
+
+FOLLOW-UPS (not done): (1) `freight migrate` still drops AUTO_LINKED system libs
+and emits bare `*` versions for `[os.*.dependencies]` — should route system libs
+to `[os.*].features` and stop emitting `*`. (2) include-hygiene could use the
+stub `headers` data to attribute a `#include` to a declared feature. (3) the
+`which_all_deduplicates_symlinks` PATH-race flake still stands.
+
 ### 2026-06-15 — Claude — dep-define example, incremental-cache fix, doc drift cleanup
 
 Following the `<dep>/define:NAME` feature:
