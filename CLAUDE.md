@@ -99,9 +99,12 @@ libfoo = ">=1.0"
 # Detailed: table with extended fields
 libfoo = { version = "1.2", features = ["tls"], default-features = false }
 libfoo = { path = "../libfoo" }                          # local freight project or foreign
-libfoo = { git = "https://github.com/x/y.git", tag = "v1" }
-libfoo = { url = "https://example.com/foo.tar.gz", sha256 = "abc..." }
-libfoo = { system = "foo" }                              # link -lfoo directly, no fetch
+libfoo = { url = "https://github.com/x/y.git", tag = "v1" }   # git: a .git URL or a ref
+libfoo = { url = "https://example.com/foo.tar.gz", sha256 = "abc..." }  # source archive
+
+# Versionless system libraries (pthread, m, OpenCL loader, …) are linked via
+# platform features, not a dependency entry:
+unix = { features = ["pthread", "m"] }                   # -lpthread -lm on Unix
 ```
 
 `DetailedDep` fields (all optional unless noted):
@@ -110,11 +113,9 @@ libfoo = { system = "foo" }                              # link -lfoo directly, 
 |---|---|---|
 | `version` | `String` | Constraint: `"1.2"`, `">=1.0"`, `"*"` |
 | `path` | `String` | Relative path; auto-detects `freight.toml` vs foreign build system |
-| `git` | `String` | Repo URL; one of `branch`/`tag`/`rev` selects the ref |
-| `branch` / `tag` / `rev` | `String` | Mutually exclusive; `rev` pins and blocks `freight update` |
-| `url` | `String` | Archive URL (`.tar.gz`, `.zip`, etc.) |
-| `sha256` | `String` | Optional checksum; omit to auto-detect on first fetch |
-| `system` | `String` | Link `-l<name>` directly; no source, no fetch |
+| `url` | `String` | Source: a git URL (`.git`, or with `branch`/`tag`/`rev`) or an archive (`.tar.gz`, `.zip`, …) |
+| `branch` / `tag` / `rev` | `String` | Git ref; mutually exclusive; `rev` pins and blocks `freight update` |
+| `sha256` | `String` | Archive checksum; omit to auto-detect on first fetch |
 | `features` | `[String]` | Features to activate on this dep |
 | `default-features` | `bool` (true) | Set `false` to skip the dep's `default` feature set |
 | `optional` | `bool` (false) | Only active when a feature enables it via `dep:name` |
@@ -129,9 +130,9 @@ libfoo = { system = "foo" }                              # link -lfoo directly, 
 | `channel` | `String` | Registry channel (e.g. `"stable"`, `"experimental"`) |
 | `unity` | `bool` | Override dep's unity-build setting |
 
-**Dep type mutual exclusivity**: at most one of `path`, `git`, `url`, `system` (all combine with `version`). Git ref: at most one of `branch`, `tag`, `rev`.
+**Dep type mutual exclusivity**: at most one of `path`, `url` (both combine with `version`). Git ref: at most one of `branch`, `tag`, `rev`. A versionless system library is linked via platform features (`unix = { features = [...] }`), not a dependency entry.
 
-**Resolution chain** for a version dep (no `path`/`git`/`url`/`system`):
+**Resolution chain** for a version dep (no `path`/`url`):
 1. **pkg-config** — query system `pkg-config` for `{name}` with version constraint
 2. **System stubs** — hardcoded map of common libs (pthread, ws2_32, m, …)
 3. **`.deps/` cache** — populated by `freight fetch` from registry
