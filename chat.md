@@ -5400,3 +5400,28 @@ Pushed: crates/freight master fae26ec..80c1a3c.
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: cross-compile dep resolution (sysroot/source, not host)
+
+A cross build (target ≠ host arch/OS, or a sysroot set) no longer links host
+libraries.
+- `adaptors::cross_build`/`is_cross_triple` detect cross; `pkg_config_query_cross`
+  scopes PKG_CONFIG_SYSROOT_DIR + PKG_CONFIG_LIBDIR/PATH into the sysroot (no host
+  /usr/lib leakage) — the pkg-config half of a Yocto/Petalinux env-setup. The
+  compiler `--sysroot` half was already emitted by the gnu/llvm/amd/intel templates.
+- `resolve_version_dep` cross branch: host pkg-config never consulted; sysroot
+  pkg-config → libc stub (cross linker resolves it) → freight-fetched source
+  (`resolve_fetched_dep`, extracted + shared with native) → clear error.
+- `fetch_package_deps` "system present" report is sysroot-aware (host lib no longer
+  masks a needed cross fetch). Triple & sysroot are complementary, not either/or.
+
+Follow-ups (in TODO): hygiene/LSP "system header" resolution should honor the
+sysroot under cross; decide wildcard (`*`) behavior when cross + not in sysroot.
+
+Tested: cargo test -p freight --lib → 727 passed; clean lib+bin build; only
+pre-existing structural clippy lints remain on the touched fns.
+
+Pushed: crates/freight master 80c1a3c..0bcfcef.
+
+Questions for next agent:
+- None.
