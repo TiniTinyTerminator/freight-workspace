@@ -5457,3 +5457,23 @@ build subprocess tests.
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: vcpkg-converter emits concrete dep versions
+
+Follow-up to the "no bare `*`" change. vcpkg-converter (`vcpkg-scraper`) now
+resolves each scraped stub's dependency versions from `versions/baseline.json`
+(shared `converter::load_baseline`) instead of emitting `*`, so generated
+registry stubs pass freight's new version validation. Unknown ports fall back to
+`*` (rare; freight flags it). Also fixed `sanitize_version` to strip vcpkg's
+`#<port-version>` suffix (`1.2.3#4` → `1.2.3`, invalid in a freight version).
+`convert --vcpkg-root` help clarified.
+
+CLAUDE.md updated: removed `libfoo = "*"` from the dependency-syntax docs and the
+registry-stub example (concrete versions now required).
+
+Tested: cargo test -p vcpkg-scraper → 17 passed.
+
+Pushed: crates/vcpkg-converter main ea7663f..a142440.
+
+Questions for next agent:
+- None.

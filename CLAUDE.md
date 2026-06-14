@@ -89,10 +89,12 @@ Three dependency sections:
 Every entry in `[dependencies]` (and `[build-dependencies]` / `[dev-dependencies]`) is one of:
 
 ```toml
-# Simple: bare version constraint — freight resolves via pkg-config → stubs → registry
+# Simple: bare version constraint — freight resolves via pkg-config → stubs → registry.
+# A concrete version or range is REQUIRED; a bare `*` is rejected at validation
+# (C/C++ libraries change their API between versions). freight uses the version
+# installed on the system if present, else downloads it from the registry.
 libfoo = "1.2"
 libfoo = ">=1.0"
-libfoo = "*"
 
 # Detailed: table with extended fields
 libfoo = { version = "1.2", features = ["tls"], default-features = false }
@@ -222,7 +224,7 @@ url     = "https://github.com/madler/zlib/archive/v1.3.2.tar.gz"
 build   = "cmake"
 
 [dependencies]
-libfoo = "*"
+libfoo = "1.2"   # dep versions resolved from vcpkg's versions/baseline.json
 
 [features]
 bar = ["baz"]
