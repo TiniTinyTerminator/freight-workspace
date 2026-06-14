@@ -45,16 +45,16 @@ type = "static"            # or "shared"
 
 [dependencies]
 zlib     = "1.3.2"         # version dep  → resolved from registry
-glfw     = { git = "https://github.com/glfw/glfw.git", tag = "3.4" }
+glfw     = { url = "https://github.com/glfw/glfw.git", tag = "3.4" }
 myutil   = { path = "../myutil" }
-freetype = { url = "https://...", sha256 = "abc", build = "cmake" }
-pthread  = { system = "pthread" }   # link -lpthread directly
+freetype = { url = "https://...", sha256 = "abc", type = "cmake" }
+unix     = { features = ["pthread"] }   # -lpthread via platform feature
 
 [os.linux.dependencies]
 alsa = "1.2"               # Linux-only dep
 
 [os.windows.dependencies]
-ws2_32 = { system = "ws2_32" }
+windows = { features = ["ws2_32"] }   # -lws2_32 via platform feature
 ```
 
 ### Build pipeline
@@ -210,7 +210,7 @@ url     = "https://github.com/madler/zlib/archive/v1.3.2.tar.gz"
 build   = "cmake"
 
 [dependencies]
-libfoo = "*"
+libfoo = "1.2"
 ```
 
 No `sha256` in stubs — freight auto-detects on first fetch.

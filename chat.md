@@ -12,6 +12,36 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — dep-define example, incremental-cache fix, doc drift cleanup
+
+Following the `<dep>/define:NAME` feature:
+
+- **New example** `examples/deps/dep-defines/` — a path dep (`greeter`) whose
+  build receives `-DGREETER_FANCY` via the parent's `fancy` feature
+  (`greeter/define:GREETER_FANCY`). Demonstrates per-package define scoping
+  (the app never sees the define).
+- **Incremental-build bug fixed** (`build/compile.rs`): `is_up_to_date` only
+  compared mtimes, so feature/define/flag changes silently left stale objects —
+  `freight run --features X` did nothing on a warm build. Added a per-(target,
+  profile) flag fingerprint (feature defines + header-unit flags + include dirs
+  + profile + freight.toml bytes); mismatch forces recompile. This fixes feature
+  toggling generally, not just dep-defines. Verified on `cpp/features` and
+  `deps/dep-defines`.
+- **Doc/syntax drift cleanup** across README, manifest-reference, cargo-vs-freight,
+  include-hygiene, roadmap, vcpkg-migration, architecture, and several example
+  READMEs/manifests: removed **phantom** dep fields that serde silently ignores
+  (`system =`, `pkg-config =`, `git =`, `http =`, `github =`, `build =` on deps),
+  the fictional Conan/vcpkg resolver chain, and bare `*` versions (now rejected by
+  validation). Real syntax: bare-version deps (pkg-config→stub→registry), platform
+  features (`unix = { features = ["pthread"] }`), `.git` URLs, `type =`/`defines =`.
+  `examples/deps/external` was actually failing validation — now fixed. All example
+  manifests validate.
+
+NOTE for next agent: `toolchain::detect::tests::which_all_deduplicates_symlinks`
+is a **pre-existing** parallel-test flake — it does `std::env::set_var("PATH",…)`,
+racing other detection tests. Passes in isolation; ~1/3 fail under full `--lib`
+run. Not caused by this work; worth a serial guard / env isolation later.
+
 ### 2026-06-14 — Claude — feature → dependency defines (`<dep>/define:NAME`)
 
 Defines are now strictly per-package. A feature-list entry can forward an explicit

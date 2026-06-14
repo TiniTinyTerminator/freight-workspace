@@ -66,7 +66,7 @@ fmt     = "11.1.4"
 boost-filesystem = "1.87.0"
 
 [os.linux.dependencies]
-pthread = { system = "pthread" }
+linux = { features = ["pthread"] }
 ```
 
 5. The generated file has a `# TODO: Add [[bin]] / [[lib]] sections`
@@ -118,7 +118,7 @@ If a dependency isn't in the registry yet, add it as a URL dep:
 
 ```toml
 [dependencies]
-mypkg = { url = "https://github.com/owner/mypkg/archive/v1.2.tar.gz", build = "cmake" }
+mypkg = { url = "https://github.com/owner/mypkg/archive/v1.2.tar.gz", type = "cmake" }
 ```
 
 ---
