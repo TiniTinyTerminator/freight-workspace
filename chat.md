@@ -5373,3 +5373,30 @@ Pushed: crates/freight master 4582d20..fae26ec.
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: include hygiene Phase 3 (OS-header policy + seed)
+
+- POSIX/OS-header policy: `include_policy::is_os_system_header` +
+  `IncludeClass::SystemOs`. POSIX, Windows SDK, Darwin, and compiler-intrinsic
+  (`*intrin.h`, `arm_*.h`, `cpuid.h`) headers are system-provided → never flagged.
+  Cross-platform union set (unresolvable headers are skipped first → safe under
+  cross-compilation). Fixes false positives on `<unistd.h>`, `<pthread.h>`,
+  `<sys/*>`, intrinsics, etc.
+- Tier-A seed made platform-independent (dropped the Linux gate; covers
+  macOS/Windows) and expanded: openssl, libpng, libjpeg, libcurl, zstd, lz4,
+  libevent, libpcap, libffi, pcre, yaml, jansson, libzip.
+- Dropped the planned pkg-config reverse index (rationale in TODO: flagged
+  headers are exactly the ones pkg-config can't disambiguate; dedicated-subdir
+  headers never resolve/flag). The Tier-A seed is the right lever.
+- Remaining Phase 3: per-OS Tier-A data-file *generation* via the vcpkg/registry
+  scraper (`provides-headers` → downloadable override) — cross-crate, tracked in
+  vcpkg-converter.
+
+Tested: cargo test -p freight --lib → 724 passed; clean lib+bin build; no clippy
+warnings on the changed files. e2e (`freight lsp`): `<unistd.h>` not flagged;
+`<openssl/ssl.h>`/`<zlib.h>` attributed to openssl/zlib.
+
+Pushed: crates/freight master fae26ec..80c1a3c.
+
+Questions for next agent:
+- None.
