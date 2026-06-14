@@ -12,6 +12,20 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — merge same-base `-march`; warn on cpu-tuning conflicts
+
+Follow-on to `[arch.*] features`. Stacked `-march` ISA features (ARM sve/sve2,
+RISC-V rvv) clobbered each other (compiler honours only the last `-march`).
+
+- `build_settings_for` now folds same-base `-march` into one:
+  `sve` + `sve2` → `-march=armv8-a+sve+sve2` (suffixes unioned, order preserved).
+  Additive `-m<ext>` flags (AVX/SSE/FMA) already stacked — unaffected.
+- Unmergeable conflicts (different `-march` bases, or duplicate `-mcpu`/`-mtune`/
+  `-mfpu`/`-mabi`/`-mfloat-abi`) are kept as-is and surfaced once via
+  `Manifest::cpu_tuning_warnings` → `BuildEvent::Warning` ("compiler uses the last").
+- Verified end-to-end: `-march=x86-64-v2+aes` + `…+sse4.2` → merged; two different
+  bases → warning. 745 lib tests, error_examples 11, clippy clean.
+
 ### 2026-06-15 — Claude — `[arch.*] features` = CPU/ISA extensions; data-driven intrinsic headers
 
 Arch counterpart to `[os.*] features`. `[arch.<arch>] features = ["avx2","fma"]`
