@@ -5349,3 +5349,27 @@ Pushed: crates/freight master a666b58..4582d20.
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: asm-lsp — cross-file, macros, per-arch help
+
+Implemented the remaining asm-lsp TODO items (`src/lsp/indexers/Asm.rs`):
+- Cross-file `.include` resolution: goto / references / hover / completion follow
+  the transitive include closure (`include_closure`, BFS, cycle-safe; queried
+  file first). `.include "file"` navigation still opens the target.
+- Macro awareness: `.macro foo a, b` params + `\arg` refs are macro-locals;
+  macro-body labels excluded from duplicate-symbol diagnostics (`\@` templated).
+- Per-arch help: added AArch64 + RISC-V instruction/register tables next to
+  x86-64; `refresh_flags` picks arch from manifest `[target] arch` or the host;
+  unknown arch tries all tables.
+- Deferred: semantic tokens (needs freight to own the global token legend) and a
+  fuller instruction DB (could embed upstream asm-lsp data tables).
+
+Tested: 16 asm unit tests (4 new: cross-file, arch detection, macro-body dup
+exclusion, macro-param refs). cargo test -p freight --lib → 722 passed; clean
+lib+bin build; no clippy warnings on Asm.rs. Also prefixed a pre-existing unused
+`spec` binding in migration/make.rs test.
+
+Pushed: crates/freight master 4582d20..fae26ec.
+
+Questions for next agent:
+- None.
