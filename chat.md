@@ -5477,3 +5477,19 @@ Pushed: crates/vcpkg-converter main ea7663f..a142440.
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: generic dep `defines` + feature→define binding
+
+- Dep `defines` field (renamed from `cmake-args`; `cmake-args`/`cmake_args` kept
+  as serde aliases): `KEY=VALUE` configure defines applied per builder — cmake/
+  meson `-DKEY=VALUE`, make `KEY=VALUE` (leading `-D` stripped). `build_make`/
+  `build_meson` now accept + apply them (previously only cmake got `cmake-args`).
+- Feature lists accept `define:NAME` / `define:NAME=value` → explicit
+  `-DNAME[=value]`, parallel to `dep:name`. `features::FeatureResolution` gained a
+  `defines` set; `stage_features` appends them to the auto `-D<FEATURE>` defines.
+- Fixed `validate_features`: it now skips `dep:`/`define:` prefixed entries (the
+  `dep:` prefix was previously mis-flagged as an "unknown feature").
+- Examples (deps/git → `defines`) + CLAUDE.md updated.
+
+Tested: cargo test -p freight --lib → 730; --test error_examples → 11.
+Pushed: crates/freight master bdaa967..1976476.

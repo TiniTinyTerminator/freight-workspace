@@ -124,7 +124,7 @@ unix = { features = ["pthread", "m"] }                   # -lpthread -lm on Unix
 | `targets` | `[String]` | Cross-compilation triple allowlist; absent = all |
 | `type` | `String` | How the dep content is handled: `cmake`, `make`, `meson`, `autotools`, `scons`, `bazel`, `none` |
 | `include` | `[String]` | Include dirs for `type = "none"` (header-only) or foreign deps |
-| `cmake-args` | `[String]` | Extra args passed to CMake configure |
+| `defines` | `[String]` | Build-system configure defines `KEY=VALUE`, applied per builder (cmake/meson `-D`, make `KEY=VALUE`); leading `-D` accepted. Aliases: `cmake-args`/`cmake_args` |
 | `patches` | `[String]` | Patch files applied after fetch (`patch -p1`) |
 | `repo` | `String` | Registry to use: `"system"` (stubs only) or a named registry |
 | `channel` | `String` | Registry channel (e.g. `"stable"`, `"experimental"`) |
@@ -158,12 +158,19 @@ Merge order: base → family (e.g. `unix`) → specific OS → arch. Later entri
 
 ```toml
 [features]
-default = ["logging"]         # active unless --no-default-features
-logging = ["dep:spdlog"]      # activate optional dep "spdlog"
-tls     = ["openssl"]         # implies feature "openssl"
+default = ["logging"]              # active unless --no-default-features
+logging = ["dep:spdlog"]           # activate optional dep "spdlog"
+tls     = ["openssl"]              # implies feature "openssl"
+fast    = ["define:NDEBUG", "define:OPT_LEVEL=3"]  # inject explicit -D defines
 ```
 
-Active features are uppercased and injected as preprocessor defines: `with-tls` → `-DWITH_TLS`. Cycles are rejected at validation time.
+An active feature name is uppercased and injected as a preprocessor define
+(`with-tls` → `-DWITH_TLS`). A feature-list entry can also be:
+- `dep:name` — activate optional dependency `name` (no define);
+- `define:NAME` / `define:NAME=value` — inject an explicit `-DNAME` / `-DNAME=value`
+  (the `=value` is optional), for when a feature must drive a specific macro.
+
+Cycles are rejected at validation time.
 
 **`freight migrate`** — in-place converters from foreign build systems:
 
