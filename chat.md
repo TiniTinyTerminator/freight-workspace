@@ -5425,3 +5425,35 @@ Pushed: crates/freight master 80c1a3c..0bcfcef.
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: require concrete dep versions (remove bare `*`)
+
+Per design decision: C/C++ APIs change between versions, so an unpinned dep is
+unsafe. There is no special "system" dependency kind — the version is identical
+whether the package is already installed (resolved from the system via
+pkg-config) or downloaded from the registry; "installed" only skips the download.
+
+- `validate::validate_dep_versions` rejects `*`/empty/omitted version for
+  version-resolved deps (Simple, or Detailed w/o path/url). path/git/url + platform
+  pseudo-deps exempt.
+- Generators emit concrete versions: `freight add` → pkg-config `--modversion`
+  fallback (else error); migration → `--modversion` (or `*` draft placeholder
+  caught by build); LSP undeclared-include quick-fix pins the installed version,
+  freight.toml dep completion inserts a `"${1:version}"` snippet.
+- Examples updated to concrete versions. The broken/undeclared-include examples now
+  use Tier-A headers (zlib/sqlite3); they previously used POSIX `pthread.h`, which
+  the Phase-3 OS-header policy correctly stopped flagging — that had silently
+  broken `tests/error_examples.rs` (only caught now by running the integration
+  tests, not just --lib). Fixed.
+
+Tested: cargo test -p freight --lib → 729; --test error_examples → 11 (after
+cleaning stale example target dirs).
+
+Pushed: crates/freight master 0bcfcef..f17b8fb.
+
+Note for next agent: run `cargo test -p freight --test error_examples` (not just
+--lib) after touching include hygiene — the lib suite doesn't cover the example
+build subprocess tests.
+
+Questions for next agent:
+- None.
