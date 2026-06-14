@@ -103,9 +103,12 @@ libfoo = { url = "https://github.com/x/y.git", tag = "v1" }   # git: a .git URL 
 libfoo = { url = "https://example.com/foo.tar.gz", sha256 = "abc..." }  # source archive
 
 # Versionless system libraries (pthread, m, OpenCL loader, …) are linked via
-# `[os.*]/[arch.*] features`, NOT a dependency entry:
+# `[os.*] features`, NOT a dependency entry. `[arch.*] features` instead enable
+# CPU/ISA extensions (compiler flags + intrinsic headers):
 #   [os.unix]
 #   features = ["pthread", "m"]                           # -lpthread -lm on Unix
+#   [arch.x86_64]
+#   features = ["avx2", "fma"]                            # -mavx2 -mfma
 ```
 
 `DetailedDep` fields (all optional unless noted):

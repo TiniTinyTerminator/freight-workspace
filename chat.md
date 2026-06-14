@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — `[arch.*] features` = CPU/ISA extensions; data-driven intrinsic headers
+
+Arch counterpart to `[os.*] features`. `[arch.<arch>] features = ["avx2","fma"]`
+→ `-mavx2 -mfma`; `[arch.aarch64] features = ["sve"]` → `-march=armv8-a+sve`.
+
+- New data-driven `cpu-features.toml` (bundled + `$FREIGHT_HOME/toolchains/cpu-features/*.toml`):
+  name → flag (verbatim; defaults to `-m<name>`), `arch`, and the intrinsic
+  headers it unlocks. `build_settings_for` resolves the active `[arch.*]`
+  section's features to compiler flags; `system_features()` is now `[os.*]`-only.
+- **Include hygiene is now data-driven**: the hardcoded `*intrin.h`/`arm_*.h`
+  patterns are gone from `include_policy`; arch/compiler intrinsic headers
+  (immintrin.h, arm_*.h, altivec.h, riscv_vector.h …) are recognized from the
+  cpu-features `headers` fields, which support globs (`*intrin.h`, `arm_*.h`).
+  So adding a CPU feature `.toml` also teaches hygiene its headers.
+- Validation rejects a CPU feature under the wrong `[arch.*]` (avx2 under aarch64).
+- New example `c/simd` (AVX2 + scalar fallback; verified `-mavx2` emitted, runs).
+  742 lib tests; error_examples 11; all examples validate.
+
 ### 2026-06-15 — Claude — system libs as `[os.*] features`; `[os.*] version`; data-driven stubs
 
 Reworked how system/OS libraries are declared so the manifest shows platform
