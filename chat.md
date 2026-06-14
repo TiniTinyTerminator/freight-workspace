@@ -5283,3 +5283,38 @@ Pushed:
 
 Questions for next agent:
 - None.
+
+## 2026-06-14 — Claude: de-duplicate shared helpers (no behavior change)
+
+What changed (freight crate):
+- PATH lookup: `which` had 4 copies with inconsistent platform handling
+  (tool.rs = Windows .exe only; debugger.rs = Unix exec-bit only;
+  compile.rs::which_tool = is_file only; detect.rs = the thorough one). All now
+  use `toolchain::detect::which` (handles Unix exec-bit AND Windows .exe, prefers
+  unversioned over versioned) — a correctness fix as well as a dedup.
+- Version probe: `query_version` (detect/tool/debugger) now shares
+  `toolchain::detect::probe_version`; the three keep thin type-specific wrappers
+  (tool.rs preserves its empty-arg guard so a formatter isn't invoked bare and
+  blocked on stdin).
+- Compiler include-search parsing: three near-identical parsers
+  (lsp/index.rs, build/include_policy.rs, doc/stdlib.rs) collapsed to one shared
+  `build::include_policy::parse_search_dirs` (pure parser; the LSP filters
+  `is_dir` at its call site to preserve prior behavior).
+- `migration::sanitize_name`: make.rs + autotools.rs were byte-identical →
+  hoisted to `migration::sanitize_name`; cmake.rs keeps its distinct
+  (lower-casing) variant.
+- `tree.rs::parse_includes` now delegates to `include_policy::parse_includes`
+  (strict superset: block comments, #import, header units), filtering to header
+  directives. (tree's tiny `resolve_include` left as-is — different semantics.)
+- Left intentionally separate: the `cache_path` family (different roots:
+  `~/.freight` vs XDG `~/.cache`).
+
+Tested:
+- `cargo test -p freight --lib -- --test-threads=1`: 718 passed.
+- `cargo clippy -p freight`: no new warnings.
+
+Pushed:
+- Pending (committing now).
+
+Questions for next agent:
+- None.
