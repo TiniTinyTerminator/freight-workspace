@@ -161,14 +161,22 @@ Merge order: base → family (e.g. `unix`) → specific OS → arch. Later entri
 default = ["logging"]              # active unless --no-default-features
 logging = ["dep:spdlog"]           # activate optional dep "spdlog"
 tls     = ["openssl"]              # implies feature "openssl"
-fast    = ["define:NDEBUG", "define:OPT_LEVEL=3"]  # inject explicit -D defines
+fast    = ["define:NDEBUG", "define:OPT_LEVEL=3"]  # inject explicit -D defines into THIS package
+crypto  = ["dep:openssl", "openssl/define:WITH_TLS"]  # forward a -D into openssl's build
 ```
 
 An active feature name is uppercased and injected as a preprocessor define
-(`with-tls` → `-DWITH_TLS`). A feature-list entry can also be:
+(`with-tls` → `-DWITH_TLS`). Defines are per-package — they only ever land in one
+package's compilation, never globally. A feature-list entry can also be:
 - `dep:name` — activate optional dependency `name` (no define);
 - `define:NAME` / `define:NAME=value` — inject an explicit `-DNAME` / `-DNAME=value`
-  (the `=value` is optional), for when a feature must drive a specific macro.
+  (the `=value` is optional) into **this** package, for when a feature must drive a
+  specific macro;
+- `<dep>/define:NAME` / `<dep>/define:NAME=value` — forward the explicit define into
+  **dependency `<dep>`'s** build instead of this package (and activate `<dep>` if it
+  is optional), mirroring Cargo's `<dep>/<feature>` syntax;
+- `<dep>?/define:NAME` — weak form: forward the define only if `<dep>` is already
+  activated by something else; never activates it itself.
 
 Cycles are rejected at validation time.
 

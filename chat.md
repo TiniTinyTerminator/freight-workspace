@@ -12,6 +12,25 @@ Guidelines:
 
 ## Log
 
+### 2026-06-14 — Claude — feature → dependency defines (`<dep>/define:NAME`)
+
+Defines are now strictly per-package. A feature-list entry can forward an explicit
+define into a *specific dependency's* build, mirroring Cargo's `<dep>/<feature>`:
+
+- `<dep>/define:NAME[=value]` — inject `-DNAME[=value]` into `<dep>`'s build and
+  activate `<dep>` if it is optional.
+- `<dep>?/define:NAME[=value]` — weak: forward only if `<dep>` is already active.
+- `define:NAME[=value]` (unchanged) — define in **this** package only.
+
+Plumbing: `features::FeatureResolution` gained `dep_defines: BTreeMap<dep,
+BTreeSet<define>>`; threaded through `pipeline::stage_features` →
+`stage_build_deps` → both `build_resolved_deps` (merged into the dep's
+compile-time `dep_feature_defines`) and `adaptors::build_foreign_deps` (merged
+into the foreign builder's `defines`, so cmake/make/meson see them too).
+`validate_features` skips `<dep>/define:` entries. CLAUDE.md features section
+updated. 2 new unit tests; `cargo test -p freight --lib` 732 ok, error_examples
+11 ok, clippy clean (only pre-existing arg-count/complex-type warns).
+
 ### 2026-06-14 — Claude — dedup: LSP reads package dirs from build, not its own walk
 
 The LSP's header/module indexes re-walked the manifest dep graph
