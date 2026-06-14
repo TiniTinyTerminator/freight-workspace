@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — dedup link tail; propagate dep `[os.*] features`
+
+Answering "does flag handling work for deps too":
+
+- **Compile flags for deps already worked** — each dep compiles with its own
+  `manifest.build_settings_for` (so `merge_march_flags` + exact-dedup run per-dep);
+  packages compile in isolation so no cross-package concatenation.
+- **Fixed two link-side gaps**: (1) the final link tail (system libs + every dep's
+  pkg-config/raw flags) is now order-preserving de-duplicated, so a lib pulled in by
+  multiple deps collapses to one `-l`/`-L`. (2) Dependencies' own `[os.*] features`
+  are folded into the final link (`BuiltDepsOutput.system_features`) — a dep needing
+  pthread/m now links without the root re-declaring it (was silently dropped, since
+  `collect_system_lib_flags` only read the root manifest).
+- Refactor: `resolve_system_lib_flags(features, linker)` + `system_and_extra_link_flags`;
+  `dep_system_features` threaded through link_targets/executable/shared/test_binary.
+- Verified e2e (path dep with `[os.unix] features=["m"]` → binary links `-lm`).
+  747 lib tests, clippy clean.
+
 ### 2026-06-15 — Claude — merge same-base `-march`; warn on cpu-tuning conflicts
 
 Follow-on to `[arch.*] features`. Stacked `-march` ISA features (ARM sve/sve2,
