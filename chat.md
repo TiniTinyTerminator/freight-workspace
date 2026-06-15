@@ -12,6 +12,14 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — label standard headers as ISO C / ISO C++
+
+Refinement: "stdlib" is implementation grab-bag; the headers are defined by ISO C /
+ISO C++ (provided by glibc/musl/bionic/libstdc++/libc++). Inlay/hover/diagnostic
+now label `← ISO C` (stdio.h, math.h), `← ISO C++` (vector, cmath), `← POSIX`
+(pthread.h), `← Windows SDK`. `iso_std_origin` uses the ISO C/C++ name tables;
+`system_header_origin` falls back to the stub's [os.*] family. Verified e2e (C+C++).
+
 ### 2026-06-15 — Claude — system headers labelled by standard origin (POSIX vs stdlib)
 
 Correction: `<pthread.h>` is a POSIX header, not "the pthread library"; `<math.h>`
