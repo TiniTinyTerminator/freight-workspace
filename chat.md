@@ -12,6 +12,15 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — LSP recognizes system-lib headers by feature
+
+Follow-up: `<pthread.h>` was mislabelled `← stdlib` in the inlay/hover path (fell
+through to the stdlib fallback since it isn't a real index entry). Now the include
+inlay + hover resolve it through the system-lib stub table and show the feature
+(`← pthread`; hover "`pthread` system library — linked via [os.unix] features" /
+"not linked — add it"). stdlib/file headers (`<vector>`, `<stdio.h>`) unchanged.
+Verified e2e (inlayHint: pthread.h → `← pthread`, stdio.h → `← stdlib`).
+
 ### 2026-06-15 — Claude — LSP link-feature hints for system-library headers
 
 Instead of hermetic includes (deemed too much), system/common headers get a
