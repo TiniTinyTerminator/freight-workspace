@@ -12,6 +12,27 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — migrate(cmake) system libs→features; cross-build hygiene
+
+Two TODO items.
+
+- **migrate(cmake)**: was emitting invalid manifests since the `*` removal and
+  dropping system libs. Now OS system libraries (`pthread`, `m`, `dl`, `rt`,
+  `ws2_32`, `dbghelp`, …) and `find_package(Threads)` route to `[os.<os>] features`
+  (linked via `-l`); compiler-driver libs (`c`, `gcc`, `stdc++`) stay dropped;
+  platform-conditional real deps pin via pkg-config `--modversion` (else `*`
+  draft). Verified e2e (Threads/m/ws2_32/ZLIB → correct sections). NOTE:
+  make/autotools migrators still drop system libs (they already avoid the bare-`*`
+  bug via `system_dep_item`) — smaller consistency follow-up left open.
+- **cross-build hygiene**: `include_policy::system_include_dirs` now takes the
+  sysroot and probes the compiler with `--sysroot=<path>`, so cross system headers
+  resolve against the sysroot not host `/usr/include`. Wired into the build pass
+  + the LSP (`cached_system_dirs` re-probes on sysroot change). Verified e2e with
+  a fake sysroot via `FREIGHT_SYSROOT`. TODO marked done.
+
+Also fixed earlier this session: freight standalone CI build (clang-bridge/
+fortran-lsp now git deps + workspace `[patch]`). 747 lib tests, clippy clean.
+
 ### 2026-06-15 — Claude — dedup link tail; propagate dep `[os.*] features`
 
 Answering "does flag handling work for deps too":
