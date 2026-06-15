@@ -5888,3 +5888,28 @@ Remaining gaps are low-value for freight's design and intentionally deferred:
 `cargo vendor` (redundant with .pkgs/ + --offline), `cargo tree -d` (flat .pkgs
 pool can't have duplicate versions), `[source]` mirrors, virtual workspace
 manifests, per-package profile overrides.
+
+## 2026-06-16 — Claude: examples, tests, docs for the parity features (+ a bug fix)
+
+Filling in examples/tests/docs for the Cargo-parity work, and fixed a real bug
+found while writing the workspace example.
+
+**Bug fix (9eb7a6a):** inherited path deps from `[workspace.dependencies]` were
+substituted verbatim into members, so a member in a subdir resolved the dep
+relative to its own dir (`app/greeter` instead of root `greeter`) and failed.
+`resolve_deps` now rewrites an inherited `path` relative to the member dir.
+
+**Examples (892fbc3):** c/required-features, misc/examples-target, deps/patch,
+misc/workspace-inherit, misc/aliases — all C, build cleanly. Added a .gitignore
+exemption so misc/aliases/.freight/config.toml ships.
+
+**Tests:** 5 new integration tests in build_examples.rs (consolidated per-dir to
+avoid races) + the path-rewrite unit test. Full suite: 778 lib, all green; the
+only build_examples failures are the pre-existing fortran/assembly env gaps.
+
+**Docs:** README CLI reference (full command list + flags + aliases) & examples
+table; examples/README feature table; roadmap "Cargo Parity ✓" section;
+pipeline.md (Examples goal); compiler-templates.md (resolution chain de-Conan);
+TODO.md cleanup. (cargo-vs-freight.md / manifest-reference.md done earlier.)
+
+Pushed: crates/freight master 9eb7a6a, 892fbc3, 63e9e86.
