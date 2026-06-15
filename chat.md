@@ -5913,3 +5913,30 @@ pipeline.md (Examples goal); compiler-templates.md (resolution chain de-Conan);
 TODO.md cleanup. (cargo-vs-freight.md / manifest-reference.md done earlier.)
 
 Pushed: crates/freight master 9eb7a6a, 892fbc3, 63e9e86.
+
+## 2026-06-16 — Claude: release validation against real upstream packages
+
+Ran a curated "validate first" pass (build real third-party libs over the
+network; installed cmake 3.30.5 + tried ninja locally since neither was present).
+Covered the main dependency mechanisms — and it surfaced **three real bugs**,
+all now fixed with regression tests:
+
+1. **URL-archive deps git-cloned at build time** → `ensure_git_deps_fetched`
+   cloned every dep with a `url` (ignoring `is_git()`), so a `.tar.gz` 404'd on
+   a fresh `freight build`. Now skips non-git/patched deps. (build/mod.rs)
+2. **git `tag` deps failed checkout** → tag passed to libgit2 `RepoBuilder::
+   branch()` (remote-tracking branches only) → "refs/remotes/origin/<tag> not
+   found". Now clones default branch + detaches to the tag (peels annotated
+   tags). (fetch/git.rs)
+3. (No third code bug — the cmake/pkg-config/header-only paths worked once 1 & 2
+   were fixed.)
+
+Validated green after fixes: zlib (C, url+cmake), fmt (C++, url+cmake),
+zlib (pkg-config `>=1.2` → system 1.3.2), zlib (git `.git` + tag v1.3.1 + cmake),
+nlohmann/json (C++ header-only, `type = "none"`). 780 lib tests pass.
+
+Commit: crates/freight master d96446b. Validation projects live in /tmp/freight-val
+(not committed).
+
+Next: release prep (0.1.0) — CHANGELOG, README known-limitations, release notes,
+binary-release CI. Pending a go/no-go on validation depth.
