@@ -12,6 +12,17 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — clang-bridge optional (off by default)
+
+`freight` previously always compiled the clang-bridge C++ FFI + linked libclang,
+even though clangd is the default backend. Now `clang-bridge` is an **optional dep
+behind a `clang-bridge` cargo feature, off by default** — a normal build/install
+doesn't touch the bridge. All usage cfg-gated (Clang indexer + registration,
+clang-tidy spawn, resource-dir/per-file probes); `--use-clang-bridge` only takes
+effect when compiled in (`clang_bridge_active()`), else ignored with a warning.
+Builds + 759 tests clean with and without the feature. AGENTS.md/TODO/flag-help
+updated. (Workspace `[patch]` unchanged — still applies when the feature is on.)
+
 ### 2026-06-15 — Claude — finish migrate story (make/autotools); B5 pkg-config negative cache
 
 - **migrate(make, autotools)**: now route OS system libs (pthread/m/dl/ws2_32/…)

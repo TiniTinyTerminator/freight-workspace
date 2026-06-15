@@ -69,7 +69,8 @@ workspace root.
 cmake-lossless  ←── freight (migration module)
 cmake-lossless  ←── vcpkg-converter (cmake_probe module)
 docify          ←── freight (freight doc command)
-clang-bridge    ←── freight (LSP ClangIndexer; default feature, runtime-gated by --use-clang-bridge)
+clang-bridge    ←── freight (LSP ClangIndexer; OPTIONAL dep behind the `clang-bridge`
+                              cargo feature, OFF by default; also runtime-gated by --use-clang-bridge)
 fortran-lsp     ←── freight (planned: native Fortran indexer behind freight lsp; not yet wired)
 freight-registry    (standalone; no internal deps)
 ```
