@@ -12,6 +12,26 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — backlog: test flakes, dead cfg, cpu-extensions docs, `workspace graph`
+
+Cleared the small leftovers + one formal TODO (plugins left per request):
+- **Test flakes fixed**: detect tests mutated global `$PATH`, racing PATH-reading
+  detection tests (which/gdb). Extracted `which_all_in(binary, path)`; tests pass
+  an explicit path now — no global mutation. 8/8 clean full runs.
+- **Dead `#[cfg(feature = "clang")]`** doc-extraction tests removed (referenced a
+  gone `extract_clang` module; also killed the "unexpected cfg" warning).
+- **cpu-extensions vs `[arch.*] features`**: documented the distinction (preferred
+  arch-gated/data-driven features vs unconditional per-compiler cpu-extensions);
+  not merged in code — mechanisms differ (would risk mixed-asm/msvc).
+- **`freight workspace graph` (S15)**: new subcommand, inter-member path-dep graph
+  (text/mermaid/dot). 759 tests, clippy clean.
+
+Still open (need dedicated sessions / external resources): clang-bridge clangd
+differential audit; native Fortran wiring (differential vs fortls); per-OS Tier-A
+provides-headers (cross-crate); DAP rr/cdb/windbg (Windows/hardware); workspace
+`[patch]` table; per-crate items (cmake-lossless include()/add_subdirectory,
+registry SMTP/TOTP/roles, docify extractors, vcpkg add_subdirectory).
+
 ### 2026-06-15 — Claude — clang-bridge optional (off by default)
 
 `freight` previously always compiled the clang-bridge C++ FFI + linked libclang,
