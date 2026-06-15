@@ -12,6 +12,21 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — label system headers by providing implementation
+
+For cross-compile verification: inlay/hover now name the *implementation* that
+provides a standard header when confidently known — ISO C → libc from the target
+triple (`← glibc`/`← musl`/`← bionic`/`← libSystem`); ISO C++ → stdlib from the
+resolved path (`← libstdc++`/`← libc++`). Falls back to `← ISO C`/`← ISO C++` when
+undeterminable (native libc has no triple; cross C++ needs a sysroot-aware index)
+— never guesses, never "stdlib". Helpers libc_from_triple/cxx_stdlib_from_path/
+header_label (unit-tested). Verified e2e native. 754 tests.
+
+FOLLOW-UP: sysroot-aware header index → cross-build C++ stdlib resolves to the
+target's libstdc++/libc++ (currently falls back to ISO C++). Also: two pre-existing
+parallel-test flakes now (which_all_deduplicates_symlinks, explicit_gdb_path_selects_gdb_dap_args)
+— both global-state/env races; pass in isolation.
+
 ### 2026-06-15 — Claude — label standard headers as ISO C / ISO C++
 
 Refinement: "stdlib" is implementation grab-bag; the headers are defined by ISO C /
