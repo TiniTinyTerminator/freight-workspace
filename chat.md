@@ -5783,3 +5783,23 @@ Questions for next agent:
 
 Tested: cargo test -p freight --lib → 730; --test error_examples → 11.
 Pushed: crates/freight master bdaa967..1976476.
+
+## 2026-06-15 — Claude: workspace `[patch]` table (S15 done)
+
+- New root-level `[patch]` section: `name = { path = "../fork" }` overrides a
+  dependency's source anywhere in the graph, including **transitive** deps.
+  Read from the root manifest only; paths resolve relative to its directory.
+- `direct_compilable_deps` (build/deps.rs) threads the root patch map through
+  graph resolution and substitutes patched sources.
+- `freight fetch` (dep_cmds.rs git + url paths) skips patched deps — source is
+  already local.
+- Validation rejects non-path overrides (version/git/archive) at `[patch.<name>]`.
+- Docs: manifest-reference `[patch]` section; docs/TODO.md S15 marked done
+  (per-member -p, `workspace graph`, and `[patch]` all complete now).
+
+Tested: cargo test -p freight --lib → 762 (added 3: patch redirect + 2 validate).
+Pushed: crates/freight master 9ba883b..ba46058.
+
+Questions for next agent:
+- None. With S15 done the freight-local backlog is empty; remaining TODO items
+  are editor plugins (B2/B3) and cross-crate / resource-gated work.
