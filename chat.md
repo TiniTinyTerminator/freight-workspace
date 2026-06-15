@@ -12,6 +12,26 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — LSP link-feature hints for system-library headers
+
+Instead of hermetic includes (deemed too much), system/common headers get a
+*resolve hint* that writes the right thing into freight.toml when clicked.
+
+- `<pthread.h>` etc. compile but won't link without `[os.*] features` → the LSP
+  emits a **Hint** diagnostic (`code: link-feature-hint`) on the include when the
+  feature isn't declared, with quick-fix "Add `<feature>` to [os.<os>] features".
+- Header→feature from the system-lib stub `headers` (`section_os` picks the OS
+  from `supports`; `find_stub_by_header`). Runs regardless of
+  `[lints].undeclared-include` (link concern, not hygiene). feature+os ride in the
+  diagnostic `data` → quick-fix needs no server state; `insert_os_feature_toml`
+  writes the array. `compute_include_hygiene` refactored to publish hints in all
+  lint modes.
+- Verified e2e via `freight lsp`. 751 lib tests + error_examples 11, clippy clean.
+
+FUTURE: same hint shape could cover cpu-feature headers (immintrin.h → `[arch.*]
+features`) and "common library" headers in `allow` mode (zlib.h → `[dependencies]`,
+overlaps the undeclared-include quick-fix under deny/warn). Not done.
+
 ### 2026-06-15 — Claude — migrate(cmake) system libs→features; cross-build hygiene
 
 Two TODO items.
