@@ -12,6 +12,18 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — system headers labelled by standard origin (POSIX vs stdlib)
+
+Correction: `<pthread.h>` is a POSIX header, not "the pthread library"; `<math.h>`
+is ISO C stdlib even though it links `-lm`. So the inlay/hover/diagnostic now
+separate the header's **standard origin** from its **link library**:
+- inlay: pthread.h → `← POSIX`, math.h → `← stdlib`, winsock2.h → `← Windows SDK`.
+- hover/diagnostic: "<pthread.h> is a POSIX header; link `pthread` via [os.unix]
+  features" / "<math.h> is a stdlib header; link `m` …".
+Origin from ISO stdlib name tables vs the stub's `[os.*]` section
+(`system_header_origin`); link feature still from the stub table; quick-fix
+unchanged. Verified e2e. 751 tests, clippy clean.
+
 ### 2026-06-15 — Claude — LSP recognizes system-lib headers by feature
 
 Follow-up: `<pthread.h>` was mislabelled `← stdlib` in the inlay/hover path (fell
