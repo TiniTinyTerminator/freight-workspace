@@ -12,6 +12,18 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — sysroot/cross-toolchain-aware header index
+
+So cross-build C++ stdlib labels resolve to the target's libstdc++/libc++:
+- `probe_system_include_dirs_for(sysroot, target)` probes the cross toolchain
+  (`<triple>-g++`, …) first + `--sysroot`; threaded through `build_source_indexes`.
+- **`refresh_project_model` now applies `compiler.target`/`sysroot`** (both
+  `#[serde(skip)]`) from the same global/local config + `FREIGHT_SYSROOT` the build
+  uses — the LSP's `active_manifest` never carried them before, so all the cross
+  paths (this + the earlier cross-hygiene + provider labels) were dormant. Now live.
+- `header_provider_label` trusts the resolved C++ path under cross (index is
+  sysroot-aware). Native unchanged (glibc/libstdc++). 757 tests.
+
 ### 2026-06-15 — Claude — package-based system-header labels (glibc/musl/libstdc++…)
 
 Pivot from standard-based (ISO C/C++/POSIX) to **package-based** labels: a system
