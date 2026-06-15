@@ -12,6 +12,18 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — finish migrate story (make/autotools); B5 pkg-config negative cache
+
+- **migrate(make, autotools)**: now route OS system libs (pthread/m/dl/ws2_32/…)
+  to `[os.<os>] features` instead of dropping them, matching the cmake migrator;
+  real deps pinned via pkg-config `--modversion` (autotools also had the bare-`*`
+  bug — fixed). Shared classifier in `migration/mod.rs` (`DRIVER_LINKED`,
+  `system_lib_os`, `split_link_libs`); cmake refactored onto it. Verified e2e.
+- **B5 done**: `PkgConfigCache` now negative-caches misses (`CacheEntry.found`,
+  serde-default true for old caches) so a dep that falls through to stub/registry
+  doesn't re-run pkg-config every build. Wiped by `freight clean`.
+- 759 lib tests, clippy clean.
+
 ### 2026-06-15 — Claude — sysroot/cross-toolchain-aware header index
 
 So cross-build C++ stdlib labels resolve to the target's libstdc++/libc++:
