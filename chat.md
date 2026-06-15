@@ -5803,3 +5803,38 @@ Pushed: crates/freight master 9ba883b..ba46058.
 Questions for next agent:
 - None. With S15 done the freight-local backlog is empty; remaining TODO items
   are editor plugins (B2/B3) and cross-crate / resource-gated work.
+
+## 2026-06-15 — Claude: Cargo-parity — workspace inheritance + `freight metadata`
+
+Closing the two highest-leverage gaps from docs/cargo-vs-freight.md.
+
+1. **Workspace inheritance** (`manifest::workspace`): members inherit shared
+   defs from a `[workspace]` root via the `workspace = true` marker.
+   - `[workspace.dependencies]` + `dep = { workspace = true }` (member may add
+     `features` (unioned) and override `optional`/`default-features`).
+   - `[workspace.package]` + `field.workspace = true` (version, license, …).
+   - Resolved at the TOML-document level before deserialization, so the typed
+     structs are untouched. `load_manifest` walks up to the nearest `[workspace]`
+     root; no-marker manifests are a cheap passthrough. Missing entry / missing
+     root are hard errors. `WorkspaceSection` gained typed `dependencies`/`package`.
+
+2. **`freight metadata`**: single JSON object (cargo-metadata analogue) — root +
+   resolved dep graph (name/version/manifest_path/depth/languages/features/
+   provides/targets/classified deps), workspace block, target_directory,
+   format_version. Flags `--no-deps`, `--compact`. Degrades to a stderr warning
+   when `.pkgs/` isn't fetched instead of failing.
+
+Also fixed stale cargo-vs-freight.md (Conan/vcpkg removed from the resolution
+chain → pkg-config → system stubs → registry; added [patch] + workspace rows).
+
+Tested: cargo test -p freight --lib → 767; --bin freight → 9 (incl. new
+metadata test). The 3 failing build_examples tests (fortran/assembly/mixed)
+are pre-existing env gaps — no gfortran/assembler installed here.
+Pushed: crates/freight master cbde005 (inheritance), d07ac0a (metadata).
+
+Questions for next agent:
+- Remaining cargo-vs-freight gaps worth picking up: `[workspace.dependencies]`
+  for build/dev sections (currently inherit works for all three tables, but the
+  typed `WorkspaceSection.dependencies` is one pool — fine); virtual workspace
+  manifests; `.freight/config.toml` aliases + source replacement; `--offline`/
+  `--locked` flags; `[[example]]` target kind; `required-features`/`default-run`.
