@@ -5838,3 +5838,31 @@ Questions for next agent:
   typed `WorkspaceSection.dependencies` is one pool — fine); virtual workspace
   manifests; `.freight/config.toml` aliases + source replacement; `--offline`/
   `--locked` flags; `[[example]]` target kind; `required-features`/`default-run`.
+
+## 2026-06-15 — Claude: more Cargo parity — bin gating, lock flags, examples
+
+Continuing the cargo-vs-freight gap close-out (three commits on crates/freight):
+
+1. **`[[bin]] required-features` + `[package] default-run`** (13970be) — a bin is
+   linked only when all its required-features are active (enforced in
+   `link_targets`; `FeatureResolution` now carries `active`); `default-run` picks
+   the bin for `freight run` when multiple exist and `--bin` is omitted. Both
+   validated.
+2. **`--offline` / `--locked` / `--frozen`** (8da9dee) — on shared BuildFlags.
+   Threaded via env vars (FREIGHT_OFFLINE/FREIGHT_LOCKED) like FREIGHT_VERBOSE,
+   so no PipelineConfig churn. `--offline` skips the fetch stage; `--locked`
+   verifies freight.lock without rewriting (stale/missing → error). LockFile got
+   PartialEq/Eq.
+3. **`[[example]]` targets** (347b338) — `examples/` auto-discovered (name = file
+   stem) + declared `[[example]]` overrides; new `PipelineGoal::Examples` links
+   each against lib objects into `target/<profile>/examples/`. CLI:
+   `freight build --examples`/`--example NAME`, `freight run --example NAME`.
+
+Tested: cargo test -p freight --lib → 774 (added: 3 bin/run validate, 1 lock
+round-trip, 2 collect_examples, 1 example validate). clippy clean.
+Pushed: crates/freight master d07ac0a..347b338.
+
+Remaining cargo-vs-freight gaps (smaller / lower priority): `.freight/config.toml`
+command aliases + `[source]` replacement/mirrors; `cargo vendor` equivalent;
+`cargo fix` (lint --fix); virtual workspace manifests; `cargo tree`
+--duplicates/-i.
