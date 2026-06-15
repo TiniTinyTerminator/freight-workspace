@@ -5866,3 +5866,25 @@ Remaining cargo-vs-freight gaps (smaller / lower priority): `.freight/config.tom
 command aliases + `[source]` replacement/mirrors; `cargo vendor` equivalent;
 `cargo fix` (lint --fix); virtual workspace manifests; `cargo tree`
 --duplicates/-i.
+
+## 2026-06-15 — Claude: command aliases + tree shows all dep kinds
+
+Two more cargo-parity items (crates/freight master 08fd493, e87d6de):
+
+- **`[alias]`** in `~/.freight/config.toml` / `<project>/.freight/config.toml`:
+  `b = "build"` (whitespace-split) or `br = ["build","--release"]` (verbatim).
+  Expanded in `main()` before clap; can't shadow a built-in; local overrides
+  global; single-pass. New `GlobalConfig.alias` + `AliasValue`.
+- **`freight tree`** now lists `[build-dependencies]` and `[dev-dependencies]`
+  groups too (was normal-deps only), matching `cargo tree`.
+
+Tested: 777 lib + 12 bin tests. clippy clean (the 20 bin warnings are
+pre-existing register-TUI doc lints).
+
+Cargo-parity status: implemented this session — workspace inheritance, metadata,
+[patch], required-features, default-run, --offline/--locked/--frozen, [[example]],
+[alias], tree all-kinds. (Earlier: lint --fix already == cargo fix.)
+Remaining gaps are low-value for freight's design and intentionally deferred:
+`cargo vendor` (redundant with .pkgs/ + --offline), `cargo tree -d` (flat .pkgs
+pool can't have duplicate versions), `[source]` mirrors, virtual workspace
+manifests, per-package profile overrides.
