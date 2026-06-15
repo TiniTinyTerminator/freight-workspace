@@ -12,6 +12,25 @@ Guidelines:
 
 ## Log
 
+### 2026-06-15 — Claude — package-based system-header labels (glibc/musl/libstdc++…)
+
+Pivot from standard-based (ISO C/C++/POSIX) to **package-based** labels: a system
+header is labelled by the package that provides it — what you need to verify a
+cross build uses the target's lib. `<stdio.h>`/`<pthread.h>`/… → `← glibc` (or
+musl/bionic/libSystem); `<vector>` → `← libstdc++` (or libc++).
+
+Data-driven: new `src/toolchain/std-providers.toml` + `std_providers.rs` (user-
+extensible via `$FREIGHT_HOME/toolchains/std-providers/`). Each provider declares
+`provides = ["stdlib","posix"]` (glibc/musl) / `["cxx"]` (libstdc++/libc++) and
+detection: triple substrings for libc (active triple = cross target, else host via
+`cc -dumpmachine`), resolved-path substrings for C++ stdlib. `header_capability` +
+`header_provider_label`; falls back to generic libc / C++ stdlib when undeterminable
+(cross C++ needs a sysroot-aware header index — follow-up). Link-feature hint
+unchanged. Removed iso_std_origin/system_header_origin/header_label/etc.
+
+Also fixed latent TOML: `+`/`.` table keys must be quoted (`["libstdc++"]`,
+`["sse4.2"]` — the latter had been silently parsed as nested tables). 757 tests.
+
 ### 2026-06-15 — Claude — label system headers by providing implementation
 
 For cross-compile verification: inlay/hover now name the *implementation* that
