@@ -6036,3 +6036,12 @@ maintainer reviews + publishes. crates/freight master 22987ed.
 
 Re-release: delete the broken release+tag (`gh release delete v0.1.0 --yes
 --cleanup-tag`), re-tag at 22987ed, push the tag → draft release → publish.
+
+## 2026-06-16 — Claude: release as v0.1.1 (v0.1.0 tag burned)
+
+The failed first run published an immutable 0.1.0 release; GitHub reserves that
+tag name permanently (confirmed: 0 rulesets remain, tag creation still blocked).
+Deleted the broken release+tag, then bumped to 0.1.1 (Cargo.toml, committed
+Cargo.lock entry, CHANGELOG). crates/freight master 52ae5c3. Also fixed
+release.yml earlier (22987ed): matrix builds → artifacts → single DRAFT release
+(avoids the immutable-upload race). Next: push v0.1.1 tag → draft release → publish.
