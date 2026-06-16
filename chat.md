@@ -5989,3 +5989,26 @@ Prepared the first release (crates/freight master 1d58388):
 
 Release build verified locally (optimized 29 MB binary, ~4 min). NOT tagged yet —
 cutting `v0.1.0` is the maintainer's call (the tag triggers the publish workflow).
+
+## 2026-06-16 — Claude: fix standalone/CI build (fortran-lsp drift) + lockfile
+
+CI (and any `cargo install`) of the standalone freight repo failed to compile:
+`src/lsp/indexers/Fortran.rs` (always-on) used a `fortran_lsp::Workspace` API
+that lives only in UNCOMMITTED WIP in crates/fortran-lsp (workspace.rs, parser.rs,
+model.rs, …). The monorepo built via its local `[patch]`; standalone pulled
+fortran-lsp's published HEAD (simpler API) → 22 compile errors.
+
+Fixes (crates/freight master 6024e25, edbc272):
+- Gated the native Fortran indexer behind an opt-in `fortran-lsp` feature
+  (default OFF), mirroring clang-bridge. Default `freight lsp` uses the fortls
+  passthrough; the git dep isn't pulled. `native_fortran_enabled()` now reflects
+  the feature. Enable with `cargo install --features fortran-lsp`.
+- Committed Cargo.lock (from a clean-clone release build) + `--locked` in rust.yml
+  and release.yml — pins all git deps so this drift class can't recur.
+
+Verified: fresh `git clone` + `cargo build --release` → exit 0, `freight 0.1.0`;
+`cargo build --locked` confirmed. Default monorepo: 782 lib tests pass.
+
+NOTE for whoever owns fortran-lsp: the native indexer's WIP (Workspace API) is
+unpushed in crates/fortran-lsp. To ship it enabled, commit+push that crate and
+flip the `fortran-lsp` feature on (or pin the rev).
