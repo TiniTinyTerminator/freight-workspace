@@ -6024,3 +6024,15 @@ CI `cargo test` on the standalone repo failed ~19 example tests + a doctest:
   modules, which are rebuilt every build — documented as a known limitation).
 - doctest fix: `signtool` snippet in build_msix docs tagged ```text.
 Full `cargo test` green locally. crates/freight master 18d8536.
+
+## 2026-06-16 — Claude: fix release workflow (immutable-release upload error)
+
+Tagging v0.1.0 ran release.yml, which failed: each of the 4 matrix jobs uploaded
+to the release, but once GitHub published it the release became immutable →
+"Cannot upload asset to an immutable release". Rewrote release.yml: matrix builds
+each platform + uploads a workflow artifact; a single final job downloads all and
+creates ONE draft release with every binary. Draft so assets attach cleanly;
+maintainer reviews + publishes. crates/freight master 22987ed.
+
+Re-release: delete the broken release+tag (`gh release delete v0.1.0 --yes
+--cleanup-tag`), re-tag at 22987ed, push the tag → draft release → publish.
