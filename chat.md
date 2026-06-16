@@ -5966,3 +5966,13 @@ d96446b (earlier fetch fixes). Added `zip` dep (Cargo.lock bumped here).
 Release-readiness: dependency story now solid across mechanisms. Remaining
 untested surfaces (env limits, not known freight bugs): meson, Windows/macOS,
 broad vcpkg corpus. Next: release prep (CHANGELOG, known-limitations, CI).
+
+## 2026-06-16 — Claude: meson validated + deps/meson example
+
+meson 1.11.1 now installed. freight's meson integration validated end-to-end
+(meson setup + ninja → lib discovered in build dir → linked): "7 squared is 49".
+No code fix needed. Added examples/deps/meson (was a gap — cmake+make existed,
+meson didn't) and gitignored foreign build dirs. crates/freight master afe70c9.
+
+Validation now covers all supported build systems (cmake, meson, autotools, make,
++ header-only). Only Windows/macOS and a broad vcpkg corpus remain untested here.
