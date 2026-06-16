@@ -6012,3 +6012,15 @@ Verified: fresh `git clone` + `cargo build --release` → exit 0, `freight 0.1.0
 NOTE for whoever owns fortran-lsp: the native indexer's WIP (Workspace API) is
 unpushed in crates/fortran-lsp. To ship it enabled, commit+push that crate and
 flip the `fortran-lsp` feature on (or pin the rev).
+
+## 2026-06-16 — Claude: fix standalone CI test failures
+
+CI `cargo test` on the standalone repo failed ~19 example tests + a doctest:
+- `freight_bin()` assumed the monorepo layout → binary not found → all example
+  tests failed. Switched to `CARGO_BIN_EXE_freight` (layout-independent).
+- fortran/assembly/mixed-tri-lang tests now skip via `missing_toolchain()` when
+  the compiler is absent; rust.yml installs gfortran+nasm so CI runs them.
+- incremental test moved cpp/hello → cpp/static-lib (cpp/hello uses C++23
+  modules, which are rebuilt every build — documented as a known limitation).
+- doctest fix: `signtool` snippet in build_msix docs tagged ```text.
+Full `cargo test` green locally. crates/freight master 18d8536.
