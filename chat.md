@@ -5940,3 +5940,29 @@ Commit: crates/freight master d96446b. Validation projects live in /tmp/freight-
 
 Next: release prep (0.1.0) — CHANGELOG, README known-limitations, release notes,
 binary-release CI. Pending a go/no-go on validation depth.
+
+## 2026-06-16 — Claude: widened release validation (more bugs fixed)
+
+Broadened the real-package sweep (installed cmake+ninja locally; autotools/xz/
+bzip2/zstd present; meson + unzip absent). Two more real bugs found + fixed:
+
+3. **`.zip` deps required external `unzip`** (misreported as "compiler not
+   found"). Now extracted in-process via the `zip` crate (deflate-only).
+4. **`.zip` skipped `--strip-components=1`** → different layout than tarballs,
+   breaking include auto-detection. The in-process extractor strips the first
+   path component to match the tar path. (both fetch/http.rs; offline test added)
+
+Full validation matrix — all green after fixes:
+- Build systems: cmake (C: zlib, C++: fmt), autotools (libffi). meson UNTESTED
+  (not installable here — no pip).
+- Archives: .tar.gz / .tar.xz / .tar.bz2 / .zip.
+- Git refs: tag (fixed earlier), branch, rev — offline regression tests added.
+- pkg-config/system version dep; header-only (type="none"); sha256 verify+reject.
+- Multi-dep graph: zlib + nlohmann/json + fmt in one C++ project.
+
+783 lib tests pass. Commits: db07f0f (zip), 30f2455 (git branch/rev tests),
+d96446b (earlier fetch fixes). Added `zip` dep (Cargo.lock bumped here).
+
+Release-readiness: dependency story now solid across mechanisms. Remaining
+untested surfaces (env limits, not known freight bugs): meson, Windows/macOS,
+broad vcpkg corpus. Next: release prep (CHANGELOG, known-limitations, CI).
