@@ -5976,3 +5976,16 @@ meson didn't) and gitignored foreign build dirs. crates/freight master afe70c9.
 
 Validation now covers all supported build systems (cmake, meson, autotools, make,
 + header-only). Only Windows/macOS and a broad vcpkg corpus remain untested here.
+
+## 2026-06-16 — Claude: 0.1.0 release prep
+
+Prepared the first release (crates/freight master 1d58388):
+- CHANGELOG.md (Keep a Changelog; full 0.1.0 entry).
+- `freight --version` wired up (clap `version` — was missing/errored).
+- .github/workflows/release.yml — on a `v*` tag, builds + packages the binary for
+  Linux x86_64, macOS arm64/x86_64, Windows x86_64 and attaches to the GH release
+  (doubles as cross-platform build validation).
+- README: "Known limitations" + corrected install (prebuilt + cargo install --git).
+
+Release build verified locally (optimized 29 MB binary, ~4 min). NOT tagged yet —
+cutting `v0.1.0` is the maintainer's call (the tag triggers the publish workflow).
