@@ -6045,3 +6045,20 @@ Deleted the broken release+tag, then bumped to 0.1.1 (Cargo.toml, committed
 Cargo.lock entry, CHANGELOG). crates/freight master 52ae5c3. Also fixed
 release.yml earlier (22987ed): matrix builds → artifacts → single DRAFT release
 (avoids the immutable-upload race). Next: push v0.1.1 tag → draft release → publish.
+
+## 2026-06-18 — Claude: `freight admin` CLI surface
+
+Added a `freight admin` command group that drives the registry's moderation/admin
+HTTP API using the token stored for the registry (env/keychain). Subcommands:
+overview, reports [--status], resolve <id> [--dismiss] [--note], users,
+set-role <user> <role>, whoami. Authorization is enforced server-side by role
+tier — moderator-only/admin-only endpoints surface 403 as "permission denied"
+(no client-side gating). Added FreightRegistry client methods (me, admin_overview,
+list_reports, resolve_report, list_users, set_role) + an http_patch helper.
+
+Tested end-to-end against a live registry: admin alice sees overview/users and can
+set-role; moderator bob can view reports/overview but set-role correctly 403s;
+invalid role rejected. cargo build + clippy clean. crates/freight master 2cab59b.
+
+Pairs with the earlier registry-side work: tier+permission model (server stores
+tiers; policy in permissions::Tier::allows) + `user role` admin bootstrap CLI.
