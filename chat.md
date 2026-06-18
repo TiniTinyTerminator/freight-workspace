@@ -6142,3 +6142,25 @@ hybrid model:
   stored user token). Full suite green.
 
 crates/freight-registry main 2865d62. No freight CLI change this turn.
+
+## 2026-06-18 — Claude: vcpkg-converter clippy cleanup + scrape coverage report
+
+Checked the vcpkg converter (crates/vcpkg-converter, pkg vcpkg-scraper): builds
+clean, was 17/17 tests green. Two improvements:
+
+- Clippy: cleared all 40 warnings. Notable: 9 regexes were recompiled every
+  iteration of simplify_dropped's loop → hoisted into a compile-once LazyLock
+  table (real perf fix); next_back() over last(); type alias for a repeated
+  5-tuple; moved a misplaced doc block onto sanitize_version; justified
+  #[allow(too_many_arguments)] on two wide builders.
+- Feature (TODO "port coverage report"): `scrape --all-versions` no longer skips
+  silently. AllVersionStats gained a categorised breakdown (not-version-like, no
+  git-tree, no portfile, unrecognized source) + a tally of unrecognised vcpkg
+  source helpers (e.g. vcpkg_from_git) ranked by frequency, via
+  AllVersionStats::report(). main prints it. +3 unit tests; suite 17 -> 20 green.
+
+Deferred: vcpkg_from_git portfile helper — needs a git-rev field the registry
+stub schema doesn't have yet (generic git can't form a tarball URL). The new
+report now surfaces how often it's actually hit, to prioritise it later.
+
+crates/vcpkg-converter main d3eab24.
