@@ -6432,3 +6432,23 @@ KEY FINDING / remaining work:
   NOT the root package (tested) — matters for convert's layout.
 
 Full freight + scraper suites green; clippy clean on touched files.
+
+## 2026-06-18 — Claude: convert→workspace (transitive closure + [patch])
+
+vcpkg-converter main 8f9c272: `convert <project> --vcpkg-root <root>` now emits
+a workspace-style layout — the project's freight.toml + its FULL transitive dep
+closure vendored under vendor/<name>/freight.toml, wired via a root [patch]
+table (path redirects). resolve_closure BFS's the ports tree. Without
+--vcpkg-root it degrades to the project freight.toml alone. 1 unit test.
+
+Verified: convert on cpr (curl[ssl]) → vendored curl + zlib, [patch] both.
+
+So both scraper commands now emit the patched-workspace structure the user asked
+for: scrape = whole-catalog [workspace]+[patch]; convert = project + closure via
+[patch]. Native members build offline (thanks to the a7d3a0b [patch] fix);
+foreign (url+build) members still need the [package]-level foreign-build engine
+piece to compile — the agreed next step.
+
+Pre-existing limitation noticed: expand_url doesn't resolve some non-${VERSION}
+portfile vars (e.g. curl's ${curl_version}) so a few member urls keep a
+placeholder. Affects scrape + convert equally; separate fix.
