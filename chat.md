@@ -12,6 +12,24 @@ Guidelines:
 
 ## Log
 
+### 2026-06-18 — Codex — freight lsp: remove fortls passthrough
+
+Flipped Freight's Fortran LSP integration to the embedded Rust library path.
+`fortran-lsp` is now a normal `freight` dependency, `FortranIndexer` is always
+registered, the `--fortls` / `--no-fortls` CLI options and fortls launch/state
+paths were removed, and Fortran file extensions no longer map to a passthrough
+`SourceServer`. Added protocol tests to keep Fortran extensions native-owned
+while preserving clangd and asm-lsp passthrough classification. Updated the
+Fortran TODO to say the default is now native and differential testing remains
+as the open parity-hardening task.
+
+Tested: `cargo fmt -p freight -p fortran-lsp`; focused `cargo test -p freight
+--no-default-features fortran_extensions_are_native_not_passthrough`; full
+`cargo test -p fortran-lsp` — 125 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
 ### 2026-06-18 — Codex — fortran-lsp: macro goto-definition through Freight
 
 Added an LSP-facing `Workspace::definition_location()` API that returns a
@@ -6667,3 +6685,24 @@ the workspace [patch]). Full freight suite green; clippy clean.
 Remaining polish (non-blocking): non-cmake transitive wiring uses prefix paths
 only (no PKG_CONFIG_PATH/env); complex ports with many/feature-gated deps will
 surface per-port build issues to harden over time.
+
+## 2026-06-19 — Claude: header-only vcpkg ports build with freight, no cmake
+
+User: build some ports that just use freight, no cmake. Header-only ports are
+the natural fit.
+
+- vcpkg-converter main a25592b: a port with source but no detected build system
+  now gets build = "none" (was omitted). ~610 ports are now explicit header-only.
+- freight master ec1422e: invoke_build_system handles "none"/"header" (fetch +
+  expose headers, no build tool); the foreign-member closure also exposes the
+  source root so single-header-at-root ports (plf_colony.h, stb_*.h) resolve.
+
+Verified zero-cmake builds of real header-only vcpkg ports:
+- plf-colony consumer: freight fetched plf-colony, exposed header, compiled +
+  linked + ran (colony sum=16, rc=0). No cmake.
+- stb consumer: wrote a PNG via stb_image_write — compiled/linked/ran with
+  freight only (rc=0). No cmake.
+
+So header-only ports (a big slice of vcpkg) convert to freight projects that
+build entirely with freight's toolchain. cmake/make ports still foreign-build.
+Full freight + scraper suites green; clippy clean.
