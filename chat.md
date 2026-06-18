@@ -6089,3 +6089,36 @@ CLI (crates/freight master 950c6f8):
 - FreightRegistry client methods + http_delete_body (DELETE w/ JSON body).
 - Tested end-to-end against a live registry: add/list/set-role/remove all work;
   last-owner removal rejected; a maintainer is correctly denied member mgmt.
+
+## 2026-06-18 — Claude: team owners (GitHub/GitLab), crates.io-style
+
+On top of per-package roles, added team/group ownership matching crates.io's
+model (chosen for its GitHub/GitLab linkage): per-user OAuth token for live
+membership checks, teams as flat full owners, both providers.
+
+Registry (crates/freight-registry main 72374c6):
+- migration 0015: package_teams (provider, org, team); oauth_accounts gains
+  access_token/refresh_token/token_expires_at.
+- oauth callback now captures + stores the provider token; github preset adds
+  read:org, gitlab adds read_api scope.
+- teams.rs: TeamMembership trait + HttpTeamMembership (GitHub team membership
+  via /orgs/:org/teams/:team/memberships/:login; GitLab group membership via
+  /groups/:path/members/all/:id incl. subgroups) + TeamSpec parser
+  (github:org:team, gitlab:group[/subgroup]). Resolver injected via AppState
+  (new field) so auth is testable; main derives provider API bases (GHE / self-
+  hosted GitLab supported).
+- pkg_auth: membership of an owning team passes any package-permission check;
+  publish/yank/owner-mgmt all consult it (fail-closed on provider error).
+- owners API add/remove/list handle team specs; adding a team requires the actor
+  to belong to it (admins bypass); owner-equivalents (individual owners + teams)
+  protected from full removal.
+- tests: teams unit tests + 4 integration tests (github grant, gitlab grant,
+  cannot-add-team-not-in, last-owner guard) via a fake resolver. Full suite green.
+
+CLI (crates/freight master bb90977):
+- `freight owner add/remove` accept github:ORG:TEAM / gitlab:GROUP; list tags
+  team owners. PackageMember gained `kind`.
+
+Limitation (inherent to the chosen method): live checks use the user's stored
+OAuth token, so only users who logged in via that provider can be verified as
+team members. Username/password-only accounts can't be team members.
