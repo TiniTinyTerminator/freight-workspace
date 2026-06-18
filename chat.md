@@ -6219,3 +6219,24 @@ Known follow-ups: per-target link tracking (to auto-wire exe→lib path deps in
 workspaces); option()→features and broad-define noise in migrate output;
 make/autotools multi-lib full workspace split (currently warn+first).
 Full freight suite green (0 failures); clippy clean on touched files.
+
+## 2026-06-18 — Claude: tested scraper on full vcpkg repo (2848 ports)
+
+Cloned microsoft/vcpkg (depth 1, 2848 ports) and ran `vcpkg-scraper scrape`.
+First pass: 2845/2848 — 3 failed (qt, corrade, usd) with "data did not match any
+variant of untagged enum VcpkgDep". Root cause: a dependency's `features` list
+can mix bare strings with platform-conditional objects `{name, platform}`; the
+parser only accepted Vec<String>.
+
+Fix (vcpkg-converter main 814e2dd): added VcpkgFeatureRef (untagged
+string | {name,platform}); VcpkgDepDetailed.features uses it; call sites extract
+.name(). Re-ran scrape → 2848/2848, 0 skips. Stubs sane: 2671 have url (rest are
+meta-ports like qt = dep aggregators), 2083 build-system detected, 0 bare `*`
+(baseline versions resolve). 2 regression tests.
+
+Applied the same hardening to freight's vcpkg.json folding (freight master
+e382921, migration/vcpkg.rs FeatureRef) + 1 test.
+
+Not run: scrape --all-versions (needs full git history, not in a shallow clone)
+and freight-build-all (network per port, very long). Next candidates if we want
+deeper signal.
