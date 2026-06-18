@@ -6452,3 +6452,29 @@ piece to compile — the agreed next step.
 Pre-existing limitation noticed: expand_url doesn't resolve some non-${VERSION}
 portfile vars (e.g. curl's ${curl_version}) so a few member urls keep a
 placeholder. Affects scrape + convert equally; separate fix.
+
+## 2026-06-18 — Claude: [package] foreign build + expand_url plain-REPLACE
+
+Did both requested pieces.
+
+#2 expand_url (vcpkg-converter main 6c47ec9): handle plain
+`string(REPLACE "from" "to" var "template")` (template may embed ${VERSION}),
+e.g. curl's `string(REPLACE "." "_" curl_version "curl-${VERSION}")`. After this,
+scraping full vcpkg leaves 0 unexpanded ${...} member URLs (was several). 3 tests.
+
+#1 [package]-level foreign build (freight master e4e389c): a package whose
+[package] declares url + build (no local [lib]) is fetched + foreign-built and
+exposed to dependents — the vcpkg-scraper member shape. Package gained
+url/build/sha256/patches; build_foreign_deps detects a foreign path-dep member
+(foreign_package_spec), fetches (fetch_url_dep) or builds in place, applies
+[package].patches, pushes a foreign build job. Combined with the earlier [patch]
+resolve fix (a7d3a0b), a vendored upstream builds offline.
+
+Verified end-to-end (no cmake in this env, so via make): a workspace whose
+member is [package] build="make", reached via [patch], builds + links + runs
+(rc=0). The cmake path is the same code; needs a cmake-enabled env + network to
+fetch tarballs for full vcpkg validation.
+
+So the full chain now works: scrape/convert -> workspace + [patch] -> members are
+foreign [package]s that fetch+foreign-build -> project links them offline.
+Full freight + scraper suites green; clippy clean on touched files.
