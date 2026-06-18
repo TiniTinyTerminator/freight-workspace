@@ -6164,3 +6164,26 @@ stub schema doesn't have yet (generic git can't form a tarball URL). The new
 report now surfaces how often it's actually hit, to prioritise it later.
 
 crates/vcpkg-converter main d3eab24.
+
+## 2026-06-18 — Claude: `freight migrate` folds in sibling vcpkg.json deps
+
+User wanted a "full" mode: scrape the project's original CMake/Make and rebuild
+it as a freight setup. Chose to extend freight's existing migration engine
+(rather than duplicate target-parsing in vcpkg-converter), so one tool does both
+targets AND deps and Make/autotools come for free.
+
+crates/freight master b7f94c9:
+- New migration::vcpkg::apply_vcpkg_manifest — shared post-process invoked by all
+  three migrators (cmake/make/autotools) after emit. If a vcpkg.json sits next to
+  the build file, folds its deps into the emitted freight.toml:
+  versions from overrides → pkg-config → "*" placeholder; features/default-
+  features → inline table; platform → [os.*.dependencies]; vcpkg-* skipped;
+  bare-"*" build-system entries upgraded when vcpkg gives a real version.
+- 6 unit tests; migration suite 120 -> 126, all green.
+- Verified end-to-end: `freight migrate cmake` on a CMake project + vcpkg.json
+  produced [[bin]] + [language.cpp] + [os.unix] pthread (from CMake) AND
+  fmt=override, zlib/sdl2=pkg-config versions, sdl2 features inline, dirent ->
+  [os.windows.dependencies] (from vcpkg.json).
+
+Docs: docs/vcpkg-migration.md gained a "Full migration" section; CLAUDE.md
+migrate paragraph updated. vcpkg-converter `convert` stays the deps-only path.

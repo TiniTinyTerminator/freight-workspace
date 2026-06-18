@@ -192,7 +192,7 @@ freight migrate make  /path/to/project      # reads Makefile → writes freight.
 freight migrate autotools /path/to/project  # reads configure.ac → writes freight.toml
 ```
 
-Each migrator uses `cmake_lossless` to parse the source AST, routes `find_package` / `target_link_libraries` inside `if(WIN32)` / `if(UNIX)` blocks to `[os.windows.dependencies]` / `[os.unix.dependencies]`, and emits `src = "entry_point_file"` for `[[bin]]` targets (other sources in `src/` are auto-discovered).
+Each migrator uses `cmake_lossless` to parse the source AST, routes `find_package` / `target_link_libraries` inside `if(WIN32)` / `if(UNIX)` blocks to `[os.windows.dependencies]` / `[os.unix.dependencies]`, and emits `src = "entry_point_file"` for `[[bin]]` targets (other sources in `src/` are auto-discovered). When a `vcpkg.json` sits next to the build file, its declared dependencies are also folded in (`migration/vcpkg.rs::apply_vcpkg_manifest`): versions from `vcpkg.json` overrides → `pkg-config` → `"*"` placeholder; `features`/`default-features` → inline table; `platform` → `[os.*.dependencies]`; `vcpkg-*` packages skipped; a bare-`"*"` build-system entry is upgraded when vcpkg gives a real version.
 
 **Compiler templates** live in `toolchains/` as `.rhai` scripts. Each script registers callbacks via `compiler_option` / `language_option`. The script receives a `ctx` object (`ctx.value`, `ctx.version`, `ctx.arch`, `ctx.os`) and calls `add_flag(s)` to inject flags.
 
