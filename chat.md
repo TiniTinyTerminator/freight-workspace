@@ -6062,3 +6062,30 @@ invalid role rejected. cargo build + clippy clean. crates/freight master 2cab59b
 
 Pairs with the earlier registry-side work: tier+permission model (server stores
 tiers; policy in permissions::Tier::allows) + `user role` admin bootstrap CLI.
+
+## 2026-06-18 — Claude: per-package roles (publisher/maintainer/owner)
+
+Extended package ownership from flat owners into a role tier so a project owner
+can grant scoped access to collaborators. Mirrors the global tier/permission
+split at package scope.
+
+Registry (crates/freight-registry main 8803479):
+- migration 0014: package_owners.role TEXT DEFAULT 'owner' (existing owners keep
+  full power; first publisher auto-granted owner).
+- permissions::PackageRole + PackagePermission; policy in PackageRole::allows.
+  publisher = publish; maintainer = publish+yank; owner = full incl. members.
+  New global ManageAnyPackage admin override.
+- api/pkg_auth::require_pkg_perm composes per-package role + global override in
+  one place; publish/yank/owner-management route through it.
+- owners API role-aware: PUT add takes role (default owner), DELETE remove,
+  new POST /owners/:user/role; last owner protected from removal/demotion.
+- db: package_member_role, list_package_members, count_package_role,
+  set_package_member_role; add_package_owner upserts a role.
+- tests: db role matrix + 4 integration tests (publisher/maintainer/owner caps,
+  last-owner protection, admin override). Full suite green.
+
+CLI (crates/freight master 950c6f8):
+- `freight owner list|add|remove|set-role` against the role-aware owners API.
+- FreightRegistry client methods + http_delete_body (DELETE w/ JSON body).
+- Tested end-to-end against a live registry: add/list/set-role/remove all work;
+  last-owner removal rejected; a maintainer is correctly denied member mgmt.
