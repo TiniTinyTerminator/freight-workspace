@@ -6187,3 +6187,35 @@ crates/freight master b7f94c9:
 
 Docs: docs/vcpkg-migration.md gained a "Full migration" section; CLAUDE.md
 migrate paragraph updated. vcpkg-converter `convert` stays the deps-only path.
+
+## 2026-06-18 — Claude: tested real packages; multi-lib→workspace + build fixes
+
+Tested freight against real upstream C/C++ libs and fixed what broke.
+
+Validated: cJSON (C) and fmt (C++, include/ headers) build to static libs; a
+consumer binary depending on cJSON via a path dep builds+links+runs. So the
+build engine is solid on real code.
+
+Findings → fixes (crates/freight master 65b10d0):
+- Discovery was src/**-only; [lib].srcs/[[bin]].src were entry-point hints, not
+  compiled. Now discovery ALSO compiles listed srcs (dedup) + adds [lib].hdrs
+  parent dirs to includes → root-layout / shared-source projects build without
+  moving files. object/dep paths sanitize `..` (-> objs/__up__/) so out-of-tree
+  sources can't escape target/.
+- migrate cmake: multiple libraries now emit a WORKSPACE (one member per lib +
+  per exe, referencing shared sources by ../path) instead of an invalid
+  multi-[[lib]] manifest. (User's call: "multiple libs means creating a
+  workspace.")
+- Latent bug: all migrators emitted [[lib]] (array) vs the manifest's single
+  [lib] table → output didn't parse. Now single [lib]; make/autotools warn +
+  keep first lib when several.
+- migrate cmake dropped `-U` undefines that became invalid `-D-U…`.
+
+E2E: migrate cmake on cJSON → 5-member workspace, all 4 library members build;
+only the test exe needs its inter-target lib dep wired manually (warned — the
+extractor doesn't track per-target target_link_libraries yet).
+
+Known follow-ups: per-target link tracking (to auto-wire exe→lib path deps in
+workspaces); option()→features and broad-define noise in migrate output;
+make/autotools multi-lib full workspace split (currently warn+first).
+Full freight suite green (0 failures); clippy clean on touched files.
