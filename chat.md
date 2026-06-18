@@ -12,6 +12,56 @@ Guidelines:
 
 ## Log
 
+### 2026-06-18 — Codex — fortran-lsp: macro goto-definition through Freight
+
+Added an LSP-facing `Workspace::definition_location()` API that returns a
+`Location` for both normal Fortran symbols and active preprocessor `#define`
+names. Freight's native `FortranIndexer::goto_definition` now calls this API
+directly, so macro uses can jump to their `#define` without inventing fake
+symbols or changing the older symbol-returning `definition()` helper. README
+coverage was updated and the crate tests now assert definition locations for
+both a `use only` symbol and a macro use.
+
+Tested: `cargo fmt -p freight -p fortran-lsp`; focused `cargo test -p
+fortran-lsp workspace_resolves_use_only_definition`; focused `cargo test -p
+fortran-lsp preprocessor`; full `cargo test -p fortran-lsp` — 125 pass;
+`cargo check -p freight --no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: preprocessor references and rename
+
+Extended native preprocessor support beyond hover/completion. Active `#define`
+names now have file-local references, rename edits, conflict detection against
+other active defines, and macro semantic tokens on both the directive and use
+sites. This keeps the existing `definition()` API stable while letting Freight's
+references, rename, highlights, and semantic-token paths see macro names through
+the embedded `fortran_lsp::Workspace`.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+preprocessor`; focused `cargo test -p fortran-lsp semantic_tokens`; full
+`cargo test -p fortran-lsp` — 125 pass. Freight check not rerun this turn; last
+known blocker remains the unrelated adaptor work in
+`crates/freight/src/adaptors/mod.rs`. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: preprocessor definition completions
+
+Ported fortls-style completion items for active preprocessor definitions.
+`Workspace::default_completions_at` now offers parsed `#define` names with
+`#define ...` detail and documentation, including function-like macro
+replacements. Names removed by `#undef` are not offered. The new path is kept
+out of narrower completion contexts such as `use`, `import`, `type(...)`, and
+member access.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+preprocessor`; full `cargo test -p fortran-lsp` — 124 pass. Freight check not
+rerun this turn; last known blocker remains the unrelated adaptor work in
+`crates/freight/src/adaptors/mod.rs`. No commits/pushes.
+
+---
+
 ### 2026-06-18 — Codex — fortran-lsp: preprocessor definition hover
 
 Ported fortls-style hover feedback for active preprocessor definitions.
@@ -6592,3 +6642,28 @@ deps wired via CMAKE_PREFIX_PATH. Full freight suite green; clippy clean on new 
 Remaining polish (not blocking): non-cmake transitive wiring (make/autotools
 deps consuming a built dep) only gets the install prefix as a path, not
 PKG_CONFIG_PATH/env — cmake (the vcpkg-dominant case) is fully wired.
+
+## 2026-06-18 — Claude: vcpkg ports build as full freight projects (/goal)
+
+Goal: make vcpkg-scraper convert vcpkg into full freight-converted projects.
+
+freight master d88887c: a scraped port (foreign [package] with url+build, no
+native targets) now builds via `freight build` — foreign self-build
+(adaptors::build_foreign_self) fetches + builds it and places the lib in
+target/<profile>/. validate + source-discovery allow target-less foreign
+packages; the --emit post-step no longer errors on a [workspace]-only root.
+
+Validated on the REAL scraped vcpkg (2848-member workspace):
+- `freight build` in ws/zlib → fetches + cmake-builds zlib → target/dev/libz.a.
+- `freight build -p libpng` at the workspace root → builds libpng AND its zlib
+  dependency (transitive foreign build), wired via CMAKE_PREFIX_PATH →
+  libpng16d.a. Clean exit.
+
+So `vcpkg-scraper scrape` converts the whole catalog into a freight workspace of
+full, buildable projects; `convert <proj>` does the per-project closure. Each
+member is a valid freight project that builds (leaf standalone; dep'd ports via
+the workspace [patch]). Full freight suite green; clippy clean.
+
+Remaining polish (non-blocking): non-cmake transitive wiring uses prefix paths
+only (no PKG_CONFIG_PATH/env); complex ports with many/feature-gated deps will
+surface per-port build issues to harden over time.
