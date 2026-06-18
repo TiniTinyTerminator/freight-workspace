@@ -12,6 +12,167 @@ Guidelines:
 
 ## Log
 
+### 2026-06-18 — Codex — fortran-lsp: contains diagnostics
+
+Ported fortls-style `contains` parser diagnostics into `fortran-lsp`. The
+parser now records the first `contains` statement per scope, reports
+`CONTAINS statement without enclosing scope`, `Multiple CONTAINS statements in
+scope`, and flags subroutine/function definitions that appear before
+`contains` in modules, submodules, subroutines, and functions. Updated README
+coverage and added regressions for invalid and valid placement.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+reports_contains_statement_errors`; full `cargo test -p fortran-lsp` — 113
+pass; `cargo check -p freight --no-default-features` — passes. No
+commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: use-after-implicit diagnostics
+
+Ported fortls' same-scope ordering diagnostic for `use` statements that appear
+after an `implicit` statement. The parser now tracks the first implicit line per
+scope, reports `USE statements after IMPLICIT statement` on that line when a
+later `use` is seen, and preserves the check for unterminated scopes during
+mid-edit parsing. Updated README coverage and added parser regressions for both
+closed and partial scopes.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+reports_use`; full `cargo test -p fortran-lsp` — 112 pass; `cargo check -p
+freight --no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: completion skip contexts
+
+Ported fortls' skip behavior for scope declarations and `end ...` statements.
+`Workspace::completions_at` now returns no completions on lines like
+`module m`, `subroutine run`, and `end subroutine`, while preserving narrower
+contexts such as `module procedure ...`, `call ...`, first-word statement
+keywords, and member completions. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_skip_scope_declarations_and_end_statements`; full `cargo test -p
+fortran-lsp` — 110 pass; `cargo check -p freight --no-default-features` —
+passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: scope-sensitive declaration keywords
+
+Tightened declaration keyword completions to match fortls' keyword-context
+buckets. `Workspace::completions_at` now filters pre-`::` declaration
+attributes by enclosing scope: module declarations get variable attributes,
+visibility, and `parameter`; procedure declarations get variable attributes,
+dummy-argument attributes like `intent(...)`/`optional`, and `parameter`; type
+declarations get variable attributes plus type-bound procedure attributes like
+`deferred`/`nopass`/`pass` and visibility. Updated README coverage and expanded
+the declaration completion regression.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_offer_declaration_keywords_before_double_colon`; full
+`cargo test -p fortran-lsp` — 109 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: first-word statement completions
+
+Ported fortls' first-word completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects cursor positions at the first token of
+a line, offers Fortran statement/declaration/visibility keywords from a native
+table, and merges those with the normal visible-symbol completions. The regular
+`call ...` context still wins after the first token, so callable filtering is
+unchanged. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_at_first_word_offer_fortran_statements_plus_visible_symbols`; full
+`cargo test -p fortran-lsp` — 109 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: declaration variable completions
+
+Ported fortls' declaration variable-list completion context into
+`fortran-lsp`. `Workspace::completions_at` now detects declaration RHS contexts
+after `::` and offers variable symbols only, including visible local,
+included, and `use`-associated variables, while excluding types, subroutines,
+functions, and procedure links. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_in_declaration_variable_lists_offer_variables_only`; full
+`cargo test -p fortran-lsp` — 108 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: visibility statement completions
+
+Ported fortls' visibility-statement completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects `public ...` / `private ...` lines and
+offers only local variables, derived types, subroutines, and functions from the
+current scope. It excludes `use` imports, intrinsic/global symbols, generic
+interface names, and nested module-procedure link stubs. Updated README
+coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_in_visibility_statements_offer_local_visible_object_kinds_only`;
+full `cargo test -p fortran-lsp` — 107 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: procedure interface completions
+
+Ported another fortls completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects `procedure(...)` declaration contexts
+and offers abstract-interface subroutine/function prototypes instead of broad
+symbols. This works for prototypes in the same host scope and for prototypes
+imported from modules with `use, only:` renames. `use` diagnostics now also
+recognize abstract-interface prototypes as module exports, so the new completion
+path and diagnostics agree. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+procedure_interface`; full `cargo test -p fortran-lsp` — 106 pass;
+`cargo check -p freight --no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: interface import completions
+
+Ported the fortls import-statement completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects `import ...` lines inside interfaces
+and suggests only host-scope variables and derived types, excluding procedures
+and symbols merely imported from another module. Freight needs no additional
+LSP wiring because `FortranIndexer::completion` already delegates to the
+workspace API. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_in_import_statements_offer_host_variables_and_types_only`; full
+`cargo test -p fortran-lsp` — 104 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: module procedure link completions
+
+Ported another fortls completion context into `fortran-lsp`.
+`Workspace::completions_at` now detects `module procedure ...` lines and offers
+only concrete local subroutine/function implementations from the enclosing
+scope. It strips the half-written module-procedure link stub from the active
+scope, excludes imported procedures and variables, and avoids falling back to
+normal broad symbol completion for generic-interface links. Freight needs no
+new LSP wiring because `FortranIndexer::completion` already calls the same
+workspace API. Updated README coverage.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+completions_for_module_procedure_links_offer_local_procedures_only`; full
+`cargo test -p fortran-lsp` — 103 pass; `cargo check -p freight
+--no-default-features` — passes. No commits/pushes.
+
+---
+
 ### 2026-06-15 — Claude — backlog: test flakes, dead cfg, cpu-extensions docs, `workspace graph`
 
 Cleared the small leftovers + one formal TODO (plugins left per request):
@@ -6240,3 +6401,34 @@ e382921, migration/vcpkg.rs FeatureRef) + 1 test.
 Not run: scrape --all-versions (needs full git history, not in a shallow clone)
 and freight-build-all (network per port, very long). Next candidates if we want
 deeper signal.
+
+## 2026-06-18 — Claude: scraper emits workspaces; [patch] engine fix (part 1)
+
+Per user direction, the scraper should emit a buildable freight workspace
+(root freight.toml [workspace]+[patch] + freight.toml per dep), not flat stubs.
+
+Done:
+- vcpkg-converter main 152fcc0: `scrape` now emits a workspace
+  (workspace::emit_workspace) — root [workspace] members + [patch] <dep>={path}
+  per member, one <port>/freight.toml each. Verified on full vcpkg: 2848 members
+  + 2848 patch entries; `freight workspace graph` reads it.
+- freight master a7d3a0b: ENGINE FIX (part 1) — build_foreign_deps now honors
+  [patch] (was iterating raw manifest.dependencies, so a patched dep fell through
+  to pkg-config and errored "dep not found" even after the member built).
+  Now a `[patch] foo={path="foo"}` both builds AND links foo. Verified
+  end-to-end on a native source dep.
+
+KEY FINDING / remaining work:
+- vcpkg port members are foreign: [package] url + build="cmake". But freight's
+  Package struct has NO url/build fields → freight build IGNORES them, so foreign
+  members build nothing. Making the vcpkg workspace actually build needs a 2nd
+  engine piece: [package]-level foreign build (a package that declares url+build
+  gets fetched + foreign-built, like a registry stub does). The patch fix alone
+  makes NATIVE-package workspaces build (e.g. the migrate multi-lib workspace,
+  where members are real source packages).
+- convert→workspace (project + transitive closure) not yet done; needs the same
+  foreign-build support for its vcpkg deps.
+- Note: a freight.toml that is both [package] and [workspace] builds members but
+  NOT the root package (tested) — matters for convert's layout.
+
+Full freight + scraper suites green; clippy clean on touched files.
