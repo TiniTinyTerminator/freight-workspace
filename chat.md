@@ -12,6 +12,92 @@ Guidelines:
 
 ## Log
 
+### 2026-06-18 — Codex — fortran-lsp: preprocessor definition hover
+
+Ported fortls-style hover feedback for active preprocessor definitions.
+`Workspace::hover` now recognizes tokens backed by parsed `#define`
+definitions and returns a Fortran code block showing the macro replacement,
+including function-like macro argument lists. `#undef`-removed definitions do
+not hover. Updated README coverage and added object-like, function-like, and
+undef regressions.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+preprocessor`; full `cargo test -p fortran-lsp` — 123 pass. Freight check not
+rerun this turn; last run still failed in pre-existing adaptor work because
+`foreign_roots` and `build_foreign_member_closure` are referenced in
+`crates/freight/src/adaptors/mod.rs` but are not defined. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: interface host-type import diagnostics
+
+Ported another fortls declared-type diagnostic into `fortran-lsp`. Workspace
+diagnostics now report `Object "T" not imported in interface` when a
+non-abstract interface block uses a host derived type without a matching
+`import`. `import, only:` and interface-local derived types are accepted, and
+abstract interface prototypes keep their existing host-type behavior for
+type-bound procedure compatibility checks. Updated README coverage and added
+valid/invalid regressions.
+
+Tested: `cargo fmt -p fortran-lsp -p freight`; focused `cargo test -p
+fortran-lsp imported_in_interfaces`; focused `cargo test -p fortran-lsp
+accepts_imported_and_interface_local_declared_types`; full `cargo test -p
+fortran-lsp` — 121 pass. `cargo check -p freight --no-default-features` still
+fails in pre-existing adaptor work: `foreign_roots` and
+`build_foreign_member_closure` are referenced in `crates/freight/src/adaptors/mod.rs`
+but are not defined. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: parent-scope masking diagnostics
+
+Ported fortls' parent-scope variable masking warning into `fortran-lsp`.
+The parser now emits a warning when a variable declared in a subroutine,
+function, or block scope masks a variable from an enclosing scope. Derived-type
+members are intentionally skipped to match fortls' member/interface exclusions.
+Updated README coverage and added positive and negative regressions.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+reports_variables_that_mask_parent_scope_variables`; focused `cargo test -p
+fortran-lsp type_members_do_not_report_parent_masking`; full `cargo test -p
+fortran-lsp` — 119 pass; `cargo check -p freight --no-default-features` —
+passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: procedure argument diagnostics
+
+Ported fortls-style subroutine/function argument declaration diagnostics into
+`fortran-lsp`. The parser now tracks declared variables per procedure scope,
+inherits `implicit none` from enclosing scopes, reports undeclared dummy
+arguments when implicit typing is disabled, and reports `intent(...)`
+declarations for variables that are not in the procedure argument list. Updated
+README coverage and added regressions for both diagnostic paths plus the
+implicit-typing allowed case.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+argument`; full `cargo test -p fortran-lsp` — 117 pass; `cargo check -p
+freight --no-default-features` — passes. No commits/pushes.
+
+---
+
+### 2026-06-18 — Codex — fortran-lsp: implicit/import placement diagnostics
+
+Ported two more fortls parser placement diagnostics into `fortran-lsp`.
+Top-level `implicit` statements now report `IMPLICIT statement without
+enclosing scope`, and `import` statements outside interface scopes now report
+`IMPORT statement outside of interface` while still recording the parsed import
+for best-effort mid-edit behavior. Updated README coverage and added valid plus
+invalid placement regressions.
+
+Tested: `cargo fmt -p fortran-lsp`; focused `cargo test -p fortran-lsp
+reports_implicit_without_enclosing_scope`; focused `cargo test -p fortran-lsp
+reports_import_statements_outside_interfaces`; full `cargo test -p
+fortran-lsp` — 115 pass; `cargo check -p freight --no-default-features` —
+passes. No commits/pushes.
+
+---
+
 ### 2026-06-18 — Codex — fortran-lsp: contains diagnostics
 
 Ported fortls-style `contains` parser diagnostics into `fortran-lsp`. The
@@ -6478,3 +6564,31 @@ fetch tarballs for full vcpkg validation.
 So the full chain now works: scrape/convert -> workspace + [patch] -> members are
 foreign [package]s that fetch+foreign-build -> project links them offline.
 Full freight + scraper suites green; clippy clean on touched files.
+
+## 2026-06-18 — Claude: transitive foreign deps build offline (cmake validated)
+
+User added cmake to the env. Validated + completed the foreign-build chain.
+
+freight master da4f372: transitive foreign-dep support.
+- build_foreign_deps collects foreign path/[patch] members as roots, then
+  build_foreign_member_closure discovers their transitive foreign deps
+  (foreign_dep_dir), topo-sorts (topo_order, cycle-tolerant), builds deps-first,
+  feeds each build its deps' install prefixes via CMAKE_PREFIX_PATH
+  (invoke_build_system gained prefix_paths; install_prefix per backend), and
+  returns built libs dependent-first for static link order.
+
+Validated end-to-end WITH cmake:
+- single level: real upstream zlib fetched + cmake-built + linked; consumer
+  prints "zlib 1.3.2" (rc=0).
+- transitive: app -> mid -> base, all foreign cmake via [patch]. base builds;
+  mid's find_library(base) resolves via CMAKE_PREFIX_PATH (saw "found base:
+  .../install/lib/libbase.a"); app links mid+base in order; runs rc=0.
+- discovery (make chain): transitive base now builds (was skipped before).
+
+So the FULL vision now works offline: scrape/convert -> workspace + [patch] ->
+foreign [package] members fetch + foreign-build, including transitive foreign
+deps wired via CMAKE_PREFIX_PATH. Full freight suite green; clippy clean on new code.
+
+Remaining polish (not blocking): non-cmake transitive wiring (make/autotools
+deps consuming a built dep) only gets the install prefix as a path, not
+PKG_CONFIG_PATH/env — cmake (the vcpkg-dominant case) is fully wired.
