@@ -6122,3 +6122,23 @@ CLI (crates/freight master bb90977):
 Limitation (inherent to the chosen method): live checks use the user's stored
 OAuth token, so only users who logged in via that provider can be verified as
 team members. Username/password-only accounts can't be team members.
+
+## 2026-06-18 — Claude: hybrid team credentials (GitLab server-cred, GitHub per-user)
+
+Follow-up to team owners. GitLab per-user OAuth tokens expire in ~2h, so the
+"store once" approach breaks for GitLab (GitHub tokens never expire — crates.io
+only ever supported GitHub, which is why it never hit this). Resolved with a
+hybrid model:
+
+- teams::HttpTeamMembership now prefers a registry-held server credential per
+  provider (FREIGHT_TEAMS_<PROVIDER>_TOKEN) over the user's own token
+  (token_for() selection).
+- AppState.team_server_tokens; main reads the env vars at startup.
+- oauth login callback skips persisting a user token for providers that have a
+  server credential — so for GitLab we store only the user's GitLab id (no token,
+  no refresh logic); GitHub keeps the user's own non-expiring token.
+- Selection is config-driven: any provider can use either model.
+- tests: token_for unit test + integration test (GitLab member verified with no
+  stored user token). Full suite green.
+
+crates/freight-registry main 2865d62. No freight CLI change this turn.
