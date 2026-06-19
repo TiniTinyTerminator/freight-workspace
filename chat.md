@@ -6748,3 +6748,64 @@ Notes: clean single-/multi-source cmake libs migrate+build natively now.
 Rough edges remain for migrate on nested-subdir projects (jsoncpp emitted a
 workspace whose root failed plain `freight build`) — separate migrate-hardening.
 Full freight suite green; clippy clean.
+
+### 2026-06-19 — Codex — freight lsp: native Fortran workspace symbols
+
+Added workspace-wide symbol search to the embedded Fortran path. `fortran-lsp`
+now exposes `Workspace::workspace_symbols(query)` over indexed files, matching
+plain and qualified names and returning a stable sorted symbol list. Freight's
+native Fortran indexer maps that into LSP `SymbolInformation[]`, advertises
+`workspaceSymbolProvider` when native Fortran or clang-bridge backends are
+active, and handles `workspace/symbol` by aggregating native indexers instead of
+using any fortls passthrough.
+
+Tested: `cargo test -p fortran-lsp`; `cargo check -p freight --no-default-features`;
+plus focused freight/fortran-lsp workspace-symbol tests. Not committed or pushed.
+
+### 2026-06-19 — Codex — freight lsp: native Fortran selection ranges
+
+Added `textDocument/selectionRange` to the embedded Fortran path. `fortran-lsp`
+now exposes `Workspace::selection_range(path, pos, source)` and returns nested
+ranges from the identifier under the cursor up through enclosing Fortran scopes,
+with a zero-width cursor fallback so LSP responses preserve one result per
+requested position. Freight's native Fortran indexer maps that into LSP
+`SelectionRange` objects, advertises `selectionRangeProvider`, and routes the
+request through the shared native indexer interface.
+
+Tested: `cargo test -p fortran-lsp`; `cargo check -p freight --no-default-features`;
+focused `cargo test -p freight --no-default-features fortran_indexer_serves_selection_ranges`;
+focused `cargo test -p freight --no-default-features native_fortran_advertises_selection_ranges`.
+Not committed or pushed.
+
+### 2026-06-19 — Codex — freight lsp: native Fortran implementation lookup
+
+Ported fortls-style `textDocument/implementation` for the embedded Fortran path.
+`fortran-lsp` now exposes `Workspace::implementation_location(path, pos, source)`
+for type-bound method declarations/member calls and for module-procedure
+interface prototypes that should jump to submodule implementations. Freight's
+native Fortran indexer maps that to LSP `Location`, advertises
+`implementationProvider`, and routes `textDocument/implementation` through the
+shared indexer interface.
+
+Also fixed a stale Freight field access in `apply_sanitize_override`
+(`profile.debug`, not removed `profile.dev`) that blocked `cargo check` against
+the current manifest types.
+
+Tested: `cargo test -p fortran-lsp`; `cargo check -p freight --no-default-features`;
+focused `cargo test -p freight --no-default-features fortran_indexer_serves_implementation_locations`;
+focused `cargo test -p freight --no-default-features native_fortran_advertises_implementations`.
+Not committed or pushed.
+
+## 2026-06-19 — Claude: renamed default profile dev -> debug
+
+crates/freight master 6a5cc7f: the default build profile is now `debug`
+(output → target/debug/, matching cmake's Debug config name).
+- Profiles.dev field -> `debug` with #[serde(alias = "dev")]; legacy
+  [profile.dev] manifests still parse, and "dev" still resolves as a profile name.
+- Flipped all default-profile literals (build/run/test/install/watch/publish/
+  dap/lsp/check/pipeline), target/<profile> dir, scaffolding + lsp snippets,
+  docs, example manifests, and integration-test path assertions.
+- Left metadata's dependency *kind* "dev" (dev-dependencies) untouched.
+Verified: `freight build` -> target/debug/, --release -> target/release/, a
+legacy [profile.dev] manifest still builds. Full suite green (0 failures x2),
+clippy unchanged.
