@@ -12,6 +12,25 @@ Guidelines:
 
 ## Log
 
+### 2026-06-19 — Codex — freight lsp: native Fortran semantic tokens
+
+Made Freight serve native Fortran semantic tokens without requiring the
+clang-bridge backend. `freight_capabilities(false, true)` now advertises
+Freight's semantic-token legend, `handle_semantic_tokens` answers from native
+indexers directly, and it returns `null` instead of forwarding clangd semantic
+tokens under the wrong legend. Added regressions for the advertised legend and
+for `FortranIndexer::semantic_tokens` returning LSP-encoded token data from a
+live Fortran buffer.
+
+Tested: `cargo fmt -p freight -p fortran-lsp`; focused `cargo test -p freight
+--no-default-features fortran_indexer_serves_semantic_tokens`; focused `cargo
+test -p freight --no-default-features
+native_fortran_advertises_freight_semantic_token_legend`; focused `cargo test
+-p fortran-lsp semantic_tokens`; full `cargo test -p fortran-lsp` — 125 pass;
+`cargo check -p freight --no-default-features` — passes. No commits/pushes.
+
+---
+
 ### 2026-06-18 — Codex — freight lsp: remove fortls passthrough
 
 Flipped Freight's Fortran LSP integration to the embedded Rust library path.
@@ -6706,3 +6725,26 @@ Verified zero-cmake builds of real header-only vcpkg ports:
 So header-only ports (a big slice of vcpkg) convert to freight projects that
 build entirely with freight's toolchain. cmake/make ports still foreign-build.
 Full freight + scraper suites green; clippy clean.
+
+## 2026-06-19 — Claude: cmake libraries built natively by freight (no cmake)
+
+User: build a library that used cmake, now with just freight. Did it via
+`freight migrate cmake` -> native freight.toml -> `freight build` (freight's own
+compiler, zero cmake).
+
+freight master ab542c9 (two enabling fixes):
+- discover auto-detects include/ (alongside inc/) — most cmake libs put public
+  headers there.
+- [lib].srcs optional: a lib with no srcs compiles from auto-discovered src/
+  (handles file(GLOB) sources); validation relaxed.
+
+Verified, no cmake invoked (no .freight-build dir):
+- tinyxml2 (real cmake lib): migrate -> build -> libtinyxml2.a + xmltest; ran
+  xmltest -> 528/528 pass, rc=0.
+- yaml-cpp (cmake, 32 sources, include/ layout): migrate -> build compiles all
+  src/**/*.cpp -> libyaml_cpp.a; consumer parses YAML (name=freight libs=2, rc=0).
+
+Notes: clean single-/multi-source cmake libs migrate+build natively now.
+Rough edges remain for migrate on nested-subdir projects (jsoncpp emitted a
+workspace whose root failed plain `freight build`) — separate migrate-hardening.
+Full freight suite green; clippy clean.
