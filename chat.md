@@ -6796,6 +6796,43 @@ focused `cargo test -p freight --no-default-features fortran_indexer_serves_impl
 focused `cargo test -p freight --no-default-features native_fortran_advertises_implementations`.
 Not committed or pushed.
 
+### 2026-06-19 — Codex — fortran-lsp: fortls differential harness
+
+Added `scripts/fortran_lsp_compare.py`, a JSON-RPC differential harness that
+starts Freight's embedded Fortran LSP path and fortls on the same deterministic
+fixture, then compares normalized responses for hover, definition,
+implementation, references, signature help, document symbols, and workspace
+symbols. This is the first concrete piece of the remaining fortls parity TODO;
+it is intentionally external-tool dependent and does not reintroduce a fortls
+passthrough into Freight.
+
+Also updated `scripts/lsp_hints_compare.py` for the current LSP CLI shape:
+removed the stale `--no-fortls` flag and changed the hidden compile DB path from
+`.freight/lsp/dev` to `.freight/lsp/debug`.
+
+Tested: `python3 -m py_compile scripts/fortran_lsp_compare.py scripts/lsp_hints_compare.py`;
+`cargo build -p freight --no-default-features`; ran
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight`, which
+now starts Freight but exits cleanly with fortls' missing Python dependency:
+`ModuleNotFoundError: No module named 'json5'` from `/tmp/fortls-reference`.
+Not committed or pushed.
+
+### 2026-06-19 — Codex — fortran-lsp: differential diagnostics coverage
+
+Expanded `scripts/fortran_lsp_compare.py` with a broken Fortran fixture and
+diagnostic notification capture. The harness now verifies that both Freight's
+embedded Fortran path and fortls publish an unresolved-module diagnostic over
+`textDocument/publishDiagnostics`, while still comparing hover, definition,
+implementation, references, signature help, and symbol checkpoints.
+
+Updated `crates/fortran-lsp/TODO.md` to reflect that the harness runs locally
+with lightweight fortls dependency shims; the remaining differential work is to
+grow beyond synthetic fixtures into real projects.
+
+Tested: `python3 -m py_compile scripts/fortran_lsp_compare.py`; `python3
+scripts/fortran_lsp_compare.py --freight target/debug/freight`.
+Removed generated `scripts/__pycache__`. Not committed or pushed.
+
 ## 2026-06-19 — Claude: renamed default profile dev -> debug
 
 crates/freight master 6a5cc7f: the default build profile is now `debug`
@@ -6809,3 +6846,48 @@ crates/freight master 6a5cc7f: the default build profile is now `debug`
 Verified: `freight build` -> target/debug/, --release -> target/release/, a
 legacy [profile.dev] manifest still builds. Full suite green (0 failures x2),
 clippy unchanged.
+
+### 2026-06-19 — Codex — fortran-lsp: module procedure export parity
+
+Continued the embedded `fortran-lsp` work by making interface-contained
+`module subroutine`/`module function` prototypes visible through `use ..., only:`
+resolution. This fixes hover, definition, references, and signature help for
+calls like `call axpy(...)` when `axpy` is declared in a module interface and
+implemented in a submodule. Signature help now formats those prototypes as a
+call label (`axpy(a, x, y)`) while hover keeps the full Fortran declaration.
+
+Cleaned up `scripts/fortran_lsp_compare.py` so it runs against the local
+`/tmp/fortls-reference` checkout with lightweight dependency shims and compares
+semantic checkpoints instead of raw protocol shape. The harness now passes for
+the core fixture and records known divergences separately: Freight intentionally
+keeps richer document/workspace symbols and `definition` on a submodule
+implementation still points to the ancestor prototype while `implementation`
+points back to the body.
+
+Tested: `cargo test -p fortran-lsp`; `cargo build -p freight --no-default-features`;
+`python3 -m py_compile scripts/fortran_lsp_compare.py`; `python3
+scripts/fortran_lsp_compare.py --freight target/debug/freight`.
+Not committed or pushed.
+
+## 2026-06-19 — Claude: fully implemented native asm-lsp (/goal)
+
+Goal: fully implement asm-lsp. The AsmIndexer (src/lsp/indexers/Asm.rs, GAS+NASM)
+already had symbols/definition/references/hover/completion/folding/diagnostics +
+cross-file .include resolution + per-arch instruction/register/directive hover.
+Filled the remaining LanguageIndexer methods (were defaulting to None):
+
+freight master 19f4c43:
+- semantic_tokens: labels->function, constants->enumMember, macros->macro, delta-
+  encoded under semantic_tokens_legend(); resolves names across the include
+  closure; instructions/registers left to the client grammar.
+- rename: symbol + all refs across the .include closure; rejects invalid idents.
+- document_highlight: occurrences of symbol under cursor (def=Write, use=Read).
+- workspace_symbols: substring filter over all parsed/included asm files.
+- selection_ranges: identifier nested in its line.
+
+Capabilities already advertised (freight_capabilities passes use_native_fortran=
+true unconditionally, which gates semanticTokens/rename/documentHighlight/
+workspaceSymbol/selectionRange), so no wiring change needed — dispatch in
+mod.rs already routes these to the indexers. 1 new test covering all five; 17 asm
+tests pass; full freight suite green (0 failed); clippy clean. Updated Asm.rs
+module doc + TODO.md (removed the "semantic tokens deferred" item).
