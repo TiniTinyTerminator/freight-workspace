@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/freight",
+    "crates/freight-migrate",
     "crates/freight-registry",
     "crates/vcpkg-converter",
     "crates/cmake-lossless",

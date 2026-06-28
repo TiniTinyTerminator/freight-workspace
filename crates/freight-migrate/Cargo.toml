@@ -1,0 +1,26 @@
+[package]
+name = "freight-migrate"
+version = "0.1.0"
+edition = "2021"
+description = "Migrate foreign (CMake) C/C++ projects into freight manifests — a separate tool, decoupled from the freight build engine."
+license = "MIT"
+
+[lib]
+name = "freight_migrate"
+path = "src/lib.rs"
+
+[[bin]]
+name = "freight-migrate"
+path = "src/main.rs"
+
+[dependencies]
+freight     = { path = "../freight" }
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+glob        = "0.3"
+walkdir     = "2"
+clap        = { version = "4", features = ["derive"] }
+anyhow      = "1"
+
+[dev-dependencies]
+tempfile = "3"
