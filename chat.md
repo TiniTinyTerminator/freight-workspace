@@ -79,6 +79,38 @@ output, declared-type cascades from unresolved modules, unresolved generic
 call-shape cascades such as `load_from_toml`/`has_cpp`, and diagnostic policy
 differences around variable masking. Not committed or pushed.
 
+Fourth follow-up: fixed member-call receiver extraction for array components
+such as `self%variants(i)%has_cpp()` and
+`self%dependency(jj)%load_from_toml(...)`, so those no longer fall back to
+direct procedure-call validation. Added parser support for `enumerator`
+declarations as public parameter-like symbols and fixed free-form continuation
+detection when an inline comment follows the trailing `&`; together these remove
+the fpm `fpm_compiler` enum/flag export false positives.
+
+Retested: focused regressions, `cargo fmt -p fortran-lsp`, `cargo test -p
+fortran-lsp` (204 tests), `cargo build -p freight`, and the fpm 80-file
+differential command above. The fpm diff no longer contains `load_from_toml`,
+`has_cpp`, `fpm_compiler does not export id_*`, or `flag_gnu_openmp`
+diagnostics. Remaining differences are dominated by partial-project
+unresolved-module reporting, declared-type cascades from unresolved modules, and
+fortls/native variable-masking policy differences. Not committed or pushed.
+
+Fifth follow-up: fixed derived-type resolution through public module
+re-exports. `find_type_for_symbol` now follows `use ..., only:` chains from an
+API module to the implementation module that declares the type, which removes
+fpm's `package_config_t`, `dependency_config_t`, `serializable_t`, and
+`fortran_config_t` declared-type cascades. Added a focused regression for a
+public re-exported derived type. I also tried broadening partial-module
+unresolved reporting for `only:` imports, but it overreported badly on fpm and
+was backed out; do not revive that rule without a narrower discriminator.
+
+Retested: focused re-export regression, `cargo fmt -p fortran-lsp`, `cargo test
+-p fortran-lsp` (205 tests), `cargo build -p freight`, and the fpm 80-file
+differential command above. The fpm diff now has no declared-type cascade
+diagnostics. Remaining differences are mostly which partial modules each server
+reports as unresolved plus fortls/native variable-masking policy differences.
+Not committed or pushed.
+
 ### 2026-06-29 — Codex — fortran-lsp: full stdlib parity
 
 Expanded the `fortran-lang/stdlib` project differential from 220 files to the
@@ -8084,3 +8116,74 @@ provider, and `cmake_export` (`<Name>Config.cmake`+`.pc`), plus the end-to-end
 compose example. The toolchain file was undocumented except for one config line.
 Cross-linked from manifest-reference.md (new "Generated toolchain file" para),
 README docs table, roadmap. All anchors verified. Docs only; not committed.
+
+## 2026-06-29 — CMake interop testing + path-dep provider fix (Claude)
+
+Live end-to-end testing of the CMake interop story (via the freight binary, not
+cargo test — fortran-lsp working tree was transiently broken again):
+
+- **Toolchain file** ✓ — `build = "cmake"` self-build generates
+  `Freight.toolchain.cmake` with detected compilers + `CMAKE_CXX_FLAGS_INIT`
+  `-include cstdint` (from `~/.freight/config.toml cmake-cxx-flags`); CMakeCache
+  confirms `CMAKE_TOOLCHAIN_FILE` passed and the flag propagated.
+- **Provider + foreign dep** ✓ — app `find_package(jsonlike)` resolved via
+  `.pkgs/`; app linked + ran (exit 0), `jsonlike_DIR` → freight's built prefix.
+- **Native export** ✓ — freight-native `greet` lib exported as
+  `greetConfig.cmake` (`greet::greet`); foreign app linked + ran.
+
+**Bug found + fixed**: `provide_cmake_package` (pipeline.rs) only looked under
+`project_dir/.pkgs/<name>/` — it never consulted the parent manifest, so a
+`{ path = "../greet" }` freight dependency failed `find_package(greet)` (no
+Config.cmake). Added `manifest_path_dep_dir()`: resolves a `path` dep from the
+parent manifest to its source dir before falling back to `.pkgs/`. Now a foreign
+CMake consumer can `find_package` a sibling freight library by path (local dev /
+workspaces). New regression test `provider_resolves_native_path_dependency` in
+tests/cmake_provide.rs. All 4 cmake interop tests pass (cmake_provide ×3,
+foreign_self ×1). Doc + CHANGELOG updated. Binary rebuilds clean; clippy adds no
+new warnings. NOT committed — awaiting user.
+
+## 2026-06-29 — fortran-lsp fpm parity cleanup (Codex)
+
+Continued the native Fortran LSP port against the `/tmp/freight-fpm-fixture`
+80-file differential. Fixed several fpm-specific false positives while keeping
+the rules narrow:
+
+- derived-type lookup now follows public module re-export chains, removing
+  declared-type cascades for re-exported manifest/config types;
+- variable masking checks distinguish actual type members by source range and
+  avoid treating aliased type-bound binding names as parent variables;
+- generic constructor interface procedures such as `new_build_progress` no
+  longer look like type members;
+- `command_argument_count()` is accepted as an intrinsic with no required
+  arguments.
+
+Validation: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (210 tests),
+and `cargo build -p freight` all pass. The fpm 80-file differential still exits
+1, but the remaining diff is now mostly unresolved-module reporting policy:
+fortls reports more unresolved local modules in this partial-project slice than
+the native indexer currently does. The prior Freight-side call-shape false
+positives for `c_opendir`, `c_closedir`, and `get_dos_path` are gone. Not
+committed.
+
+## 2026-06-29 — Big-library CMake interop testing + --jobs overload fix (Claude)
+
+Tested real CMake libraries via `build = "cmake"` self-builds with `--jobs 2`:
+fmt 10.2.1 ✓, yaml-cpp 0.8.0 ✓, spdlog 1.14.1 ✓, abseil 20240722 (in progress,
+150+ libs, load avg ~2.3). All link the generated toolchain file + cstdint shim.
+
+**Bug found + fixed (overload)**: the bundled cmake/meson/autotools plugins ran
+`cmake --build --parallel` (no count → all cores), `meson compile` (ninja → all
+cores), and `make -j` (UNBOUNDED), so `--jobs N` never limited foreign sub-builds.
+fmt with `--jobs 2` was running at ~7 cores. Fix: added a `JOBS` scope constant
+(`rayon::current_num_threads()`) to the plugin env (both run_build_system +
+run_plugin_script), and threaded it through cmake (`--parallel JOBS`), meson
+(`--jobs JOBS`), autotools (`-j JOBS`). make.freight left serial (adding -j risks
+non-parallel-safe Makefiles). After fix, fmt --jobs 2 ran at ~1.8 cores; abseil at
+load ~2.3. Files: src/build/plugin.rs, plugins/{cmake,meson,autotools}/*.freight.
+Doc'd JOBS in manifest-reference plugin-constants table; CHANGELOG Fixed entry.
+
+**Real-world gotchas observed** (not freight bugs): (1) CMake 4.x rejects
+`cmake_minimum_required < 3.5` — many older libs (yaml-cpp, spdlog, abseil) need
+`-DCMAKE_POLICY_VERSION_MINIMUM=3.5` (passed via `[package].defines`). Candidate
+for a freight default. (2) abseil's date version `20240722.0` isn't semver — freight
+requires major.minor.patch (`20240722.0.0`). NOT committed — awaiting user.
