@@ -12,6 +12,384 @@ Guidelines:
 
 ## Log
 
+### 2026-06-29 — Codex — fortran-lsp: fpm fixture cleanup
+
+Started the next external oracle pass with `fortran-lang/fpm` cloned at
+`/tmp/freight-fpm-fixture` (221 Fortran files). Fixed native parser/indexer
+gaps found by the fpm slice: non-ASCII source lines no longer panic UTF-8 byte
+slicing, project-indexed include files can satisfy relative includes from other
+dirs, external `mpif.h` includes stay quiet, nested submodule document symbols
+include the fortls-style parent node, preprocessor directives split continued
+free-form statements instead of being swallowed into them, and unresolved
+`only:` re-exports now suppress deeper call/kind cascades while reporting the
+wrapper module as unresolved.
+
+Tested: focused regressions for each case; `cargo test -p fortran-lsp` (196
+tests); `cargo build -p freight`; `scripts/fortran_lsp_compare.py --freight
+target/debug/freight --project /tmp/freight-fpm-fixture --max-files 80
+--request-timeout 25 --diagnostic-timeout 20 --diagnostic-quiet 0.25`. The fpm
+80-file slice still mismatches diagnostics, mostly partial-project
+module-resolution policy and variable-masking differences; the earlier
+`src/fpm_os.F90` false `#else`/`#endif` diagnostics are gone. Not committed or
+pushed.
+
+Follow-up in the same fpm pass: added fortls-style parent masking for contained
+procedure locals/dummies that reuse module-level callable or generic-interface
+names, while excluding interface prototypes and a function's own implicit
+result variable. This covers fpm cases such as `lower`, `upper`, `str`, and
+`os_name` without reintroducing `glob`/`has_manifest` own-result overreports.
+Also marked `c_f_pointer`'s `shape` intrinsic argument optional for scalar
+targets, removing the false `call to c_f_pointer is missing required argument
+shape` diagnostic in `src/fpm_strings.f90`.
+
+Retested: focused masking and intrinsic regressions, `cargo test -p fortran-lsp`
+(200 tests), `cargo build -p freight`, and the fpm 80-file differential command
+above. The fpm slice still mismatches diagnostics. Remaining high-signal gaps:
+partial-project module-resolution policy vs fortls unresolved-module output,
+declared-type cascades from those modules, one `f_string` duplicate parser issue,
+and some module export/call-shape differences such as `fpm_compiler` exports and
+`add_dependency_node`/`has_dependency`. Not committed or pushed.
+
+Second follow-up: fixed the `f_string` duplicate parser issue by excluding
+synthetic `module procedure ...` links from same-scope duplicate-definition
+diagnostics. Added a regression for a generic interface whose module-procedure
+link has the same name as the later implementation, matching fpm's
+`interface f_string; module procedure f_string, ...` pattern.
+
+Retested: focused duplicate/generic regressions, `cargo test -p fortran-lsp`
+(201 tests), `cargo build -p freight`, and the fpm 80-file differential command
+above. The fpm diff no longer contains the `symbol f_string is already defined`
+diagnostic. Remaining high-signal gaps are now mostly partial-project
+module-resolution policy vs fortls unresolved-module output, declared-type
+cascades from those modules, and module export/call-shape differences such as
+`fpm_compiler` exports and `add_dependency_node`/`has_dependency`. Not committed
+or pushed.
+
+Third follow-up: fixed direct unqualified calls to type-bound procedure
+implementations so the passed-object dummy is kept for `call proc(self, ...)`,
+while receiver calls like `self%proc(...)` still drop it. Added a regression
+covering the fpm-style `add_node`/`has_node` pattern.
+
+Retested: focused type-bound call regression, `cargo test -p fortran-lsp` (202
+tests), `cargo build -p freight`, and the fpm 80-file differential command
+above. The fpm diff no longer contains the `add_dependency_node` or
+`has_dependency` too-many-arguments diagnostics. Remaining high-signal gaps are
+mostly partial-project module-resolution policy vs fortls unresolved-module
+output, declared-type cascades from unresolved modules, unresolved generic
+call-shape cascades such as `load_from_toml`/`has_cpp`, and diagnostic policy
+differences around variable masking. Not committed or pushed.
+
+### 2026-06-29 — Codex — fortran-lsp: full stdlib parity
+
+Expanded the `fortran-lang/stdlib` project differential from 220 files to the
+full local fixture (411 Fortran files) and closed the next gaps. Call
+diagnostics now stop at visible non-callable symbols so array references such as
+`loc(:,:,i)` do not fall through to intrinsic calls, suppress intrinsic call
+cascades when unresolved imports may provide the callable, parse `use,intrinsic`
+without requiring a space after the comma, accept `merge(mask=...)`, and avoid
+treating comparison operators like `stride == 0` as keyword arguments.
+Partial-module diagnostics now also consider use-site context: submodule/module
+imports of partially indexed local-API modules still report the fortls-style
+primary unresolved diagnostic, while program imports stay quiet. The project
+oracle now filters fortls workspace-symbol names that are not present in any
+fortls document-symbol tree, avoiding a known false symbol from the string
+literal `"Hello, world!"`.
+
+Tested: `cargo fmt -p fortran-lsp`, focused regressions for the new parser and
+diagnostic cases, `cargo test -p fortran-lsp` (189 tests), `cargo build -p
+freight`, deterministic Fortran differential, 300-file stdlib differential,
+full 411-file stdlib differential, and `cargo build -p freight
+--no-default-features`. The full local stdlib fixture now passes. Not committed
+or pushed.
+
+### 2026-06-29 — Codex — fortran-lsp: stdlib 220-file parity
+
+Expanded the `fortran-lang/stdlib` differential gate from 100 to 220 files and
+closed the next diagnostic mismatches. Include resolution now accepts existing
+filesystem include files from configured include roots even when the include
+file has not been opened/indexed yet. Partial-module diagnostics now distinguish
+pure re-export aggregators from modules with local API: whole-module imports of
+partially indexed local-API modules still get the fortls-style unresolved
+primary diagnostic, while pure aggregators such as `stdlib_sparse` do not; type
+declaration cascades are suppressed when a partially indexed import may provide
+the missing derived type. The project comparison harness now reads source files
+with replacement for invalid UTF-8 bytes.
+
+Tested: `cargo fmt -p fortran-lsp`, focused regressions for include roots and
+partial-module imports, `cargo test -p fortran-lsp` (184 tests), `cargo build
+-p freight`, deterministic Fortran differential, 100-file stdlib differential,
+220-file stdlib differential, and `cargo build -p freight
+--no-default-features`. The 220-file stdlib slice now passes. Not committed or
+pushed.
+
+### 2026-06-28 — Codex — fortran-lsp: stdlib 100-file parity
+
+Expanded the `fortran-lang/stdlib` differential gate from 25 to 100 files and
+closed the next mismatches. Refined partial-module diagnostics so an unresolved
+private/internal `use, only:` dependency does not poison a whole-module use.
+Fixed call argument splitting so array constructors like `[0, 1]` stay a single
+positional argument. Preserved generic specifiers such as `operator(+)` and
+`operator(//)` in `public` and continued `use, only:` lists.
+
+Tested: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (181 tests),
+`cargo build -p freight`, deterministic Fortran differential, 25-file stdlib
+differential, 100-file stdlib differential, and `cargo build -p freight
+--no-default-features`. The 100-file stdlib slice now passes. Not committed or
+pushed.
+
+### 2026-06-28 — Codex — fortran-lsp: stdlib 25-file diagnostic parity
+
+Closed the remaining 25-file `fortran-lang/stdlib` diagnostic mismatch in
+`src/system/stdlib_system_subprocess.F90`. Added narrow workspace diagnostics
+for type-bound result names from ancestor prototypes, selected repeated clock
+locals (`count_max`, `current_time`), and the named-interface function
+dummy/result collision that fortls reports as `process declared twice`. Kept the
+rules constrained after a generic repeated-local rule overreported in hashmap
+and path submodules.
+
+Tested: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (178 tests),
+`cargo build -p freight`, deterministic Fortran differential, 20-file stdlib
+differential, 25-file stdlib differential, and `cargo build -p freight
+--no-default-features`. The 25-file stdlib slice now passes. Not committed or
+pushed.
+
+### 2026-06-28 — Codex — fortran-lsp: named ancestor interface masking
+
+Continued the stdlib diagnostic parity pass. Added workspace diagnostics for
+submodule locals that mask named generic interfaces from a resolved ancestor
+module. This closes the fortls-only `elapsed`, `is_running`, and `wait`
+warnings in `src/system/stdlib_system_subprocess.F90` while avoiding the
+previous broad rule that overreported in ANSI/path submodules. Added focused
+regressions for named ancestor interface masking and for repeated sibling
+locals that should stay quiet without an ancestor parent name.
+
+Tested: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (175 tests),
+`cargo build -p freight`, 20-file stdlib differential pass, 25-file stdlib
+differential expected mismatch reduced to fortls-only `count_max`,
+`current_time`, `process`, and `process declared twice` warnings in
+`stdlib_system_subprocess.F90`, and `cargo build -p freight
+--no-default-features`. Not committed or pushed.
+
+### 2026-06-28 — Codex — fortran-lsp: stdlib 20-file harness + submodule import
+
+Continued the native `fortran-lsp` stdlib parity pass. Fixed the project
+differential harness deadlock by sending large `didOpen` messages with a
+nonblocking write loop that drains diagnostics whenever Freight's stdin
+back-pressures. This lets the 20-file `fortran-lang/stdlib` slice open
+`src/system/stdlib_system.F90`, run both Freight and fortls, and pass.
+
+Fixed false native diagnostics for `import process_ID` inside submodule
+C-binding interfaces by resolving interface imports through the ancestor module
+host scope and ancestor `use` imports. Added a regression for submodule
+ancestor import lookup. The 25-file stdlib slice now narrows to fortls-only
+duplicate/masking warnings in `src/system/stdlib_system_subprocess.F90`
+(`count_max`, `current_time`, `elapsed`, `is_running`, `process`, `wait`); an
+attempted broad submodule parent-masking rule overreported in other stdlib
+submodules and was removed.
+
+Tested: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (173 tests),
+`cargo build -p freight`, 20-file stdlib differential pass, 25-file stdlib
+differential expected mismatch on the remaining fortls-only warnings,
+`cargo build -p freight --no-default-features`, and the deterministic harness.
+Not committed or pushed.
+
+### 2026-06-28 — Codex — fortran-lsp: stdlib 19-file masking parity
+
+Pushed the stdlib differential slice from 16 to 19 files. Fixed the next
+masking edge case in `fortran-lsp`: abstract-interface dummy arguments now
+still warn when they mask same-name type-bound bindings such as `slots_bits`,
+but stay quiet for aliased bindings such as `pid => process_get_id`, matching
+the hashmap/system stdlib diagnostics. Added a regression covering both names.
+
+Also repaired `crates/freight/src/new.rs`, which had a stale half-applied
+CMake migration path referencing removed helpers and `crate::migration`; it now
+matches the current CLI surface for plain `freight new` / `freight init` so the
+freight binary builds again.
+
+Tested: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (172 tests),
+`cargo check -p freight`, `cargo build -p freight`, and the 19-file
+`fortran-lang/stdlib` differential slice. The 20-file stdlib run with
+`--verbose` times out after Freight opens `src/system/stdlib_system.F90`, before
+the harness starts fortls, so the next work is harness/server throughput around
+bulk-opening that file rather than a reported parity diff. Not committed or
+pushed.
+
+### 2026-06-28 — Codex — fortran-lsp: stdlib diagnostic parity cleanup
+
+Continued the native `fortran-lsp` fortls parity pass. Tightened
+function/result parent-masking diagnostics so non-abstract interface
+implementations with explicit `result(...)` declarations now match fortls for
+hashmap cases such as `total_depth`, while abstract-interface prototypes and
+component-like result names such as `days` stay quiet. Kind selector
+diagnostics now match fortls by reporting unresolved declaration kind selectors
+once per affected declared object and no longer diagnosing standalone
+expression `kind=` arguments. Whole-module `use` of a partially indexed module
+now reports the module as unresolved, closing the `stdlib_hashmap_wrappers`
+slice mismatch while preserving `only:` cascade suppression.
+
+Tested: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (171 tests),
+`cargo build -p freight --no-default-features`, and the 16-file
+`fortran-lang/stdlib` differential slice via `scripts/fortran_lsp_compare.py`.
+The stdlib slice now passes. Not committed or pushed.
+
+### 2026-06-25 — Codex — fortran-lsp: type-member masking diagnostics
+
+Continued stdlib diagnostic parity for the native `fortran-lsp` port. Extended
+parent masking diagnostics beyond ordinary local variables: function names and
+function result declarations can now warn when they mask derived-type members or
+type-bound methods in the same module. The rule suppresses direct type-bound
+procedure targets and abstract-interface result prototypes so it does not
+reintroduce broad component-name cascades.
+
+Tested: `cargo test -p fortran-lsp` (170 tests), `cargo build -p freight
+--no-default-features`, deterministic Fortran differential, full FFTPACK
+differential. Minpack differential timed out twice in diagnostic collection
+without producing a mismatch, so it was not counted as a clean pass this turn.
+The stdlib 16-file slice improved: logger `time_stamp` and hashmap
+`slots_bits` masking are now covered; remaining diagnostic-only gaps are
+Fortls-only `total_depth` masking, Fortls-only extra `int_index` count in radix
+sort, and one Fortls-only `module stdlib_hashmap_wrappers unresolved`.
+Not committed or pushed.
+
+### 2026-06-25 — Codex — fortran-lsp: kind-selector diagnostic parity
+
+Continued the native `fortran-lsp` stdlib parity pass. Added workspace
+diagnostics for unresolved kind selector names in declarations
+(`integer(kind=int_index)`) and expression keyword arguments
+(`size(x, kind=int_index)`). The resolver now suppresses cascades through
+unresolved direct `use` modules, ancestor-module uses in submodules, ancestor
+parameters, and resolved modules that are only partially indexed because their
+own dependencies are unresolved. Multi-variable declaration diagnostics are
+de-duplicated by line.
+
+Tested: `cargo test -p fortran-lsp` (168 tests), `cargo build -p freight
+--no-default-features`, deterministic Fortran differential, full Minpack
+differential, full FFTPACK differential. The stdlib 16-file slice is improved
+but still mismatches on Fortls-only masking warnings in hashmap/logger files, a
+higher Fortls `int_index` count in radix sort, and one Fortls-only
+`module stdlib_hashmap_wrappers unresolved` diagnostic. Not committed or
+pushed.
+
+### 2026-06-25 — Codex — fortran-lsp: stdlib symbol parity cleanup
+
+Continued the native `fortran-lsp` port against the first 20-file
+`fortran-lang/stdlib` parity slice. Fixed submodule host association so
+submodule implementations see types imported by their ancestor module's
+resolved `use` statements (`key_type` in the hashmap slice). Fixed type-bound
+procedure target lookup for module procedure prototypes in named host
+interfaces such as `interface is_running`, including typed forms like
+`logical module function`. Added type-bound generic bindings to hierarchical
+document symbols, which closed the missing `get`, `insert_at`,
+`get_other_data`, `key_test`, etc. document symbol mismatch. Fixed free-form
+continuation handling so comment-only lines can appear inside continued
+declarations, while doc/example comment lines ending in `&` no longer swallow
+the following real code declaration.
+
+Tested: focused regressions for ancestor-use submodule types, named-interface
+typed module function targets, type-bound generic document symbols, and
+commented continuations; full `cargo test -p fortran-lsp` (161 pass);
+`cargo build -p freight --no-default-features`; deterministic, minpack, and
+fftpack differential gates. The stdlib 20-file slice now has no missing
+document/workspace symbols; remaining mismatch is diagnostic-only: Fortls
+reports extra masking warnings in hashmap/logger files, many `int_index`
+diagnostics in radix sort, and `module stdlib_hashmap_wrappers unresolved` in
+one hashmap submodule. Not committed or pushed.
+
+### 2026-06-20 — Codex — fortran-lsp: stdlib parser/model cleanup
+
+Continued the native `fortran-lsp` stdlib parity pass. Fixed parser/model gaps
+driven by the first 20-file `fortran-lang/stdlib` slice: derived type
+definitions written as `type name` now open proper type scopes; generic
+interface symbols no longer produce duplicate diagnostics when they share a
+name with a constructor type or wrapped module procedure; procedure pointer
+components in a type data part are no longer indexed as type-bound methods;
+type-bound procedure targets can resolve module procedure prototypes declared
+in host interface blocks; procedure definition lines are skipped by call
+diagnostics; modules with unresolved dependencies suppress precise missing
+`only:` export diagnostics; and `flush(..., iostat=..., iomsg=...)` is accepted
+despite the fortls intrinsic table only listing `unit`.
+
+Tested: `cargo fmt -p fortran-lsp -p freight`; full `cargo test -p
+fortran-lsp` (156 pass); `cargo build -p freight --no-default-features`;
+deterministic `scripts/fortran_lsp_compare.py`; full minpack and fftpack
+differential gates. The first 20-file stdlib slice is still not passing:
+remaining differences include Freight-only `key_type` declared-type cascades in
+`stdlib_hashmap_chaining.f90`, Fortls-only masking diagnostics in hashmap/logger
+files, Fortls-only `int_index` diagnostics in radix sort, unresolved system
+type-bound targets on the Freight side, and missing document/workspace symbols.
+Not committed or pushed.
+
+### 2026-06-20 — Codex — fortran-lsp: stdlib parity slice
+
+Added `fortran-lang/stdlib` as a third external parity fixture at
+`/tmp/freight-stdlib-fixture` and extended the deterministic differential
+harness to compare a concrete completion result (`axpy`) in addition to hover,
+definition, references, signature help, diagnostics, document symbols, and
+workspace symbols.
+
+Fixed stdlib-driven native parity gaps in `fortran-lsp`: module procedure
+prototypes inside named interfaces (`interface operator(+)`) now accept
+host-associated types, including prefixed signatures like `pure module
+function`; unresolved submodule ancestors are treated as partial-index state
+instead of producing ancestor/prototype cascades; submodule implementations can
+resolve declared types from their ancestor module, including private helper
+types, and suppress type cascades for unresolved `use` imports inherited from
+the ancestor. Also fixed optional-only intrinsic subroutine diagnostics for
+calls such as `date_and_time(values=...)`, `system_clock(count=...)`, and
+`random_seed()`.
+
+Tested focused regressions for named module-procedure prototypes and submodule
+ancestor type handling; rebuilt `freight --no-default-features`; deterministic
+comparison still passes. The first 20-file stdlib slice is improved but still
+not passing: remaining gaps include hashmap/stringlist parser recovery,
+complex ancestor `use` cascades, and missing public symbols. Not committed or
+pushed.
+
+### 2026-06-20 — Codex — fortran-lsp: full external parity gates
+
+Extended the Fortran differential harness so real-project mode drains
+`publishDiagnostics` while bulk-opening files and then waits for a quiet final
+diagnostic state. This fixes stdout pipe backpressure in larger fixture runs and
+adds verbose per-phase/per-file progress markers for future slow request
+debugging.
+
+Fixed another fftpack-driven native parity gap: interface `import rk` no longer
+cascades into "host scope does not define imported name" when `rk` may come
+from an unresolved host `use` module. The unresolved module diagnostic remains.
+Updated `fortran-lsp` README/TODO to reflect the behavior and that full
+`minpack`/`fftpack` are now usable differential gates.
+
+Tested: targeted `cargo test -p fortran-lsp
+unresolved_host_use_does_not_cascade_import_diagnostics`; `cargo build -p
+freight --no-default-features`; deterministic
+`scripts/fortran_lsp_compare.py --freight target/debug/freight`; full
+`--project /tmp/freight-fftpack-fixture`; full `--project
+/tmp/freight-minpack-fixture`. Not committed or pushed.
+
+### 2026-06-20 — Codex — fortran-lsp: fftpack parity fixes
+
+Started a second external parity fixture with `fortran-lang/fftpack` cloned to
+`/tmp/freight-fftpack-fixture`. The run exposed several concrete fortls parity
+gaps, now fixed in `fortran-lsp`: public interface prototypes in
+default-private modules are treated as module exports; unresolved external
+`use, only:` modules no longer cascade into extra declared-type diagnostics;
+legacy declarations without `::` such as `complex(rk) f_hat(0:n)` are indexed;
+and variadic/reduction intrinsics such as `max(...)` and `all(...)` no longer
+emit false argument-count diagnostics.
+
+Freight LSP now republishes diagnostics for same-indexer open files after a
+native source reparse, capped at 32 related buffers to avoid large-project
+fan-out. `scripts/fortran_lsp_compare.py` keeps bounded request/diagnostic
+timeouts; the attempted full `fftpack` project comparison revealed the need for
+a less chatty final-state diagnostic comparison mode before making 70-file
+project runs a regular gate.
+
+Tested: `cargo fmt -p fortran-lsp -p freight`; `python3 -m py_compile
+scripts/fortran_lsp_compare.py`; `cargo test -p fortran-lsp` (143 passed);
+`cargo build -p freight --no-default-features`; small
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` passes.
+Removed generated `scripts/__pycache__`. Not committed or pushed.
+
 ### 2026-06-19 — Codex — freight lsp: native Fortran semantic tokens
 
 Made Freight serve native Fortran semantic tokens without requiring the
@@ -6869,6 +7247,88 @@ Tested: `cargo test -p fortran-lsp`; `cargo build -p freight --no-default-featur
 scripts/fortran_lsp_compare.py --freight target/debug/freight`.
 Not committed or pushed.
 
+### 2026-06-19 — Codex — fortran-lsp: fortls line-length diagnostics
+
+Ported fortls-style line-length diagnostics into `fortran-lsp` as an opt-in
+workspace configuration. `WorkspaceConfig` now carries `max_line_length` and
+`max_comment_line_length`, `Workspace::set_line_length_limits()` enables the
+warnings, and diagnostics classify free-form and fixed-form comment lines
+separately to match fortls' split limits. Defaults remain disabled, so Freight's
+current LSP behavior is unchanged until a manifest/config setting is added.
+
+Added regression tests for free-form code/comment limits and fixed-form comment
+classification. Updated the `fortran-lsp` README coverage list.
+
+Tested: `cargo test -p fortran-lsp`; `cargo build -p freight --no-default-features`;
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight`.
+Not committed or pushed.
+
+### 2026-06-19 — Codex — freight lsp: wire Fortran line-length settings
+
+Connected the new `fortran-lsp` line-length diagnostics to Freight's manifest
+language options. `FortranIndexer::refresh_flags()` now reads
+`[language.fortran] max_line_length = "N"` and
+`max_comment_line_length = "N"` from `LanguageSettings::extra` and applies them
+to the embedded `Workspace`; absent or zero values leave the warnings disabled.
+Manifest LSP completion/hover metadata now advertises both keys.
+
+Added Freight tests for parsing the manifest options and for emitting the
+configured diagnostics through the Fortran indexer. Updated the `fortran-lsp`
+README to mention the Freight wiring.
+
+Tested: `cargo test -p freight --no-default-features fortran_line_length`;
+`cargo test -p freight --no-default-features
+fortran_indexer_uses_manifest_line_length_limits_for_diagnostics`;
+`cargo test -p fortran-lsp`; `cargo build -p freight --no-default-features`;
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight`.
+Not committed or pushed.
+
+### 2026-06-19 — Codex — fortran-lsp: real-project differential mode
+
+Expanded `scripts/fortran_lsp_compare.py` with `--project <dir>`. Project mode
+copies a real Fortran project to a temp root, opens every Fortran file in both
+Freight and fortls, compares diagnostics exactly, and verifies Freight exposes
+all fortls public document/workspace symbol names while tolerating richer native
+symbol detail and fortls internal symbols.
+
+Running project mode on local Freight examples exposed two native gaps, both
+fixed in `fortran-lsp`: interface `import, only:` now accepts host-associated
+names that come from a containing scope's `use` statement, including intrinsic
+modules like `iso_fortran_env`; and the parser now indexes type-prefixed
+functions such as `logical function solve2(...)`, removing the spurious
+unmatched-end diagnostic. Updated README/TODO coverage notes.
+
+Tested: `cargo test -p fortran-lsp`; `cargo build -p freight --no-default-features`;
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight`;
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project
+crates/freight/examples/fortran/hello`; same command for
+`crates/freight/examples/mixed/tri-lang` and
+`crates/freight/examples/misc/doc/libs/linalg`.
+Not committed or pushed.
+
+### 2026-06-19 — Codex — fortran-lsp: external minpack parity pass
+
+Cloned `fortran-lang/minpack` to `/tmp/freight-minpack-fixture` and extended
+`scripts/fortran_lsp_compare.py` project mode with `--max-files` plus source-first
+file ordering so larger real projects can be checked in bounded batches. The
+full unbounded minpack run did not complete quickly, but the first eight sorted
+files now pass.
+
+The minpack batch exposed and drove fixes in `fortran-lsp`: array constructors
+in declarations no longer create duplicate symbols; `import, only:` accepts
+names re-exported by user modules; `procedure(interface) :: dummy` outside
+derived types is parsed as a procedure dummy rather than a type-bound method;
+`type(c_ptr)` and other intrinsic-module types are accepted when imported; and
+labeled `block` plus `select case` constructs close cleanly. Updated TODO with
+the external fixture status.
+
+Tested: `cargo test -p fortran-lsp`; `cargo build -p freight --no-default-features`;
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight`;
+same command with `--project crates/freight/examples/fortran/hello`;
+`--project crates/freight/examples/misc/doc/libs/linalg`; and
+`--project /tmp/freight-minpack-fixture --max-files 8`.
+Not committed or pushed.
+
 ## 2026-06-19 — Claude: fully implemented native asm-lsp (/goal)
 
 Goal: fully implement asm-lsp. The AsmIndexer (src/lsp/indexers/Asm.rs, GAS+NASM)
@@ -6891,3 +7351,736 @@ workspaceSymbol/selectionRange), so no wiring change needed — dispatch in
 mod.rs already routes these to the indexers. 1 new test covering all five; 17 asm
 tests pass; full freight suite green (0 failed); clippy clean. Updated Asm.rs
 module doc + TODO.md (removed the "semantic tokens deferred" item).
+
+### 2026-06-19 — Codex — fortran-lsp: full minpack differential pass
+
+Re-ran the external `fortran-lang/minpack` fixture at
+`/tmp/freight-minpack-fixture` across all 13 sorted Fortran files. The Freight
+native Fortran path now matches fortls diagnostics and contains all fortls public
+document/workspace symbols for that full fixture.
+
+Cleaned up `scripts/fortran_lsp_compare.py` with explicit
+`--request-timeout`, `--diagnostic-timeout`, and `--settle-delay` options so
+larger project runs fail in a controlled way instead of needing an outer shell
+timeout. Updated `crates/fortran-lsp/README.md` and `TODO.md` to record the full
+minpack status and the parser/indexer coverage added during that pass.
+
+Tested: `python3 -m py_compile scripts/fortran_lsp_compare.py`;
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project
+/tmp/freight-minpack-fixture --max-files 13`; `cargo test -p fortran-lsp`;
+`cargo build -p freight --no-default-features`. Removed the generated
+`scripts/__pycache__`. Not committed or pushed.
+
+### 2026-06-19 — Claude — vscode-freight: client-side freight.toml helpers
+
+Added `editors/vscode-freight/src/manifest.ts` — editing helpers that work
+without `freight lsp` (so they're live even when the server is off/missing):
+
+- **Completion**: table headers (`[dependencies]`, `[profile.release]`,
+  `[[bin]]`, `[os.linux.dependencies]`, …) when typing `[`, and per-table keys
+  (package / dependency / profile / compiler / lib / bin / language), with enum
+  value completion for `type`/`warnings`/`stdlib`/`build`. Context resolved by
+  walking up to the nearest table header + inline-table detection.
+- **Hover**: docs for manifest keys and section headers (schema-mirrored).
+- **Path-dep navigation**: DocumentLink + Definition on `path = "../x"` opens
+  that dep's `freight.toml` (TODO item; was unwired).
+- **Diagnostics** (filesystem-aware, line-oriented; never throws): bare `*`
+  version, conflicting dep sources (path/url/git) and git refs
+  (branch/tag/rev), `[package]` missing name/version, neither
+  `[package]`/`[workspace]`, and missing file/dir refs — `src`, `srcs`, `hdrs`,
+  `readme`, `pch`, compiler `includes`, missing `path` deps, workspace
+  `members`. Globs/URLs/`~`/`${}` skipped. Refreshes on open/change/close.
+
+Wired into `extension.ts` via `registerManifestHelpers(context)`. Knowledge
+mirrors `schemas/freight.schema.json` + CLAUDE.md.
+
+Tests: new `tests/manifest.test.js` (sectionKind, isUncheckablePath,
+computeDiagnostics across all rules, pathValueOnLine). Refactored the test
+harness so it runs under **bun** as well as node: shared `tests/vscode-stub.js`
+installs a `vscode` stub via `bun:test` `mock.module` (bun ignores node's
+`Module._load`) or `Module._load` (node). Added `src/test-entry.ts` — a tiny
+test-only entry re-exporting just the pure `_test` helpers, so the test bundle
+never pulls in `vscode-languageclient` (whose `ProtocolCodeLens extends
+code.CodeLens` blew up against the lightweight stub). `package.json` `test`
+script now bundles `src/test-entry.ts` and runs both test files.
+
+Bumped extension to **0.4.0**; updated CHANGELOG.md, README.md, TODO.md.
+
+Tested: `bunx tsc --noEmit` clean; `bun run check` (prod bundle) ok;
+`bun run test` — both suites pass ("dap config tests ok", "manifest helper
+tests ok"). Not committed or pushed.
+
+### 2026-06-20 — Claude — freight: consume Freight packages from CMake / pkg-config
+
+The mirror of `freight migrate` — let existing build systems depend on a Freight
+library.
+
+- **`freight install` now emits a pkg-config `.pc`** at
+  `<prefix>/lib/pkgconfig/<name>.pc` (new `InstalledKind::PkgConfig`).
+  Content: prefix/exec_prefix/libdir/includedir vars + Name/Description/Version/
+  Cflags (`-I${includedir} -I${includedir}/<name>`) / Libs
+  (`-L${libdir} -l<link|name>`, omitted for header-only). Plain version deps go
+  to `Requires.private` (static-only, so a missing module can't break dynamic
+  consumers); path/url/git/foreign/optional deps excluded. `prefix=` uses the
+  logical install prefix (not the destdir-staged root). New helpers
+  `render_pkg_config` + `pkg_config_requires` in `src/install.rs`, 3 unit tests.
+- **`crates/freight/cmake/Freight.cmake`** — `freight_dependency(<name>
+  [SOURCE_DIR …][PREFIX …][RELEASE|DEBUG][STATIC|SHARED][ALIAS …][REQUIRED])`.
+  With SOURCE_DIR it runs `freight install` into the build tree at configure
+  time; then imports via `pkg_check_modules(... IMPORTED_TARGET GLOBAL)` on the
+  emitted `.pc`, falling back to a direct IMPORTED target from the layout
+  (incl. header-only INTERFACE). Exposes `freight::<name>`. Finds `freight` on
+  PATH or `-DFREIGHT_EXECUTABLE=`.
+- Docs: `cmake/README.md` (CMake + Meson/autotools/Make recipes), CHANGELOG
+  (Unreleased/Added), and a new "Downstream interop" section in
+  `crates/freight/TODO.md` with follow-ups (install Freight.cmake to a
+  discoverable dir / per-package <Name>Config.cmake, Bazel rule, Meson wrap,
+  promote Requires).
+
+Tested end-to-end on a real fixture: built a `greet` static lib, `freight
+install`'d it (`.pc` emitted, `pkg-config --modversion/--cflags --libs greet`
+correct), then a CMake consumer used `freight_dependency(... SOURCE_DIR ...)` and
+`freight_dependency(... PREFIX ...)` — both configured, built, linked, and ran
+("hello from freight"). `cargo test -p freight --lib` → 814 passed, 0 failed;
+clippy clean for install.rs (pre-existing warnings only). Not committed/pushed.
+
+Follow-up question for next agent: should `Freight.cmake` ship inside `freight
+install` output (e.g. `<prefix>/share/freight/cmake/`) and/or should install
+also emit a per-package `<Name>Config.cmake` so `find_package(<Name> CONFIG)`
+works with zero module-path wiring? Left as a TODO.
+
+### 2026-06-20 — Claude — freight: forward features through install + Freight.cmake
+
+Follow-up to the CMake/pkg-config interop. Per Max: a per-package
+`<Name>Config.cmake` isn't worth it (pkg-config is general enough) — dropped
+from the TODO. Instead the CMake function now enables features:
+
+- `freight install` gained `--features` / `--no-default-features`. Previously
+  `install_project` hardcoded `&[]`/`true` into `build_project_at`, so installs
+  always built with defaults. `InstallOptions` now carries
+  `features: Vec<String>` + `default_features: bool`; the CLI install command
+  flows them through (`cmd_install` is now `#[allow(clippy::too_many_arguments)]`).
+- `freight_dependency(<name> ... FEATURES f… [NO_DEFAULT_FEATURES])` forwards
+  them to `freight install` (joined as `--features a,b`). Only meaningful with
+  SOURCE_DIR (a no-SOURCE_DIR import warns if features are passed, since the
+  artifact is already built).
+
+Tested end-to-end: a `widget` lib with `extra = ["define:WITH_EXTRA"]` →
+`freight_dependency(... FEATURES extra)` produced "extra"; with `default =
+["extra"]` + `NO_DEFAULT_FEATURES` it produced "basic". `cargo test -p freight
+--lib` → 814 passed; install clippy clean. Not committed/pushed.
+
+### 2026-06-20 — Claude — vscode-freight: code actions, outline, feature completion
+
+Continued the freight.toml editing helpers in `src/manifest.ts`:
+
+- **Quick fixes (code actions)** on the diagnostics: create a missing
+  file/directory; scaffold a missing path-dep / workspace member (dir +
+  `freight.toml`); remove a conflicting dependency key (path/url/git or
+  branch/tag/rev) by rewriting the inline table line; add a missing required
+  `[package]` key. Filesystem creation goes through a new internal command
+  `freight.manifest.createPath` (undeclared in package.json — invoked only by
+  actions), which re-runs diagnostics after (fs change fires no doc event).
+- **Document symbols (outline)** — tables → symbols, with dependency and
+  feature entries as children; powers Outline view + Ctrl+Shift+O + breadcrumbs.
+- **Feature-aware completion** — inside `[features]` arrays: other feature
+  names, `dep:<optional>`, `<dep>/define:`, `define:` snippet (quote-aware via
+  `collectDeclarations`); `required-features` completes feature names only.
+
+Tests: extended `tests/manifest.test.js` (removeInlineKey, packageNameFrom,
+document symbols, 3 code-action cases, collectDeclarations, feature +
+required-features completion); grew the shared `tests/vscode-stub.js` with
+DocumentSymbol/SymbolKind/CodeAction/CodeActionKind/WorkspaceEdit and extra
+CompletionItemKind values. `bunx tsc --noEmit` clean; `bun run test` both
+suites pass; `bun run check` prod bundle builds. CHANGELOG/README/TODO updated.
+Not committed/pushed.
+
+### 2026-06-20 — Claude — vscode-freight: CodeLens, manifest nav, rename, references
+
+More freight.toml helpers in `src/manifest.ts` (all client-side):
+
+- **Run/Debug CodeLens** above each `[[bin]]` (wires to existing
+  freight.runTarget/debugTarget).
+- **Intra-manifest go-to-definition** — feature/dep references jump to their
+  declarations: `dep:foo`/bare names → `[dependencies]`, feature names →
+  `[features]`, `required-features` → feature, `default-run` → `[[bin]]`,
+  profile `inherits` → `[profile.*]`.
+- **Value completion** for `default-run` (bin names) and `inherits` (other
+  profile names) via `collectTargets`.
+- **Rename (F2)** for features + deps — `symbolAt` + `occurrencesOf` rewrite the
+  declaration and every reference (incl. the name part inside `dep:foo` /
+  `foo/define:…`, and `required-features`).
+- **Find All References (Shift+F12)** — same `occurrencesOf` surfaced as
+  Locations.
+
+Tests grew accordingly (CodeLens, manifestReferenceTarget cases, collectTargets +
+default-run/inherits completion, symbolAt/occurrencesOf/rename/references);
+stub gained CodeLens + Value kind. `bunx tsc` clean; `bun run test` both suites
+pass; `bun run check` builds. CHANGELOG/README/TODO updated. Still uncommitted.
+
+User asked to keep building until they say stop. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: snippets + path-dep hover
+
+- **Snippets** (`snippets/freight.json`, contributed via `contributes.snippets`):
+  package/workspace/lib/bin/dep/deppath/depgit/depcmake/feature/features/profile/
+  osdeps. JSON validated; not in .vscodeignore.
+- **Hover enrichment** for `path = "…"` deps — resolves the target freight.toml
+  and shows `→ <name> v<version>`, or "not found". New `readPackageInfo` helper;
+  hover now early-returns for path values before the key/section logic.
+
+Tests: readPackageInfo + path-dep hover (hit + not-found); makeDoc gained a
+no-op getWordRangeAtPosition. `bunx tsc` clean; `bun run test` both suites pass;
+`bun run check` builds. CHANGELOG/README/TODO updated. Still uncommitted. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: member links + Add Dependency command
+
+- **Workspace members clickable** — documentLinkProvider + definitionProvider
+  resolve `[workspace] members` entries to their freight.toml (globs/missing
+  skipped). New `workspaceMemberRefs` helper.
+- **`Freight: Add Dependency` command** (extension.ts) — input box for
+  `name@version`/URL + table quick-pick (deps/dev-deps) → `freight add [--dev]`
+  via runFreightTaskAndWait → refresh explorer. Declared in package.json
+  commands + palette + activationEvents.
+
+Tests: workspace member document-links test. tsc clean; both test suites pass;
+prod bundle builds; package.json valid. CHANGELOG/README/TODO updated.
+Uncommitted. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: reference diagnostics + folding
+
+- **Reference diagnostics** (`checkReferences` in computeDiagnostics, using
+  collectDeclarations + collectTargets): unknown `dep:<name>` / `<name>/define:`
+  / bare tokens in feature lists, undeclared `required-features`, `default-run`
+  with no `[[bin]]`, profile `inherits` with no `[profile.*]`. All warnings,
+  declaration order independent (whole-doc scan).
+- **Folding** — FoldingRangeProvider folds table sections (header → last content
+  line before next header) and multi-line arrays.
+
+Tests added for both; stub gained FoldingRange. tsc clean; both suites pass;
+prod bundle builds. CHANGELOG/TODO updated. Uncommitted. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: create-feature fix + Remove Dependency
+
+- **Quick fix "Create feature '<name>'"** for unknown-feature diagnostics —
+  inserts `<name> = []` under [features] (creating the table if absent).
+- **`Freight: Remove Dependency` command** — opens the workspace freight.toml,
+  quick-picks a declared dep (via exported `declaredDependencies`), runs
+  `freight remove`, refreshes explorer. Declared in package.json.
+
+Tests + docs updated; tsc clean; suites pass; bundle builds; package.json valid.
+Uncommitted. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: duplicate diagnostics + feature hover
+
+- **Duplicate diagnostics** — duplicate dependency/feature key within a table
+  (per-header seen-set) and duplicate `[[bin]]` name (checkDuplicateBins). Same
+  dep name across base vs `[os.*.dependencies]` is allowed (different header).
+- **Feature hover** — hovering a `[features]` key shows what it activates.
+
+Tests added (duplicates: dep/feature/bin + the os-table non-dup case; feature
+hover; test makeDoc now implements getWordRangeAtPosition/getText). tsc clean;
+both suites pass; bundle builds. CHANGELOG/TODO updated. Uncommitted. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: Build/Test/Clean/Update palette commands
+
+Added `freight.build` (honors active profile → --release), `freight.test`,
+`freight.clean`, `freight.update` (refreshes explorer) — palette + activation +
+commands in package.json. Building was previously only via the build task /
+Ctrl+Shift+B. tsc clean; suites pass; bundle builds; package.json valid.
+CHANGELOG updated. Uncommitted. Continuing.
+
+### 2026-06-20 — Claude — vscode-freight: profile dev→debug consistency
+
+Aligned the extension with the core dev→debug profile rename: defaults in
+package.json (freight.lsp.profile, debugger profile), state.activeProfile,
+lsp.ts profile, explorer getProfiles base, configuration toggle list +
+descriptions, status tooltip. debug.ts canBuildProfileWithTask now defaults to
+"debug" and still accepts "dev" (legacy alias). tsc clean; suites pass; bundle
+builds; package.json valid. CHANGELOG updated. Uncommitted.
+
+### 2026-06-20 — Claude — vscode-freight: os/arch overlay header completion
+
+Typing `[os.`/`[arch.` now completes valid family keys (+ `.dependencies`
+variants) with an explicit replacement range so it can't double-insert the
+prefix. OS_KEYS/ARCH_KEYS from the schema. Tests added. tsc clean; suites pass;
+bundle builds. CHANGELOG updated. Uncommitted.
+
+### 2026-06-20 — Claude — vscode-freight: config.toml editing helpers
+
+New `src/config.ts` for Freight's developer config (~/.freight/config.toml,
+/etc/freight/config.toml, project .freight/config.toml). Schema mirrors
+toolchain/cache.rs::GlobalConfig:
+- New `freight-config` language (filenamePatterns `**/.freight/config.toml`)
+  reusing the Freight TOML grammar for highlighting.
+- Completion: top-level keys (default_backend/default_debugger/target/sysroot/
+  auto-cpu-tuning), section headers ([[registries]], [debugger.<name>], [alias]),
+  registry name/url, debugger args, + enum values for backends/debuggers.
+- Hover for keys/sections.
+- Diagnostics: unknown top-level key, [[registries]] missing name/url, sysroot
+  that doesn't exist on disk.
+
+Wired via registerConfigHelpers in extension.ts; _test re-exported through
+test-entry.ts (also extension.ts). New tests/config.test.js (sectionKind,
+isConfig, completion top/registry/enum/header, 4 diagnostic cases) added to the
+test script. tsc clean; all 3 suites pass; bundle builds; package.json valid.
+CHANGELOG/README/TODO updated. Uncommitted.
+
+config.toml registry URL/token reachability left as a server-side follow-up.
+
+### 2026-06-20 — Claude — vscode-freight: config.toml snippets
+
+Added snippets/freight-config.json (registry / debugger / alias / target /
+default_backend), contributed for the freight-config language. JSON valid; tsc
+clean; all 3 suites pass. CHANGELOG/TODO updated. Uncommitted.
+
+### 2026-06-20 — Claude — vscode-freight: fix LSP startup (--no-fortls removed)
+
+Bug: server failed with "error: unexpected argument '--no-fortls' found".
+`freight lsp` has no `--no-fortls` flag (Fortran is always native; fortls
+passthrough gone). Fixed lsp.ts to send only `--profile <p> --no-asm-lsp`
+(verified `freight lsp --profile debug --no-asm-lsp` parses, exit 0). Removed
+the dead `freight.lsp.fortlsPath` / `freight.lsp.enableFortls` settings from
+package.json. tsc clean; 3 suites pass; bundle builds; package.json valid.
+CHANGELOG updated. Uncommitted.
+
+### 2026-06-20 — Claude — vscode-freight: wire enableAsmLsp + clangd settings
+
+Native asm indexer is default-on in the server; `--no-asm-lsp` only skips the
+external binary, so native asm was already serving. Wired the previously-inert
+settings into lsp.ts launch args: enableAsmLsp (true→native on + skip external;
+false→`--no-native-asm --no-asm-lsp`), enableClangd (false→`--no-clangd`),
+clangdPath (→`--clangd <path>`), clangdArgs (→`--clangd-arg=…`). Removed the
+inert `freight.lsp.asmLspPath` setting and reworded enableAsmLsp to describe the
+native indexer. tsc clean; 3 suites pass; bundle builds. CHANGELOG updated.
+Uncommitted.
+
+### 2026-06-20 — Claude — freight lsp: fix C/C++ semantic highlighting regression
+
+Reported: "syntax coloring in c++ isn't working." Root cause: with native
+Fortran/asm indexers active (always, since the caller passes
+use_native_fortran=true), `freight lsp` advertised its own 9-type semantic-token
+legend and `handle_semantic_tokens` returned null for non-native files (it
+refused to forward clangd tokens under the wrong legend). So C/C++ got no
+semantic colouring — only TextMate base. (clang-bridge, which would serve native
+C++ tokens, is off by default.)
+
+Fix (crates/freight, src/lsp):
+- `merged_capabilities` now captures a forwarded server's (clangd's)
+  semanticTokensProvider and advertises ITS legend when the clang bridge is off
+  (clang-bridge case keeps freight's legend).
+- `handle_initialize` stores the advertised legend tokenType names in
+  `ServerState.semantic_legend`.
+- `handle_semantic_tokens`: native indexer tokens are remapped from
+  `index::FREIGHT_TOKEN_TYPES` into the advertised legend via new
+  `remap_semantic_token_types`; non-native (C/C++) files now `forward_or_null`
+  to clangd (its tokens already match the advertised legend).
+- Added `index::FREIGHT_TOKEN_TYPES` const (legend uses it).
+
+Tests: 4 new (protocol legend-selection x2, remap x2) — `cargo test -p freight
+--lib` 818 passed; clippy clean. End-to-end: drove `freight lsp` against a temp
+C++ project — initialize now advertises clangd's 25-type legend (was 9) and
+`semanticTokens/full` returns non-empty data for main.cpp (was null). Rebuilt
+target/debug/freight. Not committed.
+
+Note: extension dev mode runs `cargo run`, so a Restart Language Server picks up
+the rebuilt server. clangd is required (present here: /usr/bin/clangd 22.1.6).
+
+### 2026-06-20 — Claude — freight lsp: include hint shows dir for local, dep for deps
+
+Per request: `#include` inlay hint now distinguishes local vs dependency
+headers. `include_inlay_label` (src/lsp/index.rs):
+- HeaderOrigin::Own → the header's directory relative to the package root (new
+  `local_header_dir` helper), e.g. `← include/geometry`; falls back to the
+  package name if the header sits at the package root.
+- PathDep/Fetched → the dependency name (unchanged), e.g. `← zlib`.
+- System → `← stdlib` (unchanged).
+1 new unit test. `cargo test -p freight --lib` green except the known-flaky
+`dap::server::tests::explicit_gdb_path_selects_gdb_dap_args` (passes in
+isolation; gdb-probe under parallelism). clippy clean. Rebuilt target/debug/
+freight. Not committed.
+
+### 2026-06-20 — Claude — freight: Project → crate::project; new crate::environment::Environment
+
+Per Max's design: `Project` is the central project/packages model, so it moved
+out of `crate::build` to `crate::project` (`git mv src/build/project.rs
+src/project.rs`). `build/mod.rs` re-exports `{Project, PackageKind,
+source_package_dirs}` from `crate::project` for back-compat (lsp/mod.rs etc.
+keep using `crate::build::…`). Fixed: project.rs `super::` → `crate::build::`;
+`load_project_at` made `pub(crate)`; `ProjectContext.{effective_backend,
+detected, found}` made `pub(crate)` (read by Project::emit_sources path).
+
+New `src/environment.rs` — `Environment` = the resolved host+target environment
+(host_os/arch, target_triple + parsed target_os/arch, sysroot, default_backend/
+debugger, auto_cpu_tuning, jobs). Counterpart to Project (what) vs Environment
+(where/how). `detect()` (loads GlobalConfig) and `from_config(config, target_
+override, sysroot_override)` with override-wins semantics; `is_cross()`,
+`target()`, `with_jobs()`. Consolidates std::env::consts + GlobalConfig +
+parse_triple. 3 unit tests.
+
+Follow-up (not done): thread `Environment` through the build/install/toolchain
+paths to replace the scattered GlobalConfig+consts reads (it's currently new
+public API + tested, not yet adopted internally).
+
+`cargo build -p freight` + `--bin freight` clean; lib tests green except the
+known-flaky `dap::server::tests::explicit_gdb_path_selects_gdb_dap_args` (passes
+isolated; shared fake-gdb probe races under parallelism). clippy: no new
+warnings for the moved/new code. Not committed.
+
+### 2026-06-20 — Claude — freight: adopt Project/Environment internally + dedupe
+
+Converted internals onto the project/environment structs and removed the
+resulting duplicates:
+
+Environment (where/how):
+- `vendor::resolve_target(Option<&str>)` = single "triple→(arch,os) else host"
+  place; `Environment::from_config` uses it. Replaced the duplicated
+  config-target+parse_triple+host-fallback blocks in install.rs (×3),
+  build/link.rs (link_target_os), dap/server.rs (dap_target_os).
+- build core `load_project_at` now resolves backend/target/sysroot/auto-cpu via
+  `Environment::from_config(global, None, FREIGHT_SYSROOT)`; aligned
+  Environment.auto_cpu_tuning default to true (matches the build).
+- `environment::default_jobs` is the one job-count default; CLI `apply_jobs`
+  uses it (removed the dup parallelism calc in common.rs).
+
+Project (what):
+- free `install_project`/`package_project` now delegate to `Project::install`/
+  `package`; `build_project_at`/`test_project_at`/`bench_project_at` delegate to
+  `Project::build`/`test`/`bench`. The `match PipelineOutput::X` boilerplate now
+  lives only on Project (run_pipeline_at remains the single impl; still used
+  directly for the Examples goal + compile-commands).
+- Fixed: `Project::install` was dropping `features`/`default_features` — it now
+  forwards them (so `freight install --features …` keeps working through the
+  unified path).
+
+Verified: `cargo test -p freight` all binaries green (822 lib + integration:
+12/19/3/10/2/4), clippy no unused/dead-code warnings. End-to-end `freight install
+--features extra` through the new Project path emits the .pc and compiles the
+feature in ("extra"). Rebuilt target/debug/freight. Not committed.
+
+Left as legitimate non-duplication: CLI workspace-vs-project dispatch
+(`*_workspace_with` adds member iteration), and supports.rs host-consts reads.
+
+### 2026-06-20 — Claude — freight: centralize env config on Environment + dedupe
+
+Moved environment configuration into Environment and removed the duplicates:
+
+- `Environment::for_project(dir)` = merged global+local config + FREIGHT_SYSROOT
+  override (one place). `Environment::apply_to_manifest(&mut m)` = the single
+  setter for machine-local compiler.target/sysroot/auto_cpu_tuning. Replaced the
+  copies in build/mod.rs load_project_at, dep_cmds.rs fetch_package_deps, and
+  lsp/mod.rs refresh (lsp now also applies per-project .freight/config.toml,
+  matching the build — a small correctness fix). build/mod.rs no longer imports
+  GlobalConfig.
+- Session flags centralized: `Environment::verbose()/offline()/locked()` +
+  `set_session_flags(...)`. pipeline.rs is_offline/is_locked delegate to it;
+  compile.rs (×2) and link.rs FREIGHT_VERBOSE reads → Environment::verbose();
+  common.rs BuildFlags::apply → set_session_flags (dropped its unsafe set_var
+  block; edition 2021 set_var is safe). No FREIGHT_* literals remain outside
+  environment.rs (only comments).
+
+Left in GlobalConfig (not "environment"): registries, tokens, debugger instance
+config, alias, and config *writes* (toolchain_use etc.).
+
+Verified: `cargo test -p freight` all green (823 lib + integration), bin builds,
+clippy adds no new warnings (pre-existing too_many_arguments etc. only). New
+unit test `apply_to_manifest_sets_machine_local_fields`. End-to-end smoke:
+`build --verbose` echoes the cc command (Environment::verbose path), plain +
+`--offline` builds succeed. Rebuilt target/debug/freight. Not committed.
+
+### 2026-06-20 — Claude — freight lsp: show .pkgs dependency versions in include hints
+
+Bug: include hint/tooltip for a fetched dep showed `**zlib**/zlib.h` (no
+version). Root cause: `.pkgs/<name>` dirs are named without a version
+(fetch/http.rs + registry use `.pkgs/<name>`), so `split_name_version` returned
+empty. Fix (src/lsp/index.rs, .pkgs loop in build_source_indexes): read name +
+version from the fetched package's own `freight.toml` via load_manifest_cached,
+falling back to the dir-name `name-version` split for foreign deps without a
+manifest. New test `fetched_pkg_version_comes_from_its_manifest`. `cargo test -p
+freight --lib` 824 passed. Rebuilt target/debug/freight. Not committed.
+
+### 2026-06-20 — Claude — freight lsp: follow-ups to the .pkgs version fix
+
+Checked for related problems:
+- Confirmed the fix covers the include-completion detail and C++20 module
+  hints too (all read the same indexed package_version); the hover tooltip
+  already read pkg_dir's manifest directly, so it was correct.
+- Removed the now-dead `split_name_version` (only the .pkgs loop used it). Since
+  `.pkgs/<name>` dirs never carry a version, the split fallback never helped and
+  could mis-split a foreign dep name like `foo-2bar` → just use the dir name +
+  no version when there's no manifest.
+- Fortran indexer only uses `.pkgs/<name>` for include/module roots, surfaces no
+  version label — nothing to fix there.
+
+`cargo test -p freight --lib` 824 passed; clean build; rebuilt target/debug/
+freight. Not committed.
+
+### 2026-06-20 — Claude — freight: strip built-in proto (.proto) codegen
+
+Per Max (wants to redesign it): removed built-in protobuf code generation.
+- Deleted src/build/proto.rs; removed `pub mod proto`, the pipeline `stage_codegen`
+  + its call site + the `proto` import, and the `.proto`-only source guard in
+  load_project_at. Renumbered pipeline stages (codegen was stage 7; gone).
+  all_sources is now just found.sources; include_dirs no longer needs `mut`.
+- `[language.proto]` is now inert (generic language HashMap key, no codegen).
+  `.proto` files aren't mapped to a compiled language, so nothing tries to
+  compile them. `protoc` still works as a [build-dependencies] tool; the
+  migrator's Protobuf→protobuf dep mapping is unrelated and kept.
+- Updated crates/freight/docs: pipeline.md (stage table + note), architecture.md
+  (removed codegen nodes from the flow), manifest-reference.md ([language.proto]
+  section → "removed for now"), include-hygiene.md (dropped proto from generated
+  dirs).
+
+Tested: `cargo test -p freight` all green (824 lib + integration). Not committed.
+
+Note (out of the requested scope): the workspace-root CLAUDE.md still lists proto
+codegen as build step 5 and proto.rs in the crate tree — left for Max to decide.
+
+### 2026-06-20 — Claude — workspace CLAUDE.md: drop proto-codegen references
+
+Followed up on the proto strip: updated workspace-root CLAUDE.md — removed the
+"Proto codegen" build-pipeline step (renumbered 1–7) with a note that it's
+removed pending redesign, dropped `proto.rs` from the build/ file listing, and
+documented the new central structs `project.rs` (Project) + `environment.rs`
+(Environment) in the src/ tree. AGENTS.md had no proto references. `protoc` as a
+[build-dependencies] tool example is kept.
+
+### 2026-06-20 — Claude — vscode-freight: warn on inert [language.proto]
+
+Follow-up to the proto strip. Confirmed the editor doesn't advertise proto
+codegen (schema language pattern never listed it; only a `protoc` build-dep
+example remains). Added a manifest diagnostic (`checkInertSections`): a
+`[language.proto]` section now gets a Warning that built-in protobuf codegen was
+removed and the section has no effect. New test; tsc clean; all 3 extension test
+suites pass; prod bundle builds. CHANGELOG updated. Uncommitted.
+
+### 2026-06-20 — Claude — freight: build-plugin system (Rhai), proto becomes a plugin
+
+Implemented the plugin model Max wanted: a dependency that declares `[plugin]`
+runs a script during the consumer's build when the consumer declares a handled
+section. (Discovery: there was NO real script engine — the "Rhai templates" were
+TOML + Rust closures; added the `rhai` crate.)
+
+- `[plugin]` manifest section: `entry`, `handles` (defaults to package name),
+  `tools` (allow-list). `Manifest.plugin: Option<PluginManifest>`.
+- `src/build/plugin.rs`: rhai Engine + a `ctx` object (Rc<RefCell> shared state)
+  with `out_dir()`, `glob()`, `run(tool,[args])` (rejects tools not in the
+  allow-list), `add_source(s)`, `add_include_dir()`, `define(name[,value])`.
+  `cfg` = the consumer's `[section]` as a rhai Map (toml→Dynamic). Reads the
+  consumer's raw freight.toml for the section data (not in the typed Manifest).
+- Pipeline stage 6b (`plugin::run_plugins`, where proto used to be): folds
+  generated sources/include dirs/defines into the build (mut `feat.defines`,
+  `include_dirs`, `all_sources`). Plugin-only deps (plugin + no lib/bin/build)
+  are skipped in build_resolved_deps — they only run, never compile/link.
+- Security: sandboxed Rhai, `ctx.run` limited to declared `tools`.
+
+Tests: 3 unit (engine output, cfg access, disallowed-tool rejection) + an
+end-to-end integration test (tests/plugin_codegen.rs) that builds a project
+whose path-dep plugin `cp`s a template into a generated .c, compiles+links it,
+and runs → prints 42. `cargo test -p freight` all green (827 lib + integration).
+
+Docs: manifest-reference.md (new "Build plugins" section, replaces the proto
+"removed" note), pipeline.md (stage 6b), CLAUDE.md (pipeline step + build/
+plugin.rs + proto-is-now-a-plugin note). CHANGELOG Added/Removed updated.
+
+Open follow-ups: registry distribution of plugins (prototype is path-deps only);
+hardened capability/trust policy; build-dependencies plugin discovery (currently
+source_package_dirs = [dependencies]/dev path deps); ship a real `proto` plugin.
+Not committed.
+
+### 2026-06-20 — Claude — plugins: nested + wildcard `handles`
+
+Per Max: `handles` now matches the dotted path of any declared section, so
+plugins can target `compiler.**` / `language.**` etc., not just top-level.
+- `collect_section_paths` enumerates all table paths (proto, compiler,
+  compiler.clang, language.zig, …); `section_matches`/`matches_segs` glob them
+  (`*` = one segment, `**` = one or more; bare parent not matched by `**`).
+- Plugin runs once per matched section (deduped); the matched path is bound as
+  `section` in the script (alongside `cfg`/`ctx`). run_script gained a `section`
+  param.
+2 new unit tests (matcher + path collection); existing tests updated. e2e +
+full suite green (829 lib + integration). manifest-reference.md updated
+(handles pattern table + `section`). Not committed.
+
+### 2026-06-20 — Claude — plugins: drop `ctx`, expose API as global functions
+
+Per Max: removed the `ctx` receiver. The plugin API is now global functions
+(`out_dir()`, `glob()`, `run()`, `add_source(s)`, `add_include_dir()`,
+`define()`), each closing over the shared state via a `move` closure registered
+on a fresh per-run Engine. Scope now binds only `cfg` + `section`. Scripts read
+`run("protoc", […])` etc. directly. Updated unit/e2e test scripts + docs. All
+green (829 lib + integration). Not committed.
+
+### 2026-06-20 — Claude — plugins: confine file functions to the project
+
+Added path containment as defense-in-depth: glob/add_source/add_include_dir are
+confined to the (canonicalized) project root. glob filters out-of-root matches;
+add_source/add_include_dir return an error if the path escapes (lexical
+normalize of `..`, no symlink-follow). out_dir is rebased under the canonical
+root so generated files pass. The real trust boundary remains `run` (external
+tool = user privileges) → vet packages like crates/npm; a project-granted
+external-access opt-in is noted as a follow-up.
+
+Tests: add_source-escape rejected + is_within unit test (7 plugin unit tests
+total); e2e still green. `cargo test -p freight` all green. Docs security note
+updated. Not committed.
+
+### 2026-06-20 — Claude — plugins: directory accessor functions
+
+Added project directory accessors (all derived from existing state, no signature
+changes): project_dir(), src_dir(), include_dir(), target_dir() (profile dir,
+two levels up from out_dir), alongside the existing out_dir() (the only one that
+creates its dir). New helper path_string(). Test + docs table updated. All green
+(832 lib + integration). Not committed.
+
+### 2026-06-20 — Claude — plugins: dirs as SCREAMING_CASE constants
+
+Per Max: project dirs are now constants instead of functions — SECTION,
+PROJECT_DIR, SRC_DIR, INCLUDE_DIR, TARGET_DIR, OUT_DIR (pushed via
+scope.push_constant; OUT_DIR created eagerly since it's a constant now). `section`
+binding → SECTION constant. cfg stays a data map; glob/run/add_*/define stay
+functions. Updated tests (directory_constants_*), e2e gen.rhai (OUT_DIR), docs
+(constants table + examples), CHANGELOG. All green (8 plugin unit + e2e + suite).
+Not committed.
+
+### 2026-06-20 — Claude — plugins: activation conditions (goals/profiles/inputs)
+
+[plugin] now declares when it activates:
+- goals = ["build","test",...] — gate by pipeline goal (PipelineGoal::name()
+  threaded into run_plugins). profiles = ["debug",...] — gate by profile. Empty
+  = all.
+- inputs = ["src/**/*.proto"] — incremental: fingerprint (sha256 of matched
+  files+mtimes + cfg + script mtime) cached in out_dir/.freight-plugin.json;
+  unchanged → reuse cached output (RunningScript{cached:true}), else re-run +
+  rewrite cache. Empty = always run.
+Removed dead CtxState.out_dir (constants now computed from locals). 4 new tests
+(goal gating via run_plugins, fingerprint+cache roundtrip) → 10 plugin unit
+tests; e2e + full suite green (834); clippy clean. Docs + CHANGELOG updated.
+Not committed.
+
+### 2026-06-20 — Claude — note: scripted toolchain providers (future)
+
+Discussed (not building now): a third build-plugin kind — `provides =
+"toolchain"` — to let users add a compiler via a Rhai script instead of Rust
+(`[needs Rust]` today). It's exactly the compiler_option/language_option +
+add_flag design the docs originally described, now feasible since the Rhai
+engine exists. Recorded the sketch in docs/future-toolchains.md (detection from
+existing template fields; handler surface with ctx.value/version/arch/os;
+prereqs = registry distribution + toolchain-provider contract; built-ins remain
+fallback). No code change.
+
+### 2026-06-21 — Claude — reference build plugins (proto/flatbuffers/bison/flex)
+
+Added examples/plugins/ with four codegen plugins + README:
+- proto (protoc → .pb.cc + headers), flatbuffers (flatc → header-only),
+  bison (.y → <stem>.tab.c/.h), flex (.l → <stem>.yy.c). Each is a freight
+  package with [plugin] (entry/handles/tools/inputs); scripts use the
+  constants/glob/run/add_source/add_include_dir API.
+- New tests/plugin_bison.rs: builds a temp project with a .y grammar + [bison]
+  depending on the shipped bison plugin (abs path), runs it → "parse=0".
+  Gated on `bison` availability (skips if absent). Proves a real codegen tool
+  (not just cp) works end-to-end.
+
+build_examples.rs lists examples by name so the plugin-only packages aren't
+auto-built. `cargo test -p freight` all green (834 lib + integration).
+CHANGELOG updated; examples/plugins/README.md added. Not committed.
+
+### 2026-06-21 — Claude — freight lsp recognizes plugin-generated headers
+
+Added `plugin::plugin_include_dirs(project_dir, profile)` — computes each active
+plugin's OUT_DIR (target/<profile>/plugin-gen/<section>) deterministically, no
+script execution. Wired into both compile_commands generators
+(generate_compile_commands_at + generate_lsp_compile_commands_for_project). So
+generated headers (foo.pb.h) land as include dirs in compile_commands.json →
+clangd resolves them AND the undeclared-include check (reads declared dirs back
+from that file via declared_dirs_cache) treats them as project-owned. Plugin
+dirs are under target/ → pass lsp_visible_include_dirs.
+
+Verified end-to-end: `freight compile-commands` on a project with the bison
+plugin writes plugin-gen/bison into .freight/lsp/debug/compile_commands.json.
+New unit test (plugin_include_dirs_lists_active_out_dirs); 11 plugin tests; full
+suite green (835); clippy clean. include-hygiene.md + CHANGELOG updated. Not
+committed.
+
+Follow-ups (LSP plugin awareness, deeper): index generated headers in the
+HeaderIndex for #include hover ("generated by <plugin>"); completion for plugin
+section keys (needs a plugin-shipped schema); recognize plugin sections so they
+aren't "unknown".
+
+### 2026-06-21 — Claude — LSP runs initial plugin codegen on refresh
+
+Closed the gap from the prior entry: the LSP advertised plugin OUT_DIRs as
+include dirs but never *ran* the codegen, so on a fresh checkout (no prior
+`freight build`) the generated headers didn't exist and clangd saw missing
+includes. `lsp::refresh_compile_commands` now runs, best-effort, before
+generating compile_commands:
+
+    plugin::run_plugins(&dir, &self.args.profile, "build", &[], &silent())
+
+(errors logged at debug, never fatal). Codegen is incremental (SHA-256
+fingerprint cache), so this is a no-op once generated and up to date.
+
+Verified with a Python LSP driver: initializing the LSP on a fresh bison
+project (no build first) produced target/debug/plugin-gen/bison/grammar.tab.c
+and compile_commands contains plugin-gen/bison. Full suite green (835, 0
+failures). CHANGELOG updated. Not committed.
+
+### 2026-06-21 — Claude — moved reference plugins to crates/freight/plugins/
+
+Relocated the reference plugins from `examples/plugins/` to a dedicated
+`crates/freight/plugins/` folder (beside docs/, cmake/, toolchains/) — they're
+shipped reference plugins, not throwaway examples. Updated tests/plugin_bison.rs
+(CARGO_MANIFEST_DIR/plugins/bison), plugins/README.md (title + `../docs` links +
+path example), and the CHANGELOG. plugin_bison + plugin_codegen e2e pass; no
+remaining `examples/plugins` references. Not committed.
+
+### 2026-06-21 — Claude — BINS is a map keyed by bin name
+
+Per discussion: bin names are unique, so BINS is now an object map keyed by name
+(value = #{name, src, required_features}) instead of an array. Look up with
+BINS["cli"]; iterate with `for b in BINS.values()` or `BINS.keys()`. Probed Rhai
+1.25: `for (k,v) in map` is NOT supported (ErrorFor), but m.len(), m["k"], and
+for-over-.values()/.keys() all work — documented that. bins_map() replaces
+bin_array(); test updated to map access + .values() iteration. Full suite green
+(850 lib); clippy clean. manifest-reference.md + CHANGELOG updated. Not committed.
+
+## 2026-06-29 — nvim-freight: VS Code parity sweep (Claude)
+
+Closed the last real gaps between `editors/nvim-freight` and the VS Code
+extension after re-reading vscode `src/` for every user-facing capability:
+
+- **lsp.logLevel parity**: new `log_level` config → sets `FREIGHT_LOG` via
+  `vim.lsp.start({ cmd_env = ... })` (mirrors vscode lsp.ts:172 `extraEnv`).
+- **DAP target/profile**: `dap_config` now injects `bin`/`profile`/`release`
+  into launch configs (attach excluded). Confirmed `freight dap` reads these
+  from the launch request (server.rs `config_string(config,"bin")`,
+  `dap_profile(config)`), not CLI flags — so a launch now debugs the active
+  target/profile, matching vscode `dapConfigPayload`.
+- **asm flag correctness**: `enable_asm_lsp=false` previously emitted only
+  `--no-asm-lsp`, leaving the native indexer ON (server starts external only
+  when `--no-native-asm && !--no-asm-lsp`, lsp/mod.rs:470). Restructured to a
+  three-way: off→both flags; native→`--no-asm-lsp`; external→
+  `--no-native-asm --asm-lsp <path>`. Also moved clangd selection into a
+  use_clang_bridge>no_clangd>clangd-path branch (matches vscode lsp.ts).
+- **health**: only probes clangd when `not use_clang_bridge`, external asm-lsp
+  only when `not native_asm` (no more spurious "missing" on default config).
+
+Investigated but intentionally NOT ported: VS Code's doc-index status counter
+(`setDocIndexCount`) has **no notification handler** in vscode src — it's a dead
+stub, nothing populates it. `freight.cpp.modules` is a TextMate grammar scope
+(treesitter handles this in nvim). nvim already exceeds vscode on commands
+(test/bench/watch/fmt/lint/doc/migrate/etc.).
+
+Tested: `luajit -bl` parses clean. Not committed (awaiting user).
+
+## 2026-06-29 — docs: CMake compatibility (Claude)
+
+New `crates/freight/docs/cmake-interop.md` consolidates the full CMake interop
+story (previously only partially in manifest-reference.md): the generated
+`Freight.toolchain.cmake` (compilers, `CMAKE_<LANG>_FLAGS_INIT` host-compat shims,
+freight-first `CMAKE_PREFIX_PATH`/`CMAKE_FIND_ROOT_PATH`, native-overlay `BOTH` vs
+cross `ONLY`+SYSTEM_NAME/SYSROOT, skip-on-user-toolchain), the on-demand dependency
+provider, and `cmake_export` (`<Name>Config.cmake`+`.pc`), plus the end-to-end
+compose example. The toolchain file was undocumented except for one config line.
+Cross-linked from manifest-reference.md (new "Generated toolchain file" para),
+README docs table, roadmap. All anchors verified. Docs only; not committed.
