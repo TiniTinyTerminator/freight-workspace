@@ -12,6 +12,328 @@ Guidelines:
 
 ## Log
 
+### 2026-07-01 — Codex — fortran-lsp: suppress deferred override cascades
+
+Fixed a Freight-only diagnostic mismatch found by the `fpm` fortls oracle:
+inherited deferred type-bound procedure diagnostics now skip methods defined in
+modules with unresolved imports, including `use ..., only:` imports. This avoids
+cascading "deferred procedure not implemented" errors when the parent API is
+only partially known.
+
+Validation: focused unresolved-parent regression,
+`cargo test -p fortran-lsp` (249 tests), `cargo build -p freight`,
+deterministic fortls comparison, and project comparisons for `json-fortran`,
+`fpm`, `neural-fortran`, `quadpack`, and `stdlib` passed. Pushed
+`fortran-lsp` commit `f45a9b8`
+(`suppress deferred override cascades from unresolved imports`) to
+`origin/main`. Also narrowed the root comparison harness to ignore the
+documented `json-fortran` fortls-only declaration/masking noise; not committed
+inside `fortran-lsp`.
+
+### 2026-07-01 — Codex — fortran-lsp: typed array constructor diagnostics
+
+Fixed a native diagnostic false positive found by the `fftpack` fortls oracle:
+call validation now skips typed array constructor syntax such as
+`[real(kind=rk) :: ...]`, `[complex(kind=rk) :: ...]`, and derived-type
+constructors with `::`.
+
+Validation: focused typed-constructor regression,
+`cargo test -p fortran-lsp` (248 tests), `cargo build -p freight`,
+deterministic fortls comparison, and full `/tmp/freight-fftpack-fixture`
+project comparison passed. Pushed `fortran-lsp` commit `63c546d`
+(`skip typed array constructors in call diagnostics`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp: preprocessor character constants
+
+Extended the C-preprocessor expression evaluator to handle single-character
+constants and common escaped character constants in `#if` / `#elif`
+expressions, e.g. `'A' == 65` and `'\n' == 10`. Multi-character constants are
+left unsupported because they are implementation-defined.
+
+Validation: focused preprocessor conditional regression and
+`cargo test -p fortran-lsp` (247 tests) passed. Pushed `fortran-lsp` commit
+`f4fd4b6` (`support preprocessor char constants`) to `origin/main`; then pushed
+`365ef66` (`document preprocessor char constant support`) to keep `TODO.md`
+current. Rebuilt `freight`, reran the deterministic fortls comparison, and ran
+the full stdlib fixture comparison; both passed.
+
+### 2026-07-01 — Codex — fortran-lsp: preprocessor bitwise complement
+
+Extended the C-preprocessor expression evaluator to handle unary bitwise
+complement (`~`) in `#if` / `#elif` expressions. The existing preprocessor
+conditional regression now covers `~0 != 0`.
+
+Validation: focused preprocessor conditional regression and
+`cargo test -p fortran-lsp` (247 tests) passed. Pushed `fortran-lsp` commit
+`90f311a` (`support preprocessor bitwise complement`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp: typed function header result compatibility
+
+Extended type-bound function/interface compatibility diagnostics to compare
+typed function header result types when no explicit result declaration is
+indexed, e.g. `real function area_iface(...)` vs `integer function
+circle_area(...)`. Unknown/implicit result types still stay permissive to avoid
+partial-index false positives.
+
+Validation: focused type-bound function interface result tests and
+`cargo test -p fortran-lsp` (247 tests) passed. Pushed `fortran-lsp` commit
+`68140f8` (`compare typed function interface results`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp: function result interface compatibility
+
+Extended type-bound procedure/interface compatibility diagnostics to compare
+indexed function result declarations when both prototype and target provide one.
+This now reports a mismatch when an explicit interface returns, for example,
+`real :: value` but the bound function target declares `integer :: value`.
+
+Validation: focused type-bound function result mismatch regression and
+`cargo test -p fortran-lsp` (246 tests) passed. Pushed `fortran-lsp` commit
+`2c3c4f8` (`check function result interface compatibility`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp: args-aware polymorphic generic hints
+
+Moved inlay hints onto the existing parsed-argument call-parameter resolver and
+made polymorphic unique-descendant generic fallback use parsed call arguments
+instead of only argument count. This avoids misleading parameter hints when a
+polymorphic generic call is ambiguous while still accepting keyword-selected
+descendant overloads.
+
+Validation: focused polymorphic generic regression and
+`cargo test -p fortran-lsp` (245 tests) passed. Pushed `fortran-lsp` commit
+`32e97a9` (`resolve polymorphic generic hints by args`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp: keyword generic signature help
+
+Improved native Fortran signature-help overload selection for generic
+interfaces and type-bound generic bindings. Same-arity overloads now use the
+active keyword argument when choosing the displayed signature, so calls like
+`obj%render(width=...)` resolve to the overload with a `width` dummy instead
+of whichever one-argument binding appears first.
+
+Validation: focused type-bound generic signature regression and
+`cargo test -p fortran-lsp` (244 tests) passed. Pushed `fortran-lsp` commit
+`d383c8a` (`match generic signatures by keyword`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp: preprocessor expression parity
+
+Ported another fortls-style preprocessing slice into `crates/fortran-lsp`:
+`#if` / `#elif` expressions now handle parenthesized comparisons, integer
+arithmetic, bitwise operators, shifts, hex/octal literals, and C integer
+suffixes. Updated the TODO coverage note accordingly.
+
+Validation: focused preprocessor conditional regression and
+`cargo test -p fortran-lsp` (244 tests) passed. Pushed `fortran-lsp` commit
+`dd8d6e6` (`extend preprocessor expression parity`) to `origin/main`.
+
+### 2026-07-01 — Codex — fortran-lsp TODO readability
+
+Reworked `crates/fortran-lsp/TODO.md` from a long chronological fixture log
+into a shorter status-first TODO: goal, current status, open work, compact
+fixture table, and validation commands. Pushed `fortran-lsp` commit `f674708`
+(`make fortran lsp todo readable`) to `origin/main`. Docs-only; tests not rerun.
+
+### 2026-07-01 — Codex — pushed Fortran LSP checkpoint
+
+Pushed `crates/fortran-lsp` commit `d5777c2` (`advance native fortran lsp
+parity`) to `origin/main`, including the split parser/model/workspace modules,
+intrinsic data, real-project parity fixture notes, unchanged-upsert cache,
+include-wrapper diagnostic boundary, and preprocessor numeric comparisons.
+Pushed `crates/freight` commit `1ecbe7b` (`document native fortran lsp default`)
+to `origin/adaptors-as-plugins`, limited to docs and CLI help describing native
+Fortran as the default and `fortls` as oracle-only. Workspace pointer/root
+commit not made in this note. Unrelated dirty files were left unstaged.
+
+### 2026-07-01 — Codex — fortran-lsp: preprocessor numeric comparisons
+
+Extended the Fortran preprocessor evaluator to handle numeric ordering
+comparisons (`<`, `<=`, `>`, `>=`) in `#if` / `#elif` expressions, reusing the
+existing top-level operator splitter. The existing preprocessor conditional test
+now covers a version guard such as `API_VERSION >= 3 && API_VERSION < 4`.
+
+Validation: focused preprocessor conditional test, `cargo fmt -p fortran-lsp`,
+`cargo test -p fortran-lsp` (244 tests), `cargo build -p freight`, and the
+deterministic Freight-vs-fortls harness all passed. Not committed or pushed at
+the time of writing.
+
+### 2026-07-01 — Codex — fortran-lsp: nlesolver fixture parity
+
+Added `jacobwilliams/nlesolver-fortran` as the next external differential
+fixture at `/tmp/freight-nlesolver-fixture` (3 Fortran files). The full project
+already passes the Freight-vs-fortls real-project differential, adding compact
+nonlinear-solver and sparse-test coverage without parser or workspace changes.
+
+Validation: full nlesolver-fortran project differential passed, and the
+deterministic Freight-vs-fortls harness passed. No code changes for this
+fixture. Not committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: quadpack fixture parity
+
+Added `jacobwilliams/quadpack` as the next external differential fixture at
+`/tmp/freight-quadpack-fixture` (13 preprocessed `.F90` files). Fixed native
+diagnostic publication for preprocessor-included template text: workspace
+diagnostics whose ranges fall outside the wrapper file are now dropped instead
+of being published against an impossible line in that wrapper. Narrowed
+`scripts/fortran_lsp_compare.py` to ignore fortls-only scope/masking diagnostics
+in `#ifndef MOD_INCLUDE` template files rather than teaching Freight to emit
+those false diagnostics. The full quadpack differential now passes.
+
+Validation: focused include-wrapper diagnostic regression,
+`cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (244 tests),
+`cargo build -p freight`, `python3 -m py_compile scripts/fortran_lsp_compare.py`,
+quadpack `--max-files 7` differential, full quadpack differential with
+`--request-timeout 90`, and the deterministic Freight-vs-fortls harness all
+passed. Not committed or pushed.
+
+### 2026-07-01 — Codex — freight docs: native Fortran LSP is default
+
+Cleaned stale Freight/editor docs that still described Fortran as a `fortls`
+passthrough or referenced removed `--fortls` / `--no-fortls` flags. Updated the
+CLI help string, Freight TODO, AGENTS guide, LSP architecture docs, manifest
+reference, README snippets, and VS Code README wording to say Fortran is served
+by the native in-process `FortranIndexer`; `fortls` remains only the differential
+oracle.
+
+Validation: `cargo check -p freight` passed. Not committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: unchanged upsert cache
+
+Added a minimal no-op cache to `fortran_lsp::Workspace::upsert_file`: if a file
+is upserted with identical source text, the workspace now returns without
+reparsing or rebuilding the symbol index. The method returns `true` when the
+workspace changed and `false` for an unchanged upsert; existing callers can
+ignore the return value. This does not attempt partial reparse for real edits.
+
+Validation: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (243
+tests), `cargo build -p freight`, and the deterministic
+`scripts/fortran_lsp_compare.py --freight target/debug/freight --request-timeout
+30 --diagnostic-timeout 5 --diagnostic-quiet 0.35` differential all passed. Not
+committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: search/sort fixture parity
+
+Added `jacobwilliams/fortran-search-and-sort` as the next external differential
+fixture at `/tmp/freight-search-sort-fixture` (4 Fortran files plus `.inc`
+includes). The full project already passes the Freight-vs-fortls real-project
+differential, adding include-heavy sorting-module coverage without parser or
+workspace changes.
+
+Validation: full fortran-search-and-sort project differential passed. No code
+changes for this fixture. Not committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: pyplot-fortran fixture parity
+
+Added `jacobwilliams/pyplot-fortran` as the next external differential fixture
+at `/tmp/freight-pyplot-fixture` (5 Fortran files). The full project already
+passes the Freight-vs-fortls real-project differential, adding preprocessed
+`.F90` plotting-module coverage without parser or workspace changes.
+
+Validation: full pyplot-fortran project differential passed. No code changes
+for this fixture. Not committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: neural-fortran full fixture parity
+
+Added `modern-fortran/neural-fortran` as the next external differential fixture
+at `/tmp/freight-neural-fixture` (101 Fortran files). Fixed native parity gaps:
+`select rank` constructs now balance like other select constructs, submodule
+ancestor masking skips explicit function result variables, same-name constructor
+interfaces no longer make derived-type components look like lexical parent
+variables for constructor prototype dummies, typed module-function prototypes
+such as `module integer function` parse correctly, labeled blocks preserve their
+label in document/workspace symbols, and contained function `result(...)` names
+can warn when they mask parent variables.
+
+Validation: focused masking/construct regressions, `cargo fmt -p fortran-lsp`,
+`cargo test -p fortran-lsp` (242 tests), `cargo build -p freight`, and the full
+neural-fortran project differential all passed. Not committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: roots-fortran fixture parity
+
+Added `jacobwilliams/roots-fortran` as the next external differential fixture at
+`/tmp/freight-roots-fixture` (4 Fortran files). The full project already passes
+the Freight-vs-fortls real-project differential, giving another OO/numerical
+library coverage point without requiring parser or workspace changes.
+
+Validation: full roots-fortran project differential passed. No code changes for
+this fixture. Not committed or pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: M_CLI2 fixture parity
+
+Added `urbanjost/M_CLI2` as the next external differential fixture at
+`/tmp/freight-m-cli2-fixture` (61 Fortran files). Fixed native parity gaps
+driven by the fixture: semicolon-separated statements on one physical line,
+extra whitespace in `module  procedure` / `module  function` / `module
+subroutine`, compact `doubleprecision` declarations, fortls-compatible
+intrinsic `type(integer)` / `type(character(len=:))` wrappers, and
+order-independent same-module callable masking diagnostics while excluding
+procedure dummies and implicit/explicit function results.
+
+Validation: focused regressions for each parser/diagnostic gap, `cargo fmt -p
+fortran-lsp`, `cargo test -p fortran-lsp` (238 tests), `cargo build -p
+freight`, and the full M_CLI2 project differential all passed. Not committed or
+pushed.
+
+### 2026-07-01 — Codex — fortran-lsp: CSV fixture parity
+
+Added `jacobwilliams/Fortran-CSV-Module` as the next external differential
+fixture at `/tmp/freight-csv-fixture` (8 Fortran files). Fixed two native
+parity gaps: statement-form `open(...)` / `close(...)` no longer get validated
+as intrinsic procedure calls, and workspace masking diagnostics now catch local
+variables that shadow parameters imported through whole-module `use` statements,
+including public re-export chains.
+
+Validation: focused regressions for I/O statements and whole-module imported
+parameter masking, `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (233
+tests), `cargo build -p freight`, and the full CSV project differential all
+passed. Not committed or pushed.
+
+### 2026-06-30 — Codex — fortran-lsp: bspline fixture parity
+
+Added `jacobwilliams/bspline-fortran` as the next external differential fixture
+at `/tmp/freight-bspline-fixture` (19 Fortran files). Added a workspace-level
+diagnostic backstop for contained procedure dummies that mask ancestor
+`parameter` declarations, covering `test_regrid.f90`'s `x`/`y` program
+parameters vs contained `test_func(x,y)` dummies. Also raised
+`scripts/fortran_lsp_compare.py`'s default `--diagnostic-quiet` to 2.0s after
+the fixture showed Freight can publish an early empty diagnostic set before the
+slower related native diagnostic recomputation lands.
+
+Validation: `cargo test -p fortran-lsp` (230 tests), `cargo build -p freight`,
+`python3 -m py_compile scripts/fortran_lsp_compare.py`, and the full bspline
+project differential passed with the new default quiet window. Not committed or
+pushed.
+
+### 2026-06-30 — Codex — fortran-lsp: FAT fixture parity
+
+Added `jacobwilliams/Fortran-Astrodynamics-Toolkit` as the next external
+differential fixture at `/tmp/freight-fat-fixture` (58 Fortran files). Fixed
+two native parity gaps: interface host-type import checks now accept `import ::
+name` statements scoped inside individual interface prototype bodies, and
+workspace diagnostics now emit fortls-style masking warnings for local
+`parameter` declarations that shadow names exported by resolved whole-module
+imports, including re-export aggregator modules.
+
+Validation: `cargo test -p fortran-lsp` (229 tests), `cargo build -p freight`,
+FAT differential `--max-files 30`, and the full FAT project differential all
+passed. Not committed or pushed.
+
+### 2026-06-30 — Codex — fortran-lsp: toml-f fixture parity
+
+Added `toml-f/toml-f` as the next external differential fixture at
+`/tmp/freight-toml-f-fixture`. Fixed native parity gaps found by the 40/80/full
+project passes: public use-associated generic re-export chains now work through
+default-private wrapper modules, partial public re-export chains no longer emit
+false "does not export" diagnostics when the leaf provider is outside the
+indexed slice, declared derived types resolve through `use` aliases, generic
+overload selection now requires all non-optional dummy arguments before choosing
+a specific procedure, `class is(...)` / `type is(...)` select-type guards no
+longer create fake `is` symbols, and a narrow fortls-compatible diagnostic
+covers missing direct overrides for deferred bindings inherited through a
+used-module parent.
+
+Validation: `cargo test -p fortran-lsp` (227 tests), `cargo build -p freight`,
+and toml-f real-project differentials for `--max-files 40`, `--max-files 80`,
+and the full 89-file project all passed. Not committed or pushed.
+
 ### 2026-06-29 — Codex — fortran-lsp: fpm fixture cleanup
 
 Started the next external oracle pass with `fortran-lang/fpm` cloned at
@@ -8165,6 +8487,53 @@ the native indexer currently does. The prior Freight-side call-shape false
 positives for `c_opendir`, `c_closedir`, and `get_dos_path` are gone. Not
 committed.
 
+Follow-up in same session: normalized the real-project differential harness so
+local modules present in the compared project slice are not counted as unresolved
+module mismatches; fortls can publish stale/local-module diagnostics depending
+on open order. Then fixed the remaining fpm call-shape issues:
+
+- scanner no longer treats `name()` inside character literals as calls;
+- implicit function result substring references such as
+  `get_dos_path(1:last-1)` are not validated as recursive calls;
+- `c_associated`'s second argument is optional;
+- `.f` files in explicit `free-form` paths are parsed as free form, matching
+  fpm's `example_packages/free-form`;
+- shorthand kind selectors now distinguish direct unresolved `use, only:` from
+  resolved-module/unresolved-reexport cases, and include-provided kind
+  parameters are visible to diagnostics.
+
+Validation now: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (215
+tests), `cargo build -p freight`, fpm 80-file differential passes, fpm 120-file
+differential passes. fpm 160-file differential still exits 1 with a narrow
+kind-selector policy mismatch: Freight still reports `sp` from
+`link_external/app/main.f90` and `compiler_enum` from fpm manifest files where
+fortls is quiet, while fortls reports `dp` in the unresolved stdlib metapackage
+case. Continue there before expanding further. Not committed.
+
+Second follow-up: fpm passes through 200 files now. Changes:
+
+- project differential harness now normalizes stale local-symbol diagnostics
+  for modules/symbols present in the compared project slice, and orders nested
+  include/src/app/test paths more like provider-before-consumer static indexing;
+- parser masking now reports locals that case-insensitively mask explicit
+  parent-scope `use, only:` names, matching fpm's `OS_NAME`/`os_name` warning;
+- `use, non_intrinsic :: name` now parses `name` as the module and does not
+  mark it intrinsic.
+
+Validation: `cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (217 tests),
+`cargo build -p freight`, fpm 160-file differential passes, fpm 200-file
+differential passes. Next step: expand fpm beyond 200 files toward the full
+fixture. Not committed.
+
+Third follow-up: expanded fpm to the full 221-file fixture. Both
+`--max-files 220` and full-project (`--max-files 0`) differentials pass; no new
+implementation changes were needed beyond the prior `non_intrinsic`/masking and
+harness-normalization work. Final validation for this pass:
+`cargo fmt -p fortran-lsp`, `cargo test -p fortran-lsp` (217 tests),
+`cargo build -p freight`, full fpm differential pass. Next external fixture
+should be another real Fortran project, or run broader/manual LSP request
+coverage if fpm is kept as the active oracle. Not committed.
+
 ## 2026-06-29 — Big-library CMake interop testing + --jobs overload fix (Claude)
 
 Tested real CMake libraries via `build = "cmake"` self-builds with `--jobs 2`:
@@ -8187,3 +8556,129 @@ Doc'd JOBS in manifest-reference plugin-constants table; CHANGELOG Fixed entry.
 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` (passed via `[package].defines`). Candidate
 for a freight default. (2) abseil's date version `20240722.0` isn't semver — freight
 requires major.minor.patch (`20240722.0.0`). NOT committed — awaiting user.
+
+## 2026-06-29 — Feature-pinned cmake binary (Claude)
+
+Prototyped @user's "cmake plugin feature binds set the cmake bin version" idea and
+proved it works via existing machinery: a build-dep's bin/ goes on tool_paths, and
+the plugin's run/capture("cmake") resolves tool_paths before $PATH. Live-verified a
+wrapper cmake handling all 4 plugin calls (--version/configure/build/install).
+
+Found + fixed a real bug: optional [build-dependencies] were NEVER feature-gated
+(only [dependencies] were) — so an optional build-dep was always built. Threaded
+activated_deps into build_foreign_deps (adaptors/mod.rs) and skip optional build-
+deps not in the set, mirroring deps.rs. Now `--features pinned-cmake` toggles the
+pinned tool: off → system cmake, on → the dep's cmake. Regression test
+feature_activates_a_pinned_cmake_binary (plugin_cmake.rs). Doc'd in cmake-interop.md.
+Tests passed (plugin_cmake 3/3, interop 4/4, features/build_deps/adaptors lib) when
+the tree was green. NOTE: fortran-lsp working tree is broken AGAIN by another agent
+(scopes_equal_case_insensitive) — blocks workspace build/clippy; my code was
+validated before it broke. Pushed freight 30c4bec.
+
+## 2026-06-29 — Fortran LSP stdlib/fpm differential cleanup (Codex)
+
+Tightened `scripts/fortran_lsp_compare.py` project-mode normalization for
+generated-template Fortran projects. The harness now includes `.fypp` declaration
+names and explicit local `use` aliases such as `i8 => int64` when suppressing
+open-order cascade diagnostics, and compares diagnostics as message sets because
+the comparison intentionally strips locations.
+
+Validation: `python3 -m py_compile scripts/fortran_lsp_compare.py`,
+`cargo test -p fortran-lsp` (217 tests), full stdlib differential
+(`/tmp/freight-stdlib-fixture`, `--max-files 0`) passed, and full fpm
+differential (`/tmp/freight-fpm-fixture`, `--max-files 0`) passed. Not committed.
+
+## 2026-06-30 — Fortran LSP Freight adapter coverage (Codex)
+
+Added focused `FortranIndexer` adapter tests in `crates/freight` for the native
+Fortran LSP surfaces that were implemented but not directly checked at the
+Freight boundary: inlay hints, document highlights, folding ranges, code
+actions, and rename workspace edits. Existing adapter coverage already checked
+include roots, line-length manifest options, diagnostics, workspace symbols,
+semantic tokens, selection ranges, and implementation lookup.
+
+Validation: `cargo fmt -p freight -p fortran-lsp`, `cargo test -p fortran-lsp`
+(217 tests), `cargo test -p freight fortran_indexer_serves -- --nocapture`,
+`cargo test -p freight --lib lsp::indexers::Fortran::tests:: -- --nocapture`,
+`cargo build -p freight`, and the deterministic
+`scripts/fortran_lsp_compare.py --freight target/debug/freight` differential all
+passed. Not committed.
+
+Follow-up in same session: extended the deterministic JSON-RPC harness itself
+with Freight-only live protocol checks for native Fortran surfaces that fortls
+does not own: `textDocument/inlayHint`, `documentHighlight`, `foldingRange`,
+`selectionRange`, `semanticTokens/full`, `rename`, and `codeAction`. Added a
+small deferred-procedure fixture for code-action validation. The fortls
+comparison remains scoped to shared fortls behavior; these extra checks assert
+that the actual `freight lsp` process exposes the native Rust library through
+the expected LSP methods.
+
+Validation: `python3 -m py_compile scripts/fortran_lsp_compare.py`,
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight
+--request-timeout 30 --diagnostic-timeout 5 --diagnostic-quiet 0.35`,
+`cargo test -p freight --lib lsp::indexers::Fortran::tests:: -- --nocapture`,
+and `cargo test -p fortran-lsp` (217 tests) passed. Not committed.
+
+## 2026-06-30 — Fortran LSP json-fortran parity cleanup (Codex)
+
+Continued the native `fortran-lsp` port against a new external fixture:
+`jacobwilliams/json-fortran` cloned at `/tmp/freight-json-fortran-fixture`.
+Parser now expands preprocessor include files into the logical-line stream,
+keeps continued statements open across preprocessor directives, skips blank
+lines inside continued statements, filters inactive preprocessor branches before
+folding continued statements, and imports include-defined macros. Workspace call
+diagnostics now resolve unqualified procedure calls by call-site scope, so an
+internal procedure such as `traverse(p)` shadows a same-name type-bound method.
+
+Validation: `cargo test -p fortran-lsp` (220 tests), `cargo test -p freight
+fortran -- --nocapture`, `cargo build -p freight`, and full json-fortran
+differential:
+`python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project
+/tmp/freight-json-fortran-fixture --request-timeout 30 --diagnostic-timeout 20
+--diagnostic-quiet 0.35`. The full json-fortran run still exits mismatch
+because fortls emits extra masking/declaration warnings, but there are no
+Freight-only diagnostics left in that diff. Not committed.
+
+## 2026-06-30 — Fortran LSP test-drive fixture cleanup (Codex)
+
+Added `fortran-lang/test-drive` as another external differential fixture at
+`/tmp/freight-test-drive-fixture`. Fixed a false native diagnostic where
+same-name derived types and constructor/generic interfaces were conflated:
+members of `type color_output` were treated as if they were inside a later
+`interface color_output`, producing spurious `type(color_code)` import errors.
+`interface_scope_for_symbol` now requires the interface symbol range to contain
+the queried symbol line.
+
+Validation: full `test-drive` project differential passed,
+`cargo test -p fortran-lsp` passed (222 tests), and `cargo test -p freight
+fortran -- --nocapture` passed. Not committed.
+
+## 2026-07-02 — url build-deps end-to-end: pin an exact tool binary (Claude)
+
+Follow-on to the feature-pinned-cmake work: made pinned tool binaries real
+without needing registry packages — a build-dep can now point straight at a
+prebuilt tool archive (e.g. Kitware's per-release cmake tarballs):
+
+    [build-dependencies]
+    cmake = { version = "3.28", url = "https://…/cmake-3.28.6-linux-x86_64.tar.gz" }
+
+Three gaps closed in `crates/freight` (commit d6e3a92, adaptors-as-plugins):
+- a `url`/`path`-pinned build-dep was silently short-circuited by a system
+  tool of the same name (adaptors/mod.rs); an explicit pin now always wins;
+- url build-deps were never fetched at all — the build now fetches them on
+  demand and `freight fetch` includes `[build-dependencies]` (dep_cmds.rs);
+- latent bug: `freight fetch` re-attempted an archive download of *git* url
+  deps every run (git clones write no `.freight-fetched`); git urls are now
+  skipped by the url fetcher.
+
+Tested: live build on a cmake-4.3.4 host pinned to 3.28.6 (CMAKE_COMMAND in
+CMakeCache = .pkgs/cmake/bin/cmake); mismatched constraint (4.1 vs 3.28.6)
+fails before configure; `freight fetch` downloads the tarball; new regression
+test `pinned_build_dep_beats_system_tool` (tests/plugin_cmake.rs); full
+`cargo test` in crates/freight green (825 tests). Docs: cmake-interop.md
+"Pinning the cmake binary" rewritten around the url story + CHANGELOG.
+
+Committed & pushed: freight d6e3a92 + workspace pointer bump. Note for the
+fortran-lsp agent: your uncommitted WIP (src/lsp/indexers/Fortran.rs +142 and
+rustfmt churn in plugin.rs/cmake_toolchain.rs/cmake_provide.rs) is untouched
+in the working tree.
