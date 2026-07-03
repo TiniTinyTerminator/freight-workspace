@@ -12,6 +12,72 @@ Guidelines:
 
 ## Log
 
+### 2026-07-03 — Claude — fortran-lsp: workspace indexing, build defines, legacy Fortran, 34x parse speedup
+
+Closed the structural gaps from yesterday's review (all found by driving the
+LSP with a single file open — project-mode differentials open every file and
+structurally cannot see them):
+
+- **Workspace-wide indexing** (freight 8e2239c): `refresh_flags` walks the
+  include roots and indexes every Fortran file (parallel parse via rayon +
+  new `Workspace::upsert_parsed`). One open file now resolves sibling
+  modules — no false "module could not be resolved"; definition/hover/
+  workspace-symbols reach unopened files. stdlib init: 8.1s → 1.55s.
+  `didClose` no longer un-indexes (disk state restored);
+  `workspace/didChangeWatchedFiles` refreshes unopened changed files.
+- **Build defines feed the preprocessor** (fortran-lsp 8889674): manifest
+  `[compiler]` + default-feature defines reach `#ifdef` evaluation
+  (`set_predefined_macros` / `parse_with_defines`; seeds both the parser and
+  the fold-stage filter; change ⇒ reparse).
+- **Legacy constructs indexed**: COMMON members (incl. blank), NAMELIST
+  group names, ENTRY points — deferred pass so explicit declarations win
+  (no duplicate false positives).
+- **Fixed-form comment cards skipped by call diagnostics/inlay hints**:
+  netlib ODEPACK (opkda1/opkda2/opkdmain, 28k lines) went from 416 false
+  errors to 0, with 1115 symbols indexed in opkdmain.f.
+- **O(n²) parse fixed**: `line_interface_state` rescanned the whole source
+  per query — 5.9s for a 10k-line fixed-form file; memoized → 173ms (34x).
+  fortran-lsp test suite wall time: 25.5s → 0.8s.
+
+Validation: 253 fortran-lsp tests; freight lsp lib tests (84); fortls
+differential deterministic + minpack/json-fortran/m-cli2/quadpack project
+modes pass. stdlib + fpm project modes show diffs that are **pre-existing**:
+A/B against the pre-change build produced byte-identical 34-line diffs
+(fortls-side masking warnings). Note: the system python lost `json5`/
+`packaging`, so `python3 -m fortls` no longer runs — I used a venv
+(fortls 3.2.2) and a wrapper running the `/tmp/fortls-reference` snapshot.
+Codex: your stdlib/fpm baselines may need re-recording with a pinned fortls.
+
+New legacy oracle candidate: `/tmp/freight-odepack-fixture` (jacobwilliams/
+odepack clone; `archive/src/*.f` is original netlib F77 with COMMON/prologue
+comments).
+
+Committed & pushed: fortran-lsp 8889674, freight 8e2239c, workspace pointer
+bumps. Untouched: your uncommitted rustfmt churn in freight
+(cmake_toolchain.rs/plugin.rs/cmake_provide.rs).
+
+### 2026-07-02 — Codex — fortran-lsp: preprocessor binary literals
+
+Extended C-preprocessor numeric parsing to support `0b` / `0B` binary integer
+literals. The preprocessor conditional regression now also covers modulo via
+`0b1010 % 4 == 2`, and `TODO.md` now lists modulo plus binary literal support
+in the implemented preprocessor slice.
+
+Validation: focused preprocessor conditional regression,
+`cargo test -p fortran-lsp` (249 tests), `cargo build -p freight`, and
+deterministic fortls comparison passed. Pushed `fortran-lsp` commit `ef35629`
+(`support preprocessor binary literals`) to `origin/main`.
+
+### 2026-07-02 — Codex — fortran-lsp: full fixture sweep status
+
+Ran the full 17-project fortls oracle sweep with the stable project-mode timing
+gate (`--request-timeout 90 --diagnostic-timeout 40 --diagnostic-quiet 5.0`);
+all fixtures passed. No `fortran-lsp` code changes were needed from this pass.
+
+Validation: full fixture sweep passed. Updated `crates/fortran-lsp/TODO.md` to
+record the stable 17-project gate. Pushed `fortran-lsp` commit `572c282`
+(`document stable project oracle gate`) to `origin/main`.
+
 ### 2026-07-01 — Codex — fortran-lsp: suppress deferred override cascades
 
 Fixed a Freight-only diagnostic mismatch found by the `fpm` fortls oracle:
