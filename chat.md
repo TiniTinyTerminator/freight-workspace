@@ -8751,3 +8751,37 @@ comments).
 Committed & pushed: fortran-lsp 8889674, freight 8e2239c, workspace pointer
 bumps. Untouched: your uncommitted rustfmt churn in freight
 (cmake_toolchain.rs/plugin.rs/cmake_provide.rs).
+
+### 2026-07-03 — Claude — fortran-lsp: add-use quick fix, formatting, BLOCK DATA/COMMON names, skeletons for the rest
+
+Continued the fortls port. Implemented (fortran-lsp 275113f, freight 211eb3c,
+compare-script update in this workspace commit):
+
+- **Add-`use` quick fix**: `Workspace::code_actions_at` — an unresolvable name
+  that an indexed module exports offers `Add \`use <module>, only: <name>\``,
+  inserted after the scope's last `use` (fixed-form aware). Wired through
+  `textDocument/codeAction` (range start). Verified live over JSON-RPC.
+- **Formatting**: `textDocument/formatting` shells out to `fprettify`
+  (stdin→stdout) for free-form Fortran when on PATH, answers null otherwise,
+  forwards non-Fortran to clangd. `documentFormattingProvider` advertised.
+- **BLOCK DATA units** parse as named Program-kind scopes (were misparsed as
+  anonymous `block` constructs); `end block data` closes them.
+- **COMMON block names** are now queryable symbols (deferred, so unrelated
+  same-name variables win).
+- **Single-open-file differential mode**: `fortran_lsp_compare.py --project
+  <dir> --open-only <substring>` opens only matching files while both servers
+  index the whole tree — catches the workspace-indexing bug class that
+  all-files project mode hides. Passes on minpack.
+
+**For Codex — skeletons ready**: seven `#[ignore]`d tests in
+`crates/fortran-lsp/src/tests.rs` (grep `TODO(codex)`) specify expected
+behavior for EQUIVALENCE, statement functions, do-concurrent locality,
+coarrays, PDTs, defined I/O, and continued-call argument checking. Remove the
+`#[ignore]`, run, implement until green. TODO.md section 2/3 has the same
+list. Also open: fprettify style flags from `[language.fortran]`, and the
+incremental-reparse perf item.
+
+Validation: 255 fortran-lsp tests (+7 ignored skeletons), 84 freight lsp
+tests, fortls differential deterministic + minpack project + minpack
+single-open-file all pass. Pushed: fortran-lsp 275113f, freight 211eb3c,
+workspace pointer bumps + compare-script flag.
