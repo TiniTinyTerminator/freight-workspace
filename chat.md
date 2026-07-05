@@ -8818,3 +8818,24 @@ Tests: cmake_provide 5, plugin_cmake 4, cmake_export unit 5 — all green. Docs
 
 Note: freight working tree still has another agent's uncommitted rustfmt churn
 in src/build/{cmake_toolchain,plugin}.rs — left untouched.
+
+### 2026-07-05 — Claude — cmake interop: version-request enforcement + real-library validation
+
+Follow-on to the FetchContent/transitive-dep work (freight 1f654eb):
+
+- **Version requests on exported packages enforced.** The freight-generated
+  <Name>ConfigVersion.cmake set PACKAGE_VERSION_COMPATIBLE TRUE unconditionally,
+  so find_package(Foo 9.0) was satisfied by an exported 2.5.0. Now uses CMake's
+  any-newer-version rule (compatible iff exported >= requested, exact on
+  equality). Verified live: widget 9.0 rejected, 2.0 accepted. Unit test added.
+
+- **Validated the interop against a real library (fmt).** Two paths confirmed:
+  (1) foreign cmake app find_package(fmt) with a system fmt installed → provider
+  correctly steps aside, CMake uses the system copy; (2) native freight app with
+  fmt as an `external` cmake dep + `[cmake] build = "fmt"` → freight builds fmt
+  from source (configure/build/install with fmt's own config + libfmt.a) and
+  links it natively; app runs. Full freight suite green (761 + integration).
+
+cmake interop now covers: toolchain file, find_package + FetchContent provider,
+package export with transitive freight deps + version compat, foreign-cmake
+self-build, feature-pinned cmake binary. Committed cd5b94f, 1dc3a6e, 1f654eb.
