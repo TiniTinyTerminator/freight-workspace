@@ -8785,3 +8785,36 @@ Validation: 255 fortran-lsp tests (+7 ignored skeletons), 84 freight lsp
 tests, fortls differential deterministic + minpack project + minpack
 single-open-file all pass. Pushed: fortran-lsp 275113f, freight 211eb3c,
 workspace pointer bumps + compare-script flag.
+
+### 2026-07-05 — Claude — cmake interop: FetchContent interception + transitive-dep exports
+
+Two CMake-compatibility gaps closed (freight cd5b94f + 1dc3a6e,
+adaptors-as-plugins):
+
+- **FetchContent resolved through freight.** The cmake dependency provider
+  handled only find_package; FetchContent still downloaded. It now also handles
+  FETCHCONTENT_MAKEAVAILABLE_SERIAL: for each FetchContent_MakeAvailable(dep),
+  the provider asks `freight cmake-provide dep` and, if freight can provide it,
+  does a config-mode find_package in freight's prefix + FetchContent_SetPopulated
+  — so the declared GIT_REPOSITORY/URL is never downloaded and vendored copies
+  are bypassed. Unknown deps fall through to normal population (clone/archive/
+  SOURCE_DIR). Verified live: a foreign cmake app FetchContent'ing a foreign-cmake
+  dep with a DEAD git URL builds + runs (greeting provided by freight, report
+  shows `fetchcontent-provided greeting`).
+
+- **Exported packages carry transitive freight deps.** A freight lib exported
+  for a downstream find_package wrapped only its own archive, so a foreign cmake
+  app linking mylib::mylib got undefined symbols for mylib's freight deps
+  (static libs don't embed static deps). The generated <Name>Config.cmake now
+  emits find_dependency(<dep>) + links <dep>::<dep> for each freight
+  [dependencies] (system deps omitted — unknown casing). `freight cmake-provide`
+  recursively builds+exports the whole freight-dep closure and returns every
+  prefix (;-joined onto CMAKE_PREFIX_PATH); provide_cmake_package now returns
+  Vec<PathBuf> with a visited-set guard. Verified live to 2 levels
+  (alpha->bee->cee => 22).
+
+Tests: cmake_provide 5, plugin_cmake 4, cmake_export unit 5 — all green. Docs
+(cmake-interop.md §2/§3) + CHANGELOG updated.
+
+Note: freight working tree still has another agent's uncommitted rustfmt churn
+in src/build/{cmake_toolchain,plugin}.rs — left untouched.
