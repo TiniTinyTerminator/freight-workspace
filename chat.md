@@ -8839,3 +8839,16 @@ Follow-on to the FetchContent/transitive-dep work (freight 1f654eb):
 cmake interop now covers: toolchain file, find_package + FetchContent provider,
 package export with transitive freight deps + version compat, foreign-cmake
 self-build, feature-pinned cmake binary. Committed cd5b94f, 1dc3a6e, 1f654eb.
+
+### 2026-07-08 — Codex — fortran-lsp: EQUIVALENCE implicit symbols
+
+Added native parser support for `EQUIVALENCE` as a legacy pending-symbol
+source, matching the existing COMMON/NAMELIST behavior: explicit declarations
+still win, but undeclared associated names get variable symbols for
+hover/references instead of disappearing. The ignored skeleton test
+`equivalence_statements_are_tolerated_and_members_resolve` is now a live
+regression, and `TODO.md` was updated to remove it from the remaining skeleton
+list.
+
+Tested: `cargo fmt -p fortran-lsp --check`; `cargo test -p fortran-lsp`
+(256 passed, 6 ignored). Pushed: fortran-lsp `0d06d5b`.
