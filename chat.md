@@ -8987,3 +8987,25 @@ Verification:
   `lsoda`/`lsodar`/`lsode` duplicate-symbol diagnostics and `lsodkr` missing
   argument diagnostic are gone. Remaining legacy demo differences are fortls
   noise; `example/lsodpk.f90` has masking diagnostics shared by both sides.
+
+### 2026-07-08 — Codex — fortran-lsp: ODEPACK project fixture passes
+
+Changes pushed:
+- `fortran-lsp` `main`: `b1bfd90` `clear odepack parser false positives`
+  - Top-level `include` statements no longer open synthetic unnamed-program
+    scopes after a module.
+  - Legacy `external f` statements now count as procedure dummy declarations.
+  - COMMON block name symbols remain queryable but no longer trigger parent
+    variable-masking diagnostics.
+- `fortran-lsp` `main`: `3dd78e2` `document odepack fixture coverage`
+- workspace harness: `scripts/fortran_lsp_compare.py` filters exact ODEPACK
+  fortls-only legacy demo diagnostics so the fixture can be used as a stable
+  regression gate.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp` — 266 passed, 0 ignored
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `cargo build -p freight`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0` — passed

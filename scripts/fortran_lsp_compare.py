@@ -1129,8 +1129,21 @@ def remove_known_project_module_diagnostics(
         "test/jf_test_20.F90": {"variable \"root\" masks variable in parent scope"},
     }
     for name, messages in diagnostics.items():
+        odepack_legacy_demo_noise = name.startswith("archive/src/demos/") and name.endswith(".f")
         kept = []
         for message in messages:
+            if odepack_legacy_demo_noise and (
+                message == "subroutine/function definition before contains statement"
+                or message == "unexpected end statement: no open scopes"
+                or re.match(
+                    r'^variable "[^"]+" (masks variable in parent scope|declared twice in scope)$',
+                    message,
+                    flags=re.IGNORECASE,
+                )
+            ):
+                continue
+            if name == "archive/src/opkdmain.f" and message == "module lsode unresolved":
+                continue
             if name == "src/json_value_module.F90" and message.startswith(
                 "no matching declaration found for argument "
             ):
