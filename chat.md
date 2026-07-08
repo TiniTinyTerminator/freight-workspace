@@ -9028,3 +9028,21 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
+### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
+
+Changes pushed:
+- `fortran-lsp` `main`: `cd79e4e` `complete preprocessor condition support`
+  - `#if` / `#elif` evaluation now handles ternary `?:`.
+  - Directive-condition evaluation now expands function-like macro calls in
+    both the fold-stage preprocessor filter and the main parser pass.
+  - Added regression coverage for active/inactive symbols guarded by both
+    ternary expressions and function-like macro calls.
+  - Marked the C-preprocessor expression TODO point complete; 3 unchecked
+    `fortran-lsp` TODO points remain.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp preprocessor_conditionals_filter_inactive_symbols -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 266 passed, 0 ignored
+- `python3 scripts/fortran_lsp_compare.py` — passed
