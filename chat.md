@@ -9067,3 +9067,22 @@ Verification:
 - `cargo test -p fortran-lsp type_bound_generic_signature_help_picks_matching_argument_count -- --nocapture` — passed
 - `cargo test -p fortran-lsp` — 267 passed, 0 ignored
 - `python3 scripts/fortran_lsp_compare.py` — passed
+
+### 2026-07-08 — Codex — fortran-lsp: procedure characteristic diagnostics
+
+Changes pushed:
+- `fortran-lsp` `main`: `9e97ebb` `diagnose procedure characteristic mismatches`
+  - Procedure signatures now preserve procedure prefixes such as `pure` and
+    `elemental` instead of dropping them during scope recognition.
+  - Explicit type-bound procedure interface checks now require targets to carry
+    required `pure` / `elemental` characteristics from the abstract interface.
+  - Added regression coverage for a `pure` abstract interface bound to an
+    impure target.
+  - Marked the procedure/type interface compatibility TODO point complete; 1
+    unchecked `fortran-lsp` TODO point remains.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp reports_type_bound_procedure_interface_characteristic_mismatch -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 268 passed, 0 ignored
+- `python3 scripts/fortran_lsp_compare.py` — passed
