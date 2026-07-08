@@ -8900,3 +8900,15 @@ Tested: `cargo fmt -p fortran-lsp --check`; focused
 `parameterized_derived_types_resolve`; `cargo test -p fortran-lsp` (260 passed,
 2 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
 `70d493a`.
+
+### 2026-07-08 — Codex — fortran-lsp: defined I/O regression
+
+Unignored the `defined_io_generic_bindings_resolve` skeleton because current
+generic-binding parsing already satisfies its no-false-diagnostics floor.
+`TODO.md` now has one ignored skeleton left: continued fixed-form call
+argument checking.
+
+Tested: `cargo fmt -p fortran-lsp --check`; focused
+`defined_io_generic_bindings_resolve`; `cargo test -p fortran-lsp` (261 passed,
+1 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
+`e23c1f4`.
