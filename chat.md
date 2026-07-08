@@ -8852,3 +8852,16 @@ list.
 
 Tested: `cargo fmt -p fortran-lsp --check`; `cargo test -p fortran-lsp`
 (256 passed, 6 ignored). Pushed: fortran-lsp `0d06d5b`.
+
+### 2026-07-08 — Codex — fortran-lsp: statement functions
+
+Implemented statement-function indexing for `f(x) = ...` lines in a program
+unit's specification part. Existing scalar type declarations are upgraded from
+Variable to Function symbols so there is no duplicate diagnostic; shaped array
+declarations remain array variables. The skeleton test
+`statement_functions_get_local_function_symbols` is now live, and `TODO.md`
+now lists five remaining ignored skeletons.
+
+Tested: `cargo fmt -p fortran-lsp --check`; `cargo test -p fortran-lsp`
+(257 passed, 5 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed:
+fortran-lsp `f3957d1`.
