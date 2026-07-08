@@ -8926,3 +8926,16 @@ Tested: `cargo fmt -p fortran-lsp --check`; focused
 `continued_calls_are_argument_checked`; `cargo test -p fortran-lsp` (262 passed,
 0 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
 `d3949c4`.
+
+### 2026-07-08 — Codex — freight lsp: fprettify style options
+
+Closed the remaining Fortran formatting TODO: `textDocument/formatting` now
+reads `[language.fortran]` from the active manifest and forwards `indent` /
+`indent_width` plus `max_line_length` as `fprettify` flags. The formatter still
+answers null when `fprettify` is missing or fails, and still forwards non-Fortran
+formatting to passthrough servers. Updated `crates/fortran-lsp/TODO.md` to mark
+the LSP surface item done.
+
+Tested: `cargo fmt -p freight --check`; `cargo test -p freight fprettify_args
+-- --nocapture`; `cargo test -p freight lsp:: --lib`. Pushed: freight
+`5e1b2bf`, fortran-lsp `c8abe7b`.
