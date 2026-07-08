@@ -8967,3 +8967,23 @@ Next notes:
 - ODEPACK still exposes a few Freight-side example diagnostics
   (`example/lsoda*.f90` duplicate symbols and `example/lsodkr.f90` argument
   matching). Those are separate debugging targets from the legacy F77 cleanup.
+
+### 2026-07-08 — Codex — fortran-lsp: statement-function false positives
+
+Changes pushed:
+- `fortran-lsp` `main`: `18a0a4c` `reject array assignments as statement functions`
+  - Statement-function parsing now validates raw dummy-argument fields instead
+    of silently dropping invalid numeric subscripts.
+  - Array element assignments like `ydot(1) = ...` and `pd(1,1) = ...` no
+    longer get indexed as local statement functions.
+  - Added a regression test and updated the ODEPACK fixture note.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp` — 263 passed, 0 ignored
+- `cargo build -p freight`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- ODEPACK project compare still exits mismatch, but the Freight-only
+  `lsoda`/`lsodar`/`lsode` duplicate-symbol diagnostics and `lsodkr` missing
+  argument diagnostic are gone. Remaining legacy demo differences are fortls
+  noise; `example/lsodpk.f90` has masking diagnostics shared by both sides.
