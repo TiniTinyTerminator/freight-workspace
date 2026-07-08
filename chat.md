@@ -8865,3 +8865,14 @@ now lists five remaining ignored skeletons.
 Tested: `cargo fmt -p fortran-lsp --check`; `cargo test -p fortran-lsp`
 (257 passed, 5 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed:
 fortran-lsp `f3957d1`.
+
+### 2026-07-08 — Codex — fortran-lsp: do-concurrent locality regression
+
+Unignored the `do_concurrent_locality_names_are_scoped` skeleton because the
+current parser already satisfies its no-false-masking floor. `TODO.md` now
+tracks it as covered, leaving four ignored skeletons.
+
+Tested: `cargo fmt -p fortran-lsp --check`; focused
+`do_concurrent_locality_names_are_scoped`; `cargo test -p fortran-lsp`
+(258 passed, 4 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed:
+fortran-lsp `6c159df`.
