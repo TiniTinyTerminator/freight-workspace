@@ -8888,3 +8888,15 @@ Tested: `cargo fmt -p fortran-lsp --check`; focused
 `coarray_declarations_are_tolerated`; `cargo test -p fortran-lsp` (259 passed,
 3 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
 `74a4d50`.
+
+### 2026-07-08 — Codex — fortran-lsp: parameterized derived type regression
+
+Unignored the `parameterized_derived_types_resolve` skeleton because the parser
+already satisfies its no-false-diagnostics floor and indexes the PDT type plus
+the variable declared as `type(matrix(...))`. `TODO.md` now lists two remaining
+ignored skeletons: defined I/O generics and continued fixed-form call checking.
+
+Tested: `cargo fmt -p fortran-lsp --check`; focused
+`parameterized_derived_types_resolve`; `cargo test -p fortran-lsp` (260 passed,
+2 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
+`70d493a`.
