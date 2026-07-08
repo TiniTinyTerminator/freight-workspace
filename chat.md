@@ -8876,3 +8876,15 @@ Tested: `cargo fmt -p fortran-lsp --check`; focused
 `do_concurrent_locality_names_are_scoped`; `cargo test -p fortran-lsp`
 (258 passed, 4 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed:
 fortran-lsp `6c159df`.
+
+### 2026-07-08 — Codex — fortran-lsp: coarray tolerance regression
+
+Unignored the `coarray_declarations_are_tolerated` skeleton because current
+parsing already handles the no-false-diagnostics floor for `codimension[*]`,
+`x[*]`, `sync all`, and indexed coarray references. `TODO.md` now lists three
+remaining ignored skeletons.
+
+Tested: `cargo fmt -p fortran-lsp --check`; focused
+`coarray_declarations_are_tolerated`; `cargo test -p fortran-lsp` (259 passed,
+3 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
+`74a4d50`.
