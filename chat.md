@@ -9046,3 +9046,24 @@ Verification:
 - `cargo test -p fortran-lsp preprocessor_conditionals_filter_inactive_symbols -- --nocapture` — passed
 - `cargo test -p fortran-lsp` — 266 passed, 0 ignored
 - `python3 scripts/fortran_lsp_compare.py` — passed
+
+### 2026-07-08 — Codex — fortran-lsp: ambiguous polymorphic dispatch
+
+Changes pushed:
+- `fortran-lsp` `main`: `a998066` `model ambiguous polymorphic dispatch`
+  - Ambiguous concrete overrides for a `class(parent)` receiver now resolve to
+    the declared abstract interface instead of guessing a descendant.
+  - Signature help and call diagnostics use that static deferred interface, so
+    valid keyword calls pass and invalid keyword names are reported.
+  - Deferred generic overloads still suppress misleading positional hints unless
+    the matching candidate is unique; concrete generic overload behavior is
+    preserved.
+  - Marked the polymorphic dispatch TODO point complete; 2 unchecked
+    `fortran-lsp` TODO points remain.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp polymorphic -- --nocapture` — passed
+- `cargo test -p fortran-lsp type_bound_generic_signature_help_picks_matching_argument_count -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 267 passed, 0 ignored
+- `python3 scripts/fortran_lsp_compare.py` — passed
