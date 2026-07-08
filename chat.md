@@ -8912,3 +8912,17 @@ Tested: `cargo fmt -p fortran-lsp --check`; focused
 `defined_io_generic_bindings_resolve`; `cargo test -p fortran-lsp` (261 passed,
 1 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
 `e23c1f4`.
+
+### 2026-07-08 — Codex — fortran-lsp: continued-call argument diagnostics
+
+Fixed the last Claude skeleton: call diagnostics now fold fixed/free continued
+source lines before parsing calls, so fixed-form calls split across continuation
+cards get the same missing/extra-argument checks as single-line calls. Diagnostic
+ranges remain anchored to the physical call-start line. Cleaned the old skeleton
+comments in `tests.rs`; all seven former `TODO(codex)` skeleton tests are now
+live.
+
+Tested: `cargo fmt -p fortran-lsp --check`; focused
+`continued_calls_are_argument_checked`; `cargo test -p fortran-lsp` (262 passed,
+0 ignored); `python3 scripts/fortran_lsp_compare.py`. Pushed: fortran-lsp
+`d3949c4`.
