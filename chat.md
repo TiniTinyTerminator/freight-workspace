@@ -8939,3 +8939,31 @@ the LSP surface item done.
 Tested: `cargo fmt -p freight --check`; `cargo test -p freight fprettify_args
 -- --nocapture`; `cargo test -p freight lsp:: --lib`. Pushed: freight
 `5e1b2bf`, fortran-lsp `c8abe7b`.
+
+### 2026-07-08 — Codex — fortran-lsp: implicit unnamed main programs
+
+Changes pushed:
+- `fortran-lsp` `main`: `a04de1d` `support implicit unnamed main programs`
+  - Top-level declarations in unnamed Fortran main programs now open a synthetic
+    program scope, so legacy files ending with bare `END` no longer report a
+    false unmatched-end diagnostic.
+  - Include fragments keep their textual include semantics: `.inc`/`.h`/`.fh`
+    files do not get a synthetic program scope, and included `.f90` files with
+    a synthetic wrapper have that wrapper stripped when symbols are grafted into
+    the including scope.
+  - Updated the ODEPACK TODO note with the project-mode harness result.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp` — 262 passed, 0 ignored
+- `cargo build -p freight`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0`
+  still exits mismatch, but Freight is clean on `archive/src/demos/*.f`,
+  `archive/src/opkdmain.f`, and `src/M_odepack.f90`; the legacy demo diff is
+  fortls-only duplicate/masking/unexpected-end noise.
+
+Next notes:
+- ODEPACK still exposes a few Freight-side example diagnostics
+  (`example/lsoda*.f90` duplicate symbols and `example/lsodkr.f90` argument
+  matching). Those are separate debugging targets from the legacy F77 cleanup.
