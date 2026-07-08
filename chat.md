@@ -9086,3 +9086,22 @@ Verification:
 - `cargo test -p fortran-lsp reports_type_bound_procedure_interface_characteristic_mismatch -- --nocapture` — passed
 - `cargo test -p fortran-lsp` — 268 passed, 0 ignored
 - `python3 scripts/fortran_lsp_compare.py` — passed
+
+### 2026-07-08 — Codex — fortran-lsp: stable symbol-index cache
+
+Changes pushed:
+- `fortran-lsp` `main`: `8d41bd8` `cache stable workspace symbol indexes`
+  - `Workspace` now caches each file's `(symbol-name, index)` list.
+  - `upsert_parsed` skips removing/rebuilding global `by_name` entries when a
+    text edit reparses to the same symbol index, while still storing the new
+    source/parsed file.
+  - Added regression coverage for body/comment-only changes preserving
+    workspace symbol lookup.
+  - Marked the final performance TODO point complete; 0 unchecked
+    `fortran-lsp` TODO points remain.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp workspace_upsert -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 269 passed, 0 ignored
+- `python3 scripts/fortran_lsp_compare.py` — passed
