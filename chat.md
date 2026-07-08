@@ -9009,3 +9009,22 @@ Verification:
 - `cargo build -p freight`
 - `python3 scripts/fortran_lsp_compare.py` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0` — passed
+
+### 2026-07-08 — Codex — fortran-lsp: project definition probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `2ab5cd2` `mark project differential coverage done`
+  - `TODO.md` now marks the differential-coverage point done; 4 unchecked
+    points remain.
+- Workspace harness: project mode now samples up to 20 real declaration
+  positions and compares `textDocument/definition` target file/line between
+  Freight and fortls.
+  - ODEPACK legacy demo `.f` files are skipped for definition probes because
+    fortls resolves their external procedures to the unnamed main-program line;
+    their diagnostics are already covered by the documented oracle-noise filter.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed

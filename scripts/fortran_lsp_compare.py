@@ -547,6 +547,14 @@ def simplify_location(value: Any) -> Any:
     }
 
 
+def simplify_location_line(value: Any) -> Any:
+    loc = simplify_location(value)
+    if not isinstance(loc, dict):
+        return loc
+    start = ((loc.get("range") or {}).get("start") or {})
+    return {"uri": loc.get("uri"), "line": start.get("line")}
+
+
 def simplify_signature(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
@@ -838,6 +846,46 @@ def project_conditional_include_templates(opened_files: dict[str, Path]) -> list
     return templates
 
 
+def project_definition_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    patterns = [
+        re.compile(r"^\s*module\s+(?!procedure\b)([a-z_]\w*)\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*(?:module\s+)?subroutine\s+([a-z_]\w*)\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*(?:[a-z_]\w*(?:\s*\([^)]*\))?\s+)?(?:module\s+)?function\s+([a-z_]\w*)\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*type\b[^:]*::\s*([a-z_]\w*)\b", flags=re.IGNORECASE),
+    ]
+    points: list[dict[str, Any]] = []
+    for file_name, path in sorted(files.items()):
+        if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        for line_no, raw_line in enumerate(lines):
+            line = strip_fortran_comment(raw_line)
+            if line.lower().lstrip().startswith("end "):
+                continue
+            for pattern in patterns:
+                match = pattern.match(line)
+                if not match:
+                    continue
+                symbol = match.group(1)
+                char = raw_line.lower().find(symbol.lower())
+                if char >= 0:
+                    points.append(
+                        {
+                            "file": file_name,
+                            "symbol": symbol.lower(),
+                            "line": line_no,
+                            "character": char,
+                        }
+                    )
+                break
+            if len(points) >= limit:
+                return points
+    return points
+
+
 def has_math_prototype_reference(items: Any) -> bool:
     if not isinstance(items, list):
         return False
@@ -1073,6 +1121,21 @@ def run_project_suite(
             {"textDocument": {"uri": uri(path)}},
             timeout=request_timeout,
         )
+    definition_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_definition_probe_points(files), start=1):
+        progress(f"definition probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe = request(
+            proc,
+            5_000 + offset,
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "position": {"line": point["line"], "character": point["character"]},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        definition_probes[key] = simplify_location_line(probe)
     progress("workspace/symbol")
     workspace_symbols = request(
         proc,
@@ -1092,6 +1155,7 @@ def run_project_suite(
             for name in files
         },
         "workspace_symbols": workspace_symbol_names(workspace_symbols),
+        "definition_probes": definition_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
         "conditional_include_templates": project_conditional_include_templates(files),
@@ -1238,6 +1302,15 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
     if missing_workspace:
         diffs.append("workspace symbols missing from Freight:")
         diffs.append(json.dumps(missing_workspace, indent=2, sort_keys=True))
+
+    if freight_result.get("definition_probes") != fortls_result.get("definition_probes"):
+        diffs.append("definition probes differ:")
+        diffs.append(
+            diff_json(
+                freight_result.get("definition_probes") or {},
+                fortls_result.get("definition_probes") or {},
+            )
+        )
 
     return "\n".join(diffs)
 
