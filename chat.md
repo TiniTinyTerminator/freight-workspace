@@ -9163,3 +9163,29 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
+### 2026-07-09 — Codex — fortran-lsp: project reference probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `7a13225` `skip strings in reference scans`
+  - Identifier occurrence scans now mask quoted string content before matching,
+    while preserving original byte offsets for UTF-16 range conversion.
+  - Added a regression ensuring references skip names that appear only inside
+    string literals.
+  - `TODO.md` now records same-file free-form reference probes as live project
+    coverage; fixed-form/cross-file reference policy remains for later
+    modelling/debugging.
+- Workspace harness: `scripts/fortran_lsp_compare.py --project` now samples
+  same-file free-form `textDocument/references` probes on declaration points and
+  compares normalized line locations against fortls.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp cursor_queries_use_utf16_columns -- --nocapture` — passed
+- `cargo test -p fortran-lsp references_skip_names_inside_string_literals -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 271 passed, 0 ignored
+- `cargo build -p freight` — passed
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed

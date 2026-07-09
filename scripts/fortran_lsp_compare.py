@@ -555,6 +555,27 @@ def simplify_location_line(value: Any) -> Any:
     return {"uri": loc.get("uri"), "line": start.get("line")}
 
 
+def simplify_reference_lines(value: Any, only_uri: str | None = None) -> Any:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return value
+    refs: set[tuple[str, int]] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        item_uri = item.get("uri")
+        if not isinstance(item_uri, str):
+            continue
+        if only_uri is not None and item_uri != only_uri:
+            continue
+        start = ((item.get("range") or {}).get("start") or {})
+        line = start.get("line")
+        if isinstance(line, int):
+            refs.add((item_uri, line))
+    return [{"uri": item_uri, "line": line} for item_uri, line in sorted(refs)]
+
+
 def simplify_signature(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
@@ -940,6 +961,15 @@ def project_definition_probe_points(files: dict[str, Path], limit: int = 20) -> 
     return points
 
 
+def project_reference_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    free_form_files = {
+        name: path
+        for name, path in files.items()
+        if path.suffix.lower() not in {".f", ".for", ".ftn", ".f77"}
+    }
+    return project_definition_probe_points(free_form_files, limit=limit)
+
+
 def project_signature_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
     call_re = re.compile(r"\bcall\s+([a-z_]\w*)\s*\(", flags=re.IGNORECASE)
     procedure_dummy_re = re.compile(
@@ -1251,12 +1281,29 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         hover_probes[key] = hover_mentions_symbol(probe, point["symbol"])
+    reference_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_reference_probe_points(files), start=1):
+        progress(f"references probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe_uri = uri(files[point["file"]])
+        probe = request(
+            proc,
+            7_000 + offset,
+            "textDocument/references",
+            {
+                "textDocument": {"uri": probe_uri},
+                "position": {"line": point["line"], "character": point["character"]},
+                "context": {"includeDeclaration": True},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        reference_probes[key] = simplify_reference_lines(probe, only_uri=probe_uri)
     signature_probes: dict[str, Any] = {}
     for offset, point in enumerate(project_signature_probe_points(files), start=1):
         progress(f"signature probe {point['file']}:{point['line']}:{point['symbol']}")
         probe = request(
             proc,
-            7_000 + offset,
+            8_000 + offset,
             "textDocument/signatureHelp",
             {
                 "textDocument": {"uri": uri(files[point["file"]])},
@@ -1287,6 +1334,7 @@ def run_project_suite(
         "workspace_symbols": workspace_symbol_names(workspace_symbols),
         "definition_probes": definition_probes,
         "hover_probes": hover_probes,
+        "reference_probes": reference_probes,
         "signature_probes": signature_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
@@ -1449,6 +1497,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
             diff_json(
                 freight_result.get("hover_probes") or {},
                 fortls_result.get("hover_probes") or {},
+            )
+        )
+    if freight_result.get("reference_probes") != fortls_result.get("reference_probes"):
+        diffs.append("reference probes differ:")
+        diffs.append(
+            diff_json(
+                freight_result.get("reference_probes") or {},
+                fortls_result.get("reference_probes") or {},
             )
         )
     if freight_result.get("signature_probes") != fortls_result.get("signature_probes"):
