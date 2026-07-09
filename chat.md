@@ -9189,3 +9189,35 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
+### 2026-07-09 — Codex — fortran-lsp: project completion probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `59155d7` `complete procedure dummy call completions`
+  - Call-statement completion now includes procedure dummy arguments such as
+    `procedure(func) :: fcn`.
+  - Module export completion now treats included public symbols as exports,
+    matching include-grafted module APIs.
+  - Added regressions for dummy-procedure call completion and included module
+    exports.
+  - `TODO.md` now records free-form call-statement completion probes as live
+    project coverage.
+- `freight` `adaptors-as-plugins`: `eb1b32c` `index fortran include files for lsp`
+  - `FortranIndexer` now indexes `.inc` files during workspace walks so native
+    LSP requests can resolve symbols from included Fortran sources.
+- Workspace harness: `scripts/fortran_lsp_compare.py --project` now samples
+  free-form `call <prefix>` completions and checks that both servers offer the
+  called procedure.
+
+Verification:
+- `cargo fmt -p fortran-lsp --check`
+- `cargo fmt -p freight --check`
+- `cargo test -p fortran-lsp completions_after_call_offer_callable_symbols_only -- --nocapture` — passed
+- `cargo test -p fortran-lsp included_module_exports_are_visible_for_call_completion -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 272 passed, 0 ignored
+- `cargo test -p freight fortran_indexer_indexes_include_files_for_module_exports -- --nocapture` — passed
+- `cargo build -p freight` — passed
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed

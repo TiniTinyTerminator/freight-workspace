@@ -765,6 +765,10 @@ def completion_labels(items: Any) -> list[str]:
     return sorted(labels)
 
 
+def completion_has_label(items: Any, label: str) -> bool:
+    return label.lower() in completion_labels(items)
+
+
 def diagnostic_messages(items: Any) -> list[str]:
     if not isinstance(items, list):
         return []
@@ -1007,6 +1011,41 @@ def project_signature_probe_points(files: dict[str, Path], limit: int = 20) -> l
                         "symbol": call_name,
                         "line": line_no,
                         "character": open_paren + 1,
+                    }
+                )
+                break
+            if len(points) >= limit:
+                return points
+    return points
+
+
+def project_completion_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    call_re = re.compile(r"\bcall\s+([a-z_]\w*)\s*(?:\(|$)", flags=re.IGNORECASE)
+    points: list[dict[str, Any]] = []
+    for file_name, path in sorted(files.items()):
+        if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+            continue
+        if path.suffix.lower() in {".f", ".for", ".ftn", ".f77"}:
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        for line_no, raw_line in enumerate(lines):
+            line = strip_fortran_comment(raw_line)
+            for match in call_re.finditer(line):
+                call_name = match.group(1).lower()
+                if len(call_name) < 3:
+                    continue
+                char = raw_line.lower().find(call_name[:3], match.start())
+                if char < 0:
+                    continue
+                points.append(
+                    {
+                        "file": file_name,
+                        "symbol": call_name,
+                        "line": line_no,
+                        "character": char + 3,
                     }
                 )
                 break
@@ -1313,6 +1352,21 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         signature_probes[key] = simplify_project_signature(probe)
+    completion_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_completion_probe_points(files), start=1):
+        progress(f"completion probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe = request(
+            proc,
+            9_000 + offset,
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "position": {"line": point["line"], "character": point["character"]},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        completion_probes[key] = completion_has_label(probe, point["symbol"])
     progress("workspace/symbol")
     workspace_symbols = request(
         proc,
@@ -1336,6 +1390,7 @@ def run_project_suite(
         "hover_probes": hover_probes,
         "reference_probes": reference_probes,
         "signature_probes": signature_probes,
+        "completion_probes": completion_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
         "conditional_include_templates": project_conditional_include_templates(files),
@@ -1513,6 +1568,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
             diff_json(
                 freight_result.get("signature_probes") or {},
                 fortls_result.get("signature_probes") or {},
+            )
+        )
+    if freight_result.get("completion_probes") != fortls_result.get("completion_probes"):
+        diffs.append("completion probes differ:")
+        diffs.append(
+            diff_json(
+                freight_result.get("completion_probes") or {},
+                fortls_result.get("completion_probes") or {},
             )
         )
 
