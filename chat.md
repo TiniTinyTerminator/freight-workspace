@@ -9121,3 +9121,20 @@ Changes pushed:
 
 Verification:
 - Documentation/TODO-only change; no Rust tests run.
+
+### 2026-07-09 — Codex — fortran-lsp: project hover probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `13ff643` `record project hover probe coverage`
+  - `TODO.md` now records that sampled declaration-position project hover
+    probes are live, while the broader project-mode request parity point
+    remains open for other request types.
+- Workspace harness: `scripts/fortran_lsp_compare.py --project` now reuses the
+  existing declaration probe points to issue `textDocument/hover` requests and
+  compares whether each server's hover mentions the declared symbol.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed

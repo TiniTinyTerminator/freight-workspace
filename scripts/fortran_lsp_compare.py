@@ -597,6 +597,26 @@ def simplify_hover_signature(value: Any) -> Any:
     return f"{match.group(1).lower()}({args})"
 
 
+def hover_mentions_symbol(value: Any, symbol: str) -> bool:
+    if not isinstance(value, dict):
+        return False
+    contents = value.get("contents")
+    if isinstance(contents, dict):
+        text = str(contents.get("value") or "")
+    elif isinstance(contents, list):
+        parts = []
+        for item in contents:
+            if isinstance(item, dict):
+                parts.append(str(item.get("value") or ""))
+            else:
+                parts.append(str(item))
+        text = "\n".join(parts)
+    else:
+        text = str(contents or "")
+    pattern = re.compile(rf"\b{re.escape(symbol)}\b", flags=re.IGNORECASE)
+    return bool(pattern.search(text))
+
+
 def collect_document_symbols(items: Any, container: str | None = None) -> list[dict[str, Any]]:
     if not isinstance(items, list):
         return []
@@ -1122,7 +1142,8 @@ def run_project_suite(
             timeout=request_timeout,
         )
     definition_probes: dict[str, Any] = {}
-    for offset, point in enumerate(project_definition_probe_points(files), start=1):
+    probe_points = project_definition_probe_points(files)
+    for offset, point in enumerate(probe_points, start=1):
         progress(f"definition probe {point['file']}:{point['line']}:{point['symbol']}")
         probe = request(
             proc,
@@ -1136,6 +1157,21 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         definition_probes[key] = simplify_location_line(probe)
+    hover_probes: dict[str, Any] = {}
+    for offset, point in enumerate(probe_points, start=1):
+        progress(f"hover probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe = request(
+            proc,
+            6_000 + offset,
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "position": {"line": point["line"], "character": point["character"]},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        hover_probes[key] = hover_mentions_symbol(probe, point["symbol"])
     progress("workspace/symbol")
     workspace_symbols = request(
         proc,
@@ -1156,6 +1192,7 @@ def run_project_suite(
         },
         "workspace_symbols": workspace_symbol_names(workspace_symbols),
         "definition_probes": definition_probes,
+        "hover_probes": hover_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
         "conditional_include_templates": project_conditional_include_templates(files),
@@ -1309,6 +1346,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
             diff_json(
                 freight_result.get("definition_probes") or {},
                 fortls_result.get("definition_probes") or {},
+            )
+        )
+    if freight_result.get("hover_probes") != fortls_result.get("hover_probes"):
+        diffs.append("hover probes differ:")
+        diffs.append(
+            diff_json(
+                freight_result.get("hover_probes") or {},
+                fortls_result.get("hover_probes") or {},
             )
         )
 
