@@ -9138,3 +9138,28 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
+### 2026-07-09 — Codex — fortran-lsp: project signature probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `e0144ed` `support zero argument signature help`
+  - Native signature help now returns labels for zero-argument subroutines /
+    functions instead of treating empty parameter lists as unsupported.
+  - Added a regression for `call check_deriv()` across module `use` resolution.
+  - `TODO.md` now records that project-mode hover probes and concrete call-site
+    signature-help probes are live; the broader request-parity TODO remains
+    open for the remaining request types.
+- Workspace harness: `scripts/fortran_lsp_compare.py --project` now samples
+  concrete `call name(...)` sites, compares simplified `textDocument/signatureHelp`
+  responses against fortls, skips procedure dummy callback calls for the separate
+  callback-modelling TODO, and normalizes harmless signature whitespace.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `cargo fmt -p fortran-lsp --check`
+- `cargo test -p fortran-lsp signature_help_reports_zero_argument_procedures -- --nocapture` — passed
+- `cargo test -p fortran-lsp` — 270 passed, 0 ignored
+- `cargo build -p freight` — passed
+- `python3 scripts/fortran_lsp_compare.py` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed

@@ -578,6 +578,40 @@ def simplify_signature(value: Any) -> Any:
     }
 
 
+def simplify_project_signature(value: Any) -> Any:
+    simplified = simplify_signature(value)
+    if not isinstance(simplified, dict):
+        return None
+    signatures = simplified.get("signatures") or []
+    out = []
+    for sig in signatures:
+        if not isinstance(sig, dict):
+            continue
+        label = sig.get("label")
+        if not isinstance(label, str):
+            continue
+        params = sig.get("parameters") or []
+        out.append(
+            {
+                "label": normalize_signature_text(label),
+                "parameters": [
+                    normalize_signature_text(param)
+                    for param in params
+                    if isinstance(param, str)
+                ],
+            }
+        )
+    return out
+
+
+def normalize_signature_text(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+    normalized = re.sub(r"^(?:module )?(?:subroutine|function) ", "", normalized)
+    normalized = re.sub(r"\s+\(", "(", normalized)
+    normalized = re.sub(r"\s*,\s*", ", ", normalized)
+    return normalized
+
+
 def simplify_hover_signature(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
@@ -906,6 +940,51 @@ def project_definition_probe_points(files: dict[str, Path], limit: int = 20) -> 
     return points
 
 
+def project_signature_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    call_re = re.compile(r"\bcall\s+([a-z_]\w*)\s*\(", flags=re.IGNORECASE)
+    procedure_dummy_re = re.compile(
+        r"^\s*procedure\s*\([^)]*\)\s*(?:,\s*[^:]*)?::\s*(.+)$",
+        flags=re.IGNORECASE,
+    )
+    points: list[dict[str, Any]] = []
+    for file_name, path in sorted(files.items()):
+        if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        procedure_dummies: set[str] = set()
+        for raw_line in lines:
+            match = procedure_dummy_re.match(strip_fortran_comment(raw_line))
+            if match:
+                procedure_dummies.update(split_fortran_names(match.group(1)))
+        fixed_form = path.suffix.lower() in {".f", ".for", ".ftn", ".f77"}
+        for line_no, raw_line in enumerate(lines):
+            if fixed_form and raw_line[:1] in {"c", "C", "*", "!"}:
+                continue
+            line = strip_fortran_comment(raw_line)
+            for match in call_re.finditer(line):
+                call_name = match.group(1).lower()
+                if call_name in procedure_dummies:
+                    continue
+                open_paren = raw_line.find("(", match.start())
+                if open_paren < 0:
+                    continue
+                points.append(
+                    {
+                        "file": file_name,
+                        "symbol": call_name,
+                        "line": line_no,
+                        "character": open_paren + 1,
+                    }
+                )
+                break
+            if len(points) >= limit:
+                return points
+    return points
+
+
 def has_math_prototype_reference(items: Any) -> bool:
     if not isinstance(items, list):
         return False
@@ -1172,6 +1251,21 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         hover_probes[key] = hover_mentions_symbol(probe, point["symbol"])
+    signature_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_signature_probe_points(files), start=1):
+        progress(f"signature probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe = request(
+            proc,
+            7_000 + offset,
+            "textDocument/signatureHelp",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "position": {"line": point["line"], "character": point["character"]},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        signature_probes[key] = simplify_project_signature(probe)
     progress("workspace/symbol")
     workspace_symbols = request(
         proc,
@@ -1193,6 +1287,7 @@ def run_project_suite(
         "workspace_symbols": workspace_symbol_names(workspace_symbols),
         "definition_probes": definition_probes,
         "hover_probes": hover_probes,
+        "signature_probes": signature_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
         "conditional_include_templates": project_conditional_include_templates(files),
@@ -1354,6 +1449,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
             diff_json(
                 freight_result.get("hover_probes") or {},
                 fortls_result.get("hover_probes") or {},
+            )
+        )
+    if freight_result.get("signature_probes") != fortls_result.get("signature_probes"):
+        diffs.append("signature probes differ:")
+        diffs.append(
+            diff_json(
+                freight_result.get("signature_probes") or {},
+                fortls_result.get("signature_probes") or {},
             )
         )
 
