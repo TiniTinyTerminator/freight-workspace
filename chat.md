@@ -9105,3 +9105,19 @@ Verification:
 - `cargo test -p fortran-lsp workspace_upsert -- --nocapture` — passed
 - `cargo test -p fortran-lsp` — 269 passed, 0 ignored
 - `python3 scripts/fortran_lsp_compare.py` — passed
+
+### 2026-07-09 — Codex — fortran-lsp: next hardening TODO cycle
+
+Changes pushed:
+- `fortran-lsp` `main`: `9e8914a` `seed next fortran lsp hardening cycle`
+  - Added six new unchecked TODO points under `TODO.md`:
+    project-mode request parity, preprocessor parity phase 2, procedure
+    pointer/callback modelling, generic overload selection by argument
+    characteristics, semantic-token/folding/document-highlight audit, and
+    incremental dependency invalidation.
+  - Updated README's stale "Known next ports" section to point at the new
+    hardening cycle instead of completed items.
+  - Corrected the current-status oracle sweep count from 17 to 18 projects.
+
+Verification:
+- Documentation/TODO-only change; no Rust tests run.
