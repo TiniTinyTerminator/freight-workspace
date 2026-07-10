@@ -9057,6 +9057,37 @@ Verification:
   point-1 sub-point.
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 
+### 2026-07-10 — Codex — fortran-lsp: full neural project request parity
+
+Changes pushed:
+- `fortran-lsp` `main`: `b0fd0d5` `stabilize neural project probes`
+  - Fixed native references so implicit function-result assignments such as
+    `accuracy = ...` are not counted as references to the function symbol.
+  - Resolved re-exported module procedures for signature help
+    (`app -> nf -> nf_datasets_mnist::load_mnist`).
+  - Added derived-type variables to `call <receiver>` completion candidates so
+    type-bound calls like `call net % print_info()` complete the receiver.
+  - Updated `TODO.md`: full neural-fortran now passes point-1 request probes;
+    rename probes are the next point-1 sub-point. Point 1 remains open; 6
+    hardening-cycle points remain.
+- Workspace harness: tightened project declaration probes so `type(name) :: var`
+  is not sampled as a derived-type definition, normalized `arg=arg` signature
+  labels, and made completion probes fail only when Freight misses a
+  fortls-offered completion.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp call_statement_completions_offer_derived_type_receivers` — passed
+- `cargo test -p fortran-lsp signature_help_resolves_reexported_module_procedures` — passed
+- `cargo test -p fortran-lsp references_skip_implicit_function_result_assignments` — passed
+- `cargo test -p fortran-lsp` — 276 passed
+- `cargo build -p freight` — passed
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:

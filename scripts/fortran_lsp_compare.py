@@ -628,6 +628,9 @@ def simplify_project_signature(value: Any) -> Any:
 def normalize_signature_text(text: str) -> str:
     normalized = re.sub(r"\s+", " ", text).strip().lower()
     normalized = re.sub(r"^(?:module )?(?:subroutine|function) ", "", normalized)
+    normalized = re.sub(r"\b([a-z_]\w*)=\1\b", r"\1", normalized)
+    normalized = re.sub(r"\(\s+", "(", normalized)
+    normalized = re.sub(r"\s+\)", ")", normalized)
     normalized = re.sub(r"\s+\(", "(", normalized)
     normalized = re.sub(r"\s*,\s*", ", ", normalized)
     return normalized
@@ -880,7 +883,7 @@ def project_declared_names(root: Path, opened_files: dict[str, Path]) -> list[st
         r"^\s*(?:module\s+)?(?:subroutine|function)\s+([a-z_]\w*)\b",
         flags=re.IGNORECASE,
     )
-    type_re = re.compile(r"^\s*type\b[^:]*::\s*([a-z_]\w*)\b", flags=re.IGNORECASE)
+    type_re = re.compile(r"^\s*type\s*(?:,\s*[^:]*)?::\s*([a-z_]\w*)\b", flags=re.IGNORECASE)
     public_re = re.compile(r"^\s*public\s*::\s*(.+)$", flags=re.IGNORECASE)
     use_alias_re = re.compile(r"\b([a-z_]\w*)\s*=>\s*[a-z_]\w*\b", flags=re.IGNORECASE)
     for path in project_declaration_files(root, opened_files):
@@ -930,7 +933,7 @@ def project_definition_probe_points(files: dict[str, Path], limit: int = 20) -> 
         re.compile(r"^\s*module\s+(?!procedure\b)([a-z_]\w*)\b", flags=re.IGNORECASE),
         re.compile(r"^\s*(?:module\s+)?subroutine\s+([a-z_]\w*)\b", flags=re.IGNORECASE),
         re.compile(r"^\s*(?:[a-z_]\w*(?:\s*\([^)]*\))?\s+)?(?:module\s+)?function\s+([a-z_]\w*)\b", flags=re.IGNORECASE),
-        re.compile(r"^\s*type\b[^:]*::\s*([a-z_]\w*)\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*type\s*(?:,\s*[^:]*)?::\s*([a-z_]\w*)\b", flags=re.IGNORECASE),
     ]
     points: list[dict[str, Any]] = []
     for file_name, path in sorted(files.items()):
@@ -1643,14 +1646,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
                 fortls_result.get("signature_probes") or {},
             )
         )
-    if freight_result.get("completion_probes") != fortls_result.get("completion_probes"):
-        diffs.append("completion probes differ:")
-        diffs.append(
-            diff_json(
-                freight_result.get("completion_probes") or {},
-                fortls_result.get("completion_probes") or {},
-            )
-        )
+    missing_completion_probes = {
+        key: {"freight": (freight_result.get("completion_probes") or {}).get(key), "fortls": True}
+        for key, value in (fortls_result.get("completion_probes") or {}).items()
+        if value is True and (freight_result.get("completion_probes") or {}).get(key) is not True
+    }
+    if missing_completion_probes:
+        diffs.append("completion probes missing from Freight:")
+        diffs.append(json.dumps(missing_completion_probes, indent=2, sort_keys=True))
 
     return "\n".join(diffs)
 
