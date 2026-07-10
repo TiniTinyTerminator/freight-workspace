@@ -9088,6 +9088,24 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 
+### 2026-07-10 — Codex — fortran-lsp: project rename probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `16e4d3c` `record project rename probe coverage`
+  - `TODO.md` now records rename probes as live request coverage.
+  - Folding-range probes are the next point-1 sub-point. Point 1 remains open;
+    6 hardening-cycle points remain.
+- Workspace harness now samples same-file local declaration `textDocument/rename`
+  probes in project mode and compares normalized same-file edit line sets.
+- Rename probe sampling avoids fixed-form files, type-constructor declarations,
+  too-short locals, and names without a second same-file occurrence.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:
