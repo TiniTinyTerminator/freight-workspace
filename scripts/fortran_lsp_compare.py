@@ -618,6 +618,37 @@ def simplify_folding_ranges(value: Any) -> Any:
     return [{"startLine": start, "endLine": end} for start, end in sorted(spans)]
 
 
+def summarize_semantic_tokens(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    data = value.get("data")
+    if not isinstance(data, list):
+        return value
+    token_count = len(data) // 5
+    lines: set[int] = set()
+    token_types: dict[int, int] = {}
+    line = 0
+    char = 0
+    valid_tokens = 0
+    for idx in range(0, len(data) - 4, 5):
+        delta_line, delta_char, length, token_type, _mods = data[idx : idx + 5]
+        if not all(isinstance(item, int) for item in [delta_line, delta_char, length, token_type]):
+            continue
+        line += delta_line
+        char = char + delta_char if delta_line == 0 else delta_char
+        if length <= 0:
+            continue
+        lines.add(line)
+        token_types[token_type] = token_types.get(token_type, 0) + 1
+        valid_tokens += 1
+    return {
+        "token_count": token_count,
+        "valid_token_count": valid_tokens,
+        "lines": sorted(lines),
+        "token_types": {str(key): token_types[key] for key in sorted(token_types)},
+    }
+
+
 def method_not_found(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
@@ -1239,6 +1270,51 @@ def project_folding_probe_files(files: dict[str, Path], limit: int = 20) -> list
     return selected
 
 
+def project_semantic_probe_files(files: dict[str, Path], limit: int = 12) -> list[str]:
+    candidates: list[tuple[int, int, str]] = []
+    fallback: list[tuple[int, int, str]] = []
+    patterns = [
+        re.compile(r"^\s*#\s*(?:define|ifdef|ifndef|if|elif)\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*(?:module|submodule)\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*type\s*(?:,|\b)", flags=re.IGNORECASE),
+        re.compile(r"^\s*procedure\s*(?:\(|::)", flags=re.IGNORECASE),
+        re.compile(r"^\s*(?:subroutine|function)\s+", flags=re.IGNORECASE),
+        re.compile(r"\bclass\s*\(", flags=re.IGNORECASE),
+        re.compile(r"\buse\s+[a-z_]\w*", flags=re.IGNORECASE),
+    ]
+    for file_name, path in sorted(files.items()):
+        if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        line_count = len(lines)
+        fixed_form = path.suffix.lower() in {".f", ".for", ".ftn", ".f77"}
+        has_fixed_continuation = fixed_form and any(
+            len(line) > 5 and line[:1] not in {"c", "C", "*", "!"} and line[5:6].strip()
+            for line in lines
+        )
+        has_semantic_shape = any(
+            any(pattern.search(strip_fortran_comment(line)) for pattern in patterns)
+            for line in lines
+        )
+        if has_semantic_shape or has_fixed_continuation:
+            ext_priority = 1 if fixed_form else 0
+            item = (ext_priority, line_count, file_name)
+            if line_count <= 1_200:
+                candidates.append(item)
+            else:
+                fallback.append(item)
+    selected = [file_name for _priority, _lines, file_name in sorted(candidates)[:limit]]
+    if len(selected) < limit:
+        selected.extend(
+            file_name
+            for _priority, _lines, file_name in sorted(fallback)[: limit - len(selected)]
+        )
+    return selected
+
+
 def has_math_prototype_reference(items: Any) -> bool:
     if not isinstance(items, list):
         return False
@@ -1595,6 +1671,17 @@ def run_project_suite(
             timeout=request_timeout,
         )
         folding_probes[file_name] = simplify_folding_ranges(probe)
+    semantic_probes: dict[str, Any] = {}
+    for offset, file_name in enumerate(project_semantic_probe_files(files), start=1):
+        progress(f"semantic probe {file_name}")
+        probe = request(
+            proc,
+            14_000 + offset,
+            "textDocument/semanticTokens/full",
+            {"textDocument": {"uri": uri(files[file_name])}},
+            timeout=request_timeout,
+        )
+        semantic_probes[file_name] = summarize_semantic_tokens(probe)
     progress("workspace/symbol")
     workspace_symbols = request(
         proc,
@@ -1622,6 +1709,7 @@ def run_project_suite(
         "completion_probes": completion_probes,
         "rename_probes": rename_probes,
         "folding_probes": folding_probes,
+        "semantic_probes": semantic_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
         "conditional_include_templates": project_conditional_include_templates(files),
@@ -1853,6 +1941,40 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
     if missing_folding_probes:
         diffs.append("folding probes missing from Freight:")
         diffs.append(json.dumps(missing_folding_probes, indent=2, sort_keys=True))
+    missing_semantic_probes: dict[str, Any] = {}
+    freight_semantic = freight_result.get("semantic_probes") or {}
+    for file_name, fortls_summary in (fortls_result.get("semantic_probes") or {}).items():
+        freight_summary = freight_semantic.get(file_name)
+        if method_not_found(fortls_summary):
+            if not (
+                isinstance(freight_summary, dict)
+                and freight_summary.get("valid_token_count", 0) > 0
+                and freight_summary.get("lines")
+            ):
+                missing_semantic_probes[file_name] = {
+                    "freight": freight_summary,
+                    "fortls": fortls_summary,
+                }
+            continue
+        if not isinstance(fortls_summary, dict):
+            if freight_summary != fortls_summary:
+                missing_semantic_probes[file_name] = {
+                    "freight": freight_summary,
+                    "fortls": fortls_summary,
+                }
+            continue
+        if not (
+            isinstance(freight_summary, dict)
+            and freight_summary.get("valid_token_count", 0) > 0
+            and freight_summary.get("lines")
+        ):
+            missing_semantic_probes[file_name] = {
+                "freight": freight_summary,
+                "fortls": fortls_summary,
+            }
+    if missing_semantic_probes:
+        diffs.append("semantic-token probes missing from Freight:")
+        diffs.append(json.dumps(missing_semantic_probes, indent=2, sort_keys=True))
 
     return "\n".join(diffs)
 

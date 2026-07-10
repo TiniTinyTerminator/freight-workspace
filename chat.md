@@ -9141,6 +9141,33 @@ Changes pushed:
 Verification:
 - Documentation-only change; not run.
 
+### 2026-07-10 — Codex — fortran-lsp: project semantic-token probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `9ae8e88` `record semantic token probe coverage`
+  - `crates/fortran-lsp/TODO.md` marks the semantic-token subpoint complete.
+- Workspace harness:
+  - Added project-mode `textDocument/semanticTokens/full` probes to
+    `scripts/fortran_lsp_compare.py`.
+  - Semantic responses are summarized as token count, valid token count,
+    covered lines, and token-type histogram instead of comparing raw token
+    arrays.
+  - The project gate treats fortls `method not found` as expected and requires
+    Freight to return non-empty valid summaries for sampled files.
+  - ODEPACK semantic sampling is capped to 12 smaller representative files to
+    avoid turning the request-coverage gate into a huge fixed-form performance
+    benchmark; the deeper semantic/folding/highlight audit remains a later TODO.
+- Next point-1 subpoint: project-mode document-highlight probes. Point 1 still
+  has 5 subpoints left; 6 hardening-cycle points remain.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
+- `cargo test -p fortran-lsp` — passed (276 tests)
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:
