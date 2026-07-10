@@ -602,6 +602,29 @@ def simplify_rename_edit_lines(value: Any, only_uri: str, new_text: str) -> Any:
     return sorted(lines)
 
 
+def simplify_folding_ranges(value: Any) -> Any:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return value
+    spans: set[tuple[int, int]] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        start = item.get("startLine")
+        end = item.get("endLine")
+        if isinstance(start, int) and isinstance(end, int) and end > start:
+            spans.add((start, end))
+    return [{"startLine": start, "endLine": end} for start, end in sorted(spans)]
+
+
+def method_not_found(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    error = value.get("error")
+    return isinstance(error, dict) and error.get("code") == -32601
+
+
 def simplify_signature(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
@@ -1185,6 +1208,37 @@ def project_rename_probe_points(files: dict[str, Path], limit: int = 20) -> list
     return points
 
 
+def project_folding_probe_files(files: dict[str, Path], limit: int = 20) -> list[str]:
+    selected: list[str] = []
+    patterns = [
+        re.compile(r"^\s*module\s+(?!procedure\b)", flags=re.IGNORECASE),
+        re.compile(r"^\s*submodule\s*\(", flags=re.IGNORECASE),
+        re.compile(r"^\s*(?:abstract\s+)?interface\b", flags=re.IGNORECASE),
+        re.compile(r"^\s*(?:subroutine|function)\s+", flags=re.IGNORECASE),
+    ]
+    for file_name, path in sorted(files.items()):
+        if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        fixed_form = path.suffix.lower() in {".f", ".for", ".ftn", ".f77"}
+        has_fixed_continuation = fixed_form and any(
+            len(line) > 5 and line[:1] not in {"c", "C", "*", "!"} and line[5:6].strip()
+            for line in lines
+        )
+        has_foldable_scope = any(
+            any(pattern.match(strip_fortran_comment(line)) for pattern in patterns)
+            for line in lines
+        )
+        if has_foldable_scope or has_fixed_continuation:
+            selected.append(file_name)
+        if len(selected) >= limit:
+            return selected
+    return selected
+
+
 def has_math_prototype_reference(items: Any) -> bool:
     if not isinstance(items, list):
         return False
@@ -1530,6 +1584,17 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         rename_probes[key] = simplify_rename_edit_lines(probe, probe_uri, point["new_name"])
+    folding_probes: dict[str, Any] = {}
+    for offset, file_name in enumerate(project_folding_probe_files(files), start=1):
+        progress(f"folding probe {file_name}")
+        probe = request(
+            proc,
+            13_000 + offset,
+            "textDocument/foldingRange",
+            {"textDocument": {"uri": uri(files[file_name])}},
+            timeout=request_timeout,
+        )
+        folding_probes[file_name] = simplify_folding_ranges(probe)
     progress("workspace/symbol")
     workspace_symbols = request(
         proc,
@@ -1556,6 +1621,7 @@ def run_project_suite(
         "signature_probes": signature_probes,
         "completion_probes": completion_probes,
         "rename_probes": rename_probes,
+        "folding_probes": folding_probes,
         "project_modules": project_module_names(files),
         "project_declared_names": project_declared_names(root, files),
         "conditional_include_templates": project_conditional_include_templates(files),
@@ -1759,6 +1825,34 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
                 fortls_result.get("rename_probes") or {},
             )
         )
+    missing_folding_probes: dict[str, list[dict[str, int]]] = {}
+    freight_folds = freight_result.get("folding_probes") or {}
+    for file_name, fortls_spans in (fortls_result.get("folding_probes") or {}).items():
+        if method_not_found(fortls_spans):
+            freight_spans = freight_folds.get(file_name)
+            if not isinstance(freight_spans, list) or not freight_spans:
+                missing_folding_probes[file_name] = [{"startLine": -1, "endLine": -1}]
+            continue
+        if not isinstance(fortls_spans, list):
+            if freight_folds.get(file_name) != fortls_spans:
+                missing_folding_probes[file_name] = fortls_spans
+            continue
+        freight_spans = {
+            (span.get("startLine"), span.get("endLine"))
+            for span in freight_folds.get(file_name, [])
+            if isinstance(span, dict)
+        }
+        missing = [
+            span
+            for span in fortls_spans
+            if isinstance(span, dict)
+            and (span.get("startLine"), span.get("endLine")) not in freight_spans
+        ]
+        if missing:
+            missing_folding_probes[file_name] = missing
+    if missing_folding_probes:
+        diffs.append("folding probes missing from Freight:")
+        diffs.append(json.dumps(missing_folding_probes, indent=2, sort_keys=True))
 
     return "\n".join(diffs)
 

@@ -9106,6 +9106,27 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 
+### 2026-07-10 — Codex — fortran-lsp: project folding probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `3302d45` `record project folding probe coverage`
+  - `TODO.md` now records folding probes as live request coverage.
+  - Semantic-token probes are the next point-1 sub-point. Point 1 remains open;
+    6 hardening-cycle points remain.
+- Workspace harness now samples `textDocument/foldingRange` in project mode for
+  files with modules, submodules, interfaces, procedures, or fixed-form
+  continuation lines.
+- Since fortls returns JSON-RPC `method not found` for folding ranges, the
+  project gate treats folding as Freight-native coverage: every sampled file
+  must produce at least one native fold, and if an oracle ever returns spans,
+  Freight must include them.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:
