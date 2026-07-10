@@ -974,6 +974,55 @@ def project_reference_probe_points(files: dict[str, Path], limit: int = 20) -> l
     return project_definition_probe_points(free_form_files, limit=limit)
 
 
+def project_implementation_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    patterns = [
+        re.compile(
+            r"^\s*(?:pure\s+|elemental\s+|recursive\s+)*module\s+subroutine\s+([a-z_]\w*)\b",
+            flags=re.IGNORECASE,
+        ),
+        re.compile(
+            r"^\s*(?:pure\s+|elemental\s+|recursive\s+)*(?:[a-z_]\w*(?:\s*\([^)]*\))?\s+)?module\s+function\s+([a-z_]\w*)\b",
+            flags=re.IGNORECASE,
+        ),
+    ]
+    points: list[dict[str, Any]] = []
+    for file_name, path in sorted(files.items()):
+        if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        if any(
+            re.match(r"^\s*submodule\s*\(", strip_fortran_comment(line), flags=re.IGNORECASE)
+            for line in lines
+        ):
+            continue
+        for line_no, raw_line in enumerate(lines):
+            line = strip_fortran_comment(raw_line)
+            if line.lower().lstrip().startswith("end "):
+                continue
+            for pattern in patterns:
+                match = pattern.match(line)
+                if not match:
+                    continue
+                symbol = match.group(1)
+                char = raw_line.lower().find(symbol.lower())
+                if char >= 0:
+                    points.append(
+                        {
+                            "file": file_name,
+                            "symbol": symbol.lower(),
+                            "line": line_no,
+                            "character": char,
+                        }
+                    )
+                break
+            if len(points) >= limit:
+                return points
+    return points
+
+
 def project_signature_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
     call_re = re.compile(r"\bcall\s+([a-z_]\w*)\s*\(", flags=re.IGNORECASE)
     procedure_dummy_re = re.compile(
@@ -1337,6 +1386,21 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         reference_probes[key] = simplify_reference_lines(probe, only_uri=probe_uri)
+    implementation_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_implementation_probe_points(files), start=1):
+        progress(f"implementation probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe = request(
+            proc,
+            11_000 + offset,
+            "textDocument/implementation",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "position": {"line": point["line"], "character": point["character"]},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        implementation_probes[key] = simplify_location_line(probe)
     signature_probes: dict[str, Any] = {}
     for offset, point in enumerate(project_signature_probe_points(files), start=1):
         progress(f"signature probe {point['file']}:{point['line']}:{point['symbol']}")
@@ -1389,6 +1453,7 @@ def run_project_suite(
         "definition_probes": definition_probes,
         "hover_probes": hover_probes,
         "reference_probes": reference_probes,
+        "implementation_probes": implementation_probes,
         "signature_probes": signature_probes,
         "completion_probes": completion_probes,
         "project_modules": project_module_names(files),
@@ -1560,6 +1625,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
             diff_json(
                 freight_result.get("reference_probes") or {},
                 fortls_result.get("reference_probes") or {},
+            )
+        )
+    if freight_result.get("implementation_probes") != fortls_result.get("implementation_probes"):
+        diffs.append("implementation probes differ:")
+        diffs.append(
+            diff_json(
+                freight_result.get("implementation_probes") or {},
+                fortls_result.get("implementation_probes") or {},
             )
         )
     if freight_result.get("signature_probes") != fortls_result.get("signature_probes"):

@@ -9029,6 +9029,34 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 
+### 2026-07-10 — Codex — fortran-lsp: project implementation probes + TODO setup
+
+Changes pushed:
+- `fortran-lsp` `main`: `6699e4d` `resolve full-form submodule implementations`
+  - Fixed native submodule implementation lookup for full-form
+    `module subroutine ...` / `module function ...` bodies inside submodules,
+    including named constructor interfaces.
+  - Added a regression covering both full-form submodule subroutine bodies and
+    constructor-style module functions.
+  - Reworked `crates/fortran-lsp/TODO.md` point 1 into explicit next sub-points:
+    stabilize full neural-fortran request probes, then add rename, folding, and
+    semantic-token probes. Point 1 remains open; 6 hardening-cycle points remain.
+- Workspace harness: added project-mode `textDocument/implementation` probes to
+  `scripts/fortran_lsp_compare.py`, sampling ancestor `module subroutine` /
+  `module function` prototypes and comparing simplified target locations.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp` — 273 passed
+- `cargo build -p freight` — passed
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- Neural submodule slice no longer has implementation-probe diffs; remaining
+  differences there are diagnostics/definition/reference noise for the next
+  point-1 sub-point.
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:
