@@ -9127,6 +9127,20 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 
+### 2026-07-10 — Codex — fortran-lsp: refreshed point-1 TODO queue
+
+Changes pushed:
+- `fortran-lsp` `main`: `d45099e` `refresh fortran lsp todo queue`
+  - Expanded `crates/fortran-lsp/TODO.md` point 1 into concrete next
+    sub-points: semantic-token probes, document-highlight probes,
+    selection-range probes, conditional project code-action probes, a full
+    18-project sweep, and closing the duplicate hardening-cycle parity item
+    once those are live.
+  - No code changes.
+
+Verification:
+- Documentation-only change; not run.
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:
