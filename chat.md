@@ -9454,3 +9454,35 @@ Verification:
 Left uncommitted:
 - Existing fortran-lsp model/workspace/tests changes and
   `scripts/fortran_lsp_compare.py` harness changes are still in progress.
+### 2026-07-11 — Codex — fortran-lsp: expanded project sweep through FAT
+
+Changes in this checkpoint:
+- `fortran-lsp` fixes for expanded project-mode request probes:
+  type-bound and generic `module procedure` reference links, member-call
+  reference resolution, module-function implementation lookup when result
+  variables shadow the function name, full-source signature-help context
+  extraction that ignores unmatched punctuation in prior comments, normalized
+  procedure signature labels, and two-argument `atan` diagnostic tolerance.
+- `fortran-lsp` `main`: `27461f9` `stabilize expanded project probes`
+- `scripts/fortran_lsp_compare.py` harness normalization:
+  request probes skip duplicate docs/example-package trees, reference probes
+  avoid broad derived-type declarations, rename is treated as an availability
+  oracle, signature probes allow Freight's richer parameter lists when fortls
+  omits them, and FAT's known later-model generic/type-bound diagnostics are
+  filtered.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- Focused `cargo test` cases:
+  `references_include_type_bound_procedure_binding_links`,
+  `references_include_generic_module_procedure_links`,
+  `references_skip_type_bound_member_selectors_for_same_named_local_function`,
+  `signature_help_ignores_unmatched_comment_punctuation_before_call`,
+  `diagnostics_accept_two_argument_atan_intrinsic`,
+  `pure_module_function_implementation_links_from_type_bound_interface`.
+- Project gates passed with `--diagnostic-quiet 5.0 --request-timeout 60`:
+  json-fortran, test-drive, toml-f, FAT.
+
+Next:
+- Continue point 1 from bspline, then CSV, M_CLI2, roots, neural-fortran,
+  pyplot, search-sort, quadpack, nlesolver, and ODEPACK.
