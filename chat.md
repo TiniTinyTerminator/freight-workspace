@@ -9219,6 +9219,32 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
 - `cargo test -p fortran-lsp` — passed (276 tests)
 
+### 2026-07-11 — Codex — fortran-lsp: project code-action probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `76489b9` `record code action probe coverage`
+  - `crates/fortran-lsp/TODO.md` marks the code-action subpoint complete.
+- Workspace harness:
+  - Added project-mode `textDocument/codeAction` probes to
+    `scripts/fortran_lsp_compare.py`.
+  - Project fixture copies now get `.freight-lsp-probes/code_action_export.f90`
+    plus `.freight-lsp-probes/code_action_missing_use.f90`, creating an indexed
+    module export and a real unresolved call that should produce the native
+    `use ..., only: ...` quick fix.
+  - Code-action responses are normalized to `kind:title`, and the project gate
+    requires Freight to expose `use freight_lsp_code_action_export, only:
+    freight_lsp_probe_answer`.
+- Next point-1 subpoint: re-run the full 18-project oracle sweep. Point 1 still
+  has 2 subpoints left; 6 hardening-cycle points remain.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
+- `cargo test -p fortran-lsp` — passed (276 tests)
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:

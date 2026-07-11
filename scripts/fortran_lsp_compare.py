@@ -456,7 +456,30 @@ def copy_project_fixture(source: Path, root: Path, max_files: int = 0) -> dict[s
             '[package]\nname = "fortran-lsp-project-fixture"\nversion = "0.1.0"\n\n'
             "[language.fortran]\nstd = \"f2018\"\n"
         )
+    write_project_code_action_probe(root)
+    files = fortran_files(root)
+    if max_files > 0:
+        files = files[:max_files]
     return {relative_key(root, path): path for path in files}
+
+
+def write_project_code_action_probe(root: Path) -> None:
+    probe_dir = root / ".freight-lsp-probes"
+    probe_dir.mkdir(exist_ok=True)
+    (probe_dir / "code_action_export.f90").write_text(
+        "module freight_lsp_code_action_export\n"
+        "contains\n"
+        "integer function freight_lsp_probe_answer()\n"
+        "freight_lsp_probe_answer = 42\n"
+        "end function freight_lsp_probe_answer\n"
+        "end module freight_lsp_code_action_export\n"
+    )
+    (probe_dir / "code_action_missing_use.f90").write_text(
+        "program freight_lsp_code_action_missing_use\n"
+        "implicit none\n"
+        "print *, freight_lsp_probe_answer()\n"
+        "end program freight_lsp_code_action_missing_use\n"
+    )
 
 
 def fortran_files(root: Path) -> list[Path]:
@@ -627,6 +650,22 @@ def selection_range_chain(item: dict[str, Any]) -> list[dict[str, int]]:
     return chain
 
 
+def simplify_code_action_titles(value: Any) -> Any:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return value
+    titles: list[str] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title")
+        kind = item.get("kind")
+        if isinstance(title, str):
+            titles.append(f"{kind}:{title}" if isinstance(kind, str) else title)
+    return sorted(titles)
+
+
 def simplify_rename_edit_lines(value: Any, only_uri: str, new_text: str) -> Any:
     if not isinstance(value, dict):
         return value
@@ -714,6 +753,13 @@ def valid_selection_chains(value: Any) -> bool:
     if not isinstance(first, list) or not first:
         return False
     return all(isinstance(item, dict) for item in first)
+
+
+def has_add_use_code_action(value: Any, module: str, symbol: str) -> bool:
+    if not isinstance(value, list):
+        return False
+    needle = f"use {module}, only: {symbol}".lower()
+    return any(isinstance(item, str) and needle in item.lower() for item in value)
 
 
 def simplify_signature(value: Any) -> Any:
@@ -1832,6 +1878,25 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}:{point['kind']}"
         selection_probes[key] = simplify_selection_ranges(probe)
+    code_action_probes: dict[str, Any] = {}
+    code_action_file = ".freight-lsp-probes/code_action_missing_use.f90"
+    if code_action_file in files:
+        progress("code action probe missing use")
+        probe = request(
+            proc,
+            17_001,
+            "textDocument/codeAction",
+            {
+                "textDocument": {"uri": uri(files[code_action_file])},
+                "range": {
+                    "start": {"line": 2, "character": 9},
+                    "end": {"line": 2, "character": 33},
+                },
+                "context": {"diagnostics": [], "only": ["quickfix"]},
+            },
+            timeout=request_timeout,
+        )
+        code_action_probes["missing_use"] = simplify_code_action_titles(probe)
     folding_probes: dict[str, Any] = {}
     for offset, file_name in enumerate(project_folding_probe_files(files), start=1):
         progress(f"folding probe {file_name}")
@@ -1878,6 +1943,7 @@ def run_project_suite(
         "reference_probes": reference_probes,
         "highlight_probes": highlight_probes,
         "selection_probes": selection_probes,
+        "code_action_probes": code_action_probes,
         "implementation_probes": implementation_probes,
         "signature_probes": signature_probes,
         "completion_probes": completion_probes,
@@ -2116,6 +2182,23 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
     if missing_selection_probes:
         diffs.append("selection-range probes missing from Freight:")
         diffs.append(json.dumps(missing_selection_probes, indent=2, sort_keys=True))
+    freight_code_actions = (freight_result.get("code_action_probes") or {}).get("missing_use")
+    if not has_add_use_code_action(
+        freight_code_actions,
+        "freight_lsp_code_action_export",
+        "freight_lsp_probe_answer",
+    ):
+        diffs.append("code-action probe missing from Freight:")
+        diffs.append(
+            json.dumps(
+                {
+                    "freight": freight_code_actions,
+                    "fortls": (fortls_result.get("code_action_probes") or {}).get("missing_use"),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
     if freight_result.get("implementation_probes") != fortls_result.get("implementation_probes"):
         diffs.append("implementation probes differ:")
         diffs.append(
