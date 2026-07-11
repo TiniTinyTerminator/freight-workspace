@@ -9168,6 +9168,31 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
 - `cargo test -p fortran-lsp` — passed (276 tests)
 
+### 2026-07-11 — Codex — fortran-lsp: project document-highlight probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `c2d7fc7` `record document highlight probe coverage`
+  - `crates/fortran-lsp/TODO.md` marks the document-highlight subpoint complete.
+- Workspace harness:
+  - Added project-mode `textDocument/documentHighlight` probes to
+    `scripts/fortran_lsp_compare.py`.
+  - Highlights are normalized to same-file line spans and sampled from
+    unambiguous local declarations, using a stricter variant of the rename
+    sample that skips names with multiple declarations in one file.
+  - The diff gate requires Freight to return non-empty highlight lines that
+    fortls also recognizes. It does not require Freight to reproduce fortls-only
+    surrounding/context lines observed in ODEPACK repeated-dummy cases.
+- Next point-1 subpoint: project-mode selection-range probes. Point 1 still has
+  4 subpoints left; 6 hardening-cycle points remain.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
+- `cargo test -p fortran-lsp` — passed (276 tests)
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:

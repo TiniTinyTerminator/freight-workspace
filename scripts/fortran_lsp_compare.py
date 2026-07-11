@@ -576,6 +576,25 @@ def simplify_reference_lines(value: Any, only_uri: str | None = None) -> Any:
     return [{"uri": item_uri, "line": line} for item_uri, line in sorted(refs)]
 
 
+def simplify_highlight_lines(value: Any) -> Any:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return value
+    lines: set[tuple[int, int]] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        range_ = item.get("range") or {}
+        start = range_.get("start") or {}
+        end = range_.get("end") or {}
+        start_line = start.get("line")
+        end_line = end.get("line")
+        if isinstance(start_line, int):
+            lines.add((start_line, end_line if isinstance(end_line, int) else start_line))
+    return [{"startLine": start, "endLine": end} for start, end in sorted(lines)]
+
+
 def simplify_rename_edit_lines(value: Any, only_uri: str, new_text: str) -> Any:
     if not isinstance(value, dict):
         return value
@@ -1239,6 +1258,31 @@ def project_rename_probe_points(files: dict[str, Path], limit: int = 20) -> list
     return points
 
 
+def project_highlight_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    points: list[dict[str, Any]] = []
+    for point in project_rename_probe_points(files, limit=limit * 4):
+        path = files.get(point["file"])
+        if path is None:
+            continue
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        symbol = point["symbol"]
+        declaration_lines = [
+            line
+            for line in lines
+            if "::" in line
+            and re.search(rf"\b{re.escape(symbol)}\b", strip_fortran_comment(line), re.IGNORECASE)
+        ]
+        if len(declaration_lines) != 1:
+            continue
+        points.append(point)
+        if len(points) >= limit:
+            return points
+    return points
+
+
 def project_folding_probe_files(files: dict[str, Path], limit: int = 20) -> list[str]:
     selected: list[str] = []
     patterns = [
@@ -1582,7 +1626,8 @@ def run_project_suite(
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         hover_probes[key] = hover_mentions_symbol(probe, point["symbol"])
     reference_probes: dict[str, Any] = {}
-    for offset, point in enumerate(project_reference_probe_points(files), start=1):
+    reference_points = project_reference_probe_points(files)
+    for offset, point in enumerate(reference_points, start=1):
         progress(f"references probe {point['file']}:{point['line']}:{point['symbol']}")
         probe_uri = uri(files[point["file"]])
         probe = request(
@@ -1643,8 +1688,9 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         completion_probes[key] = completion_has_label(probe, point["symbol"])
+    rename_points = project_rename_probe_points(files)
     rename_probes: dict[str, Any] = {}
-    for offset, point in enumerate(project_rename_probe_points(files), start=1):
+    for offset, point in enumerate(rename_points, start=1):
         progress(f"rename probe {point['file']}:{point['line']}:{point['symbol']}")
         probe_uri = uri(files[point["file"]])
         probe = request(
@@ -1660,6 +1706,21 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         rename_probes[key] = simplify_rename_edit_lines(probe, probe_uri, point["new_name"])
+    highlight_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_highlight_probe_points(files), start=1):
+        progress(f"highlight probe {point['file']}:{point['line']}:{point['symbol']}")
+        probe = request(
+            proc,
+            15_000 + offset,
+            "textDocument/documentHighlight",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "position": {"line": point["line"], "character": point["character"]},
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}"
+        highlight_probes[key] = simplify_highlight_lines(probe)
     folding_probes: dict[str, Any] = {}
     for offset, file_name in enumerate(project_folding_probe_files(files), start=1):
         progress(f"folding probe {file_name}")
@@ -1704,6 +1765,7 @@ def run_project_suite(
         "definition_probes": definition_probes,
         "hover_probes": hover_probes,
         "reference_probes": reference_probes,
+        "highlight_probes": highlight_probes,
         "implementation_probes": implementation_probes,
         "signature_probes": signature_probes,
         "completion_probes": completion_probes,
@@ -1881,6 +1943,48 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
                 fortls_result.get("reference_probes") or {},
             )
         )
+    missing_highlight_probes: dict[str, Any] = {}
+    freight_highlights = freight_result.get("highlight_probes") or {}
+    for key, fortls_lines in (fortls_result.get("highlight_probes") or {}).items():
+        freight_lines = freight_highlights.get(key)
+        if method_not_found(fortls_lines):
+            if not isinstance(freight_lines, list) or not freight_lines:
+                missing_highlight_probes[key] = {
+                    "freight": freight_lines,
+                    "fortls": fortls_lines,
+                }
+            continue
+        if not isinstance(freight_lines, list) or not freight_lines:
+            missing_highlight_probes[key] = {
+                "freight": freight_lines,
+                "fortls": fortls_lines,
+            }
+            continue
+        if isinstance(fortls_lines, list):
+            fortls_set = {
+                (span.get("startLine"), span.get("endLine"))
+                for span in fortls_lines
+                if isinstance(span, dict)
+            }
+            freight_extra = [
+                span
+                for span in freight_lines
+                if isinstance(span, dict)
+                and (span.get("startLine"), span.get("endLine")) not in fortls_set
+            ]
+            if freight_extra:
+                missing_highlight_probes[key] = {
+                    "freight_extra": freight_extra,
+                    "fortls": fortls_lines,
+                }
+        elif freight_lines != fortls_lines:
+            missing_highlight_probes[key] = {
+                "freight": freight_lines,
+                "fortls": fortls_lines,
+            }
+    if missing_highlight_probes:
+        diffs.append("document-highlight probes differ:")
+        diffs.append(json.dumps(missing_highlight_probes, indent=2, sort_keys=True))
     if freight_result.get("implementation_probes") != fortls_result.get("implementation_probes"):
         diffs.append("implementation probes differ:")
         diffs.append(
