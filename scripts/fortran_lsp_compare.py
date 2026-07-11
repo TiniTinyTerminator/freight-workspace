@@ -595,6 +595,38 @@ def simplify_highlight_lines(value: Any) -> Any:
     return [{"startLine": start, "endLine": end} for start, end in sorted(lines)]
 
 
+def simplify_selection_ranges(value: Any) -> Any:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return value
+    return [selection_range_chain(item) for item in value if isinstance(item, dict)]
+
+
+def selection_range_chain(item: dict[str, Any]) -> list[dict[str, int]]:
+    chain: list[dict[str, int]] = []
+    current: Any = item
+    while isinstance(current, dict):
+        range_ = current.get("range") or {}
+        start = range_.get("start") or {}
+        end = range_.get("end") or {}
+        start_line = start.get("line")
+        start_char = start.get("character")
+        end_line = end.get("line")
+        end_char = end.get("character")
+        if all(isinstance(value, int) for value in [start_line, start_char, end_line, end_char]):
+            chain.append(
+                {
+                    "startLine": start_line,
+                    "startCharacter": start_char,
+                    "endLine": end_line,
+                    "endCharacter": end_char,
+                }
+            )
+        current = current.get("parent")
+    return chain
+
+
 def simplify_rename_edit_lines(value: Any, only_uri: str, new_text: str) -> Any:
     if not isinstance(value, dict):
         return value
@@ -673,6 +705,15 @@ def method_not_found(value: Any) -> bool:
         return False
     error = value.get("error")
     return isinstance(error, dict) and error.get("code") == -32601
+
+
+def valid_selection_chains(value: Any) -> bool:
+    if not isinstance(value, list) or not value:
+        return False
+    first = value[0]
+    if not isinstance(first, list) or not first:
+        return False
+    return all(isinstance(item, dict) for item in first)
 
 
 def simplify_signature(value: Any) -> Any:
@@ -1283,6 +1324,59 @@ def project_highlight_probe_points(files: dict[str, Path], limit: int = 20) -> l
     return points
 
 
+def project_selection_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
+    points: list[dict[str, Any]] = []
+    seen: set[tuple[str, int, int]] = set()
+
+    def add(point: dict[str, Any], kind: str) -> None:
+        key = (point["file"], point["line"], point["character"])
+        if key in seen or len(points) >= limit:
+            return
+        seen.add(key)
+        out = dict(point)
+        out["kind"] = kind
+        points.append(out)
+
+    for point in project_definition_probe_points(files, limit=8):
+        add(point, "declaration")
+    for point in project_completion_probe_points(files, limit=8):
+        add(point, "call")
+
+    fixed_limit = max(0, limit - len(points))
+    if fixed_limit:
+        ident_re = re.compile(r"\b[a-z_]\w*\b", flags=re.IGNORECASE)
+        for file_name, path in sorted(files.items()):
+            if path.suffix.lower() not in {".f", ".for", ".ftn", ".f77"}:
+                continue
+            if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
+                continue
+            try:
+                lines = path.read_text(errors="replace").splitlines()
+            except OSError:
+                continue
+            for line_no, raw_line in enumerate(lines):
+                if len(raw_line) <= 6 or raw_line[:1] in {"c", "C", "*", "!"}:
+                    continue
+                if not raw_line[5:6].strip():
+                    continue
+                code = strip_fortran_comment(raw_line[6:])
+                match = ident_re.search(code)
+                if not match:
+                    continue
+                add(
+                    {
+                        "file": file_name,
+                        "symbol": match.group(0).lower(),
+                        "line": line_no,
+                        "character": 6 + match.start(),
+                    },
+                    "fixed-continuation",
+                )
+                if len(points) >= limit or sum(1 for point in points if point["kind"] == "fixed-continuation") >= fixed_limit:
+                    return points
+    return points
+
+
 def project_folding_probe_files(files: dict[str, Path], limit: int = 20) -> list[str]:
     selected: list[str] = []
     patterns = [
@@ -1721,6 +1815,23 @@ def run_project_suite(
         )
         key = f"{point['file']}:{point['line']}:{point['symbol']}"
         highlight_probes[key] = simplify_highlight_lines(probe)
+    selection_probes: dict[str, Any] = {}
+    for offset, point in enumerate(project_selection_probe_points(files), start=1):
+        progress(
+            f"selection probe {point['file']}:{point['line']}:{point['symbol']}:{point['kind']}"
+        )
+        probe = request(
+            proc,
+            16_000 + offset,
+            "textDocument/selectionRange",
+            {
+                "textDocument": {"uri": uri(files[point["file"]])},
+                "positions": [{"line": point["line"], "character": point["character"]}],
+            },
+            timeout=request_timeout,
+        )
+        key = f"{point['file']}:{point['line']}:{point['symbol']}:{point['kind']}"
+        selection_probes[key] = simplify_selection_ranges(probe)
     folding_probes: dict[str, Any] = {}
     for offset, file_name in enumerate(project_folding_probe_files(files), start=1):
         progress(f"folding probe {file_name}")
@@ -1766,6 +1877,7 @@ def run_project_suite(
         "hover_probes": hover_probes,
         "reference_probes": reference_probes,
         "highlight_probes": highlight_probes,
+        "selection_probes": selection_probes,
         "implementation_probes": implementation_probes,
         "signature_probes": signature_probes,
         "completion_probes": completion_probes,
@@ -1985,6 +2097,25 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
     if missing_highlight_probes:
         diffs.append("document-highlight probes differ:")
         diffs.append(json.dumps(missing_highlight_probes, indent=2, sort_keys=True))
+    missing_selection_probes: dict[str, Any] = {}
+    freight_selections = freight_result.get("selection_probes") or {}
+    for key, fortls_chains in (fortls_result.get("selection_probes") or {}).items():
+        freight_chains = freight_selections.get(key)
+        if method_not_found(fortls_chains):
+            if not valid_selection_chains(freight_chains):
+                missing_selection_probes[key] = {
+                    "freight": freight_chains,
+                    "fortls": fortls_chains,
+                }
+            continue
+        if not valid_selection_chains(freight_chains):
+            missing_selection_probes[key] = {
+                "freight": freight_chains,
+                "fortls": fortls_chains,
+            }
+    if missing_selection_probes:
+        diffs.append("selection-range probes missing from Freight:")
+        diffs.append(json.dumps(missing_selection_probes, indent=2, sort_keys=True))
     if freight_result.get("implementation_probes") != fortls_result.get("implementation_probes"):
         diffs.append("implementation probes differ:")
         diffs.append(

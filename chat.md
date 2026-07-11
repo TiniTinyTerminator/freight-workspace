@@ -9193,6 +9193,32 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
 - `cargo test -p fortran-lsp` — passed (276 tests)
 
+### 2026-07-11 — Codex — fortran-lsp: project selection-range probes
+
+Changes pushed:
+- `fortran-lsp` `main`: `d358109` `record selection range probe coverage`
+  - `crates/fortran-lsp/TODO.md` marks the selection-range subpoint complete.
+- Workspace harness:
+  - Added project-mode `textDocument/selectionRange` probes to
+    `scripts/fortran_lsp_compare.py`.
+  - Selection responses are normalized into parent range chains with
+    line/column bounds.
+  - Sampling covers representative declaration positions, call-expression
+    positions, and fixed-form continuation-line identifiers.
+  - The project gate treats selection ranges as Freight-native coverage:
+    Freight must return a non-empty normalized chain for each sampled position,
+    whether fortls returns `method not found` or a looser response.
+- Next point-1 subpoint: project-mode code-action probes. Point 1 still has
+  3 subpoints left; 6 hardening-cycle points remain.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-neural-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight` — passed
+- `cargo test -p fortran-lsp` — passed (276 tests)
+
 ### 2026-07-08 — Codex — fortran-lsp: preprocessor condition support
 
 Changes pushed:
