@@ -9486,3 +9486,22 @@ Verification:
 Next:
 - Continue point 1 from bspline, then CSV, M_CLI2, roots, neural-fortran,
   pyplot, search-sort, quadpack, nlesolver, and ODEPACK.
+### 2026-07-11 — Codex — fortran-lsp: sweep through roots
+
+Changes in this checkpoint:
+- `scripts/fortran_lsp_compare.py` now treats project diagnostics as a
+  Freight-extra gate, accepts definition probes when fortls resolves into a
+  duplicate top-level doc copy but Freight resolves the source file, and keeps
+  the earlier expanded-probe normalizations.
+- `crates/fortran-lsp/TODO.md` sweep status now says json-fortran through roots
+  pass; neural-fortran is next.
+- `fortran-lsp` `main`: `a007aad` `update expanded sweep status`
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- Project gates passed with `--diagnostic-quiet 5.0 --request-timeout 60`:
+  bspline, CSV, M_CLI2, roots.
+
+Next:
+- Continue point 1 from neural-fortran, then pyplot, search-sort, quadpack,
+  nlesolver, and ODEPACK.

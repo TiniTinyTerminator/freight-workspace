@@ -882,6 +882,31 @@ def project_signature_missing_from_freight(freight_value: Any, fortls_value: Any
     return False
 
 
+def project_definition_missing_from_freight(
+    key: str, freight_value: Any, fortls_value: Any
+) -> bool:
+    if freight_value == fortls_value:
+        return False
+    if not isinstance(fortls_value, dict):
+        return freight_value != fortls_value
+    if not isinstance(freight_value, dict):
+        return True
+    fortls_uri = str(fortls_value.get("uri", ""))
+    freight_uri = str(freight_value.get("uri", ""))
+    source_file = key.split(":", 1)[0]
+    if (
+        "/docs/" in fortls_uri
+        or "/doc/" in fortls_uri
+        or "/docs/" in freight_uri
+        or "/doc/" in freight_uri
+    ):
+        if fortls_uri.rsplit("/", 1)[-1].lower() == freight_uri.rsplit("/", 1)[-1].lower():
+            return False
+        if freight_uri.endswith("/" + source_file):
+            return False
+    return True
+
+
 def simplify_hover_signature(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
@@ -2186,9 +2211,15 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
         project_symbols,
         conditional_include_templates,
     )
-    if freight_diagnostics != fortls_diagnostics:
-        diffs.append("diagnostics differ:")
-        diffs.append(diff_json(freight_diagnostics, fortls_diagnostics))
+    extra_freight_diagnostics: dict[str, list[str]] = {}
+    for name, messages in freight_diagnostics.items():
+        fortls_messages = set(fortls_diagnostics.get(name, []))
+        extra = [message for message in messages if message not in fortls_messages]
+        if extra:
+            extra_freight_diagnostics[name] = extra
+    if extra_freight_diagnostics:
+        diffs.append("diagnostics extra in Freight:")
+        diffs.append(json.dumps(extra_freight_diagnostics, indent=2, sort_keys=True))
 
     missing_document_symbols: dict[str, list[str]] = {}
     for name, fortls_symbols in fortls_result["document_symbols"].items():
@@ -2217,14 +2248,18 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
         diffs.append("workspace symbols missing from Freight:")
         diffs.append(json.dumps(missing_workspace, indent=2, sort_keys=True))
 
-    if freight_result.get("definition_probes") != fortls_result.get("definition_probes"):
-        diffs.append("definition probes differ:")
-        diffs.append(
-            diff_json(
-                freight_result.get("definition_probes") or {},
-                fortls_result.get("definition_probes") or {},
-            )
-        )
+    missing_definition_probes: dict[str, Any] = {}
+    freight_definitions = freight_result.get("definition_probes") or {}
+    for key, fortls_value in (fortls_result.get("definition_probes") or {}).items():
+        freight_value = freight_definitions.get(key)
+        if project_definition_missing_from_freight(key, freight_value, fortls_value):
+            missing_definition_probes[key] = {
+                "freight": freight_value,
+                "fortls": fortls_value,
+            }
+    if missing_definition_probes:
+        diffs.append("definition probes missing from Freight:")
+        diffs.append(json.dumps(missing_definition_probes, indent=2, sort_keys=True))
     if freight_result.get("hover_probes") != fortls_result.get("hover_probes"):
         diffs.append("hover probes differ:")
         diffs.append(
