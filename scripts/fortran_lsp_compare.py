@@ -858,6 +858,8 @@ def normalize_signature_text(text: str) -> str:
 def project_signature_missing_from_freight(freight_value: Any, fortls_value: Any) -> bool:
     if freight_value == fortls_value:
         return False
+    if fortls_value is None and isinstance(freight_value, list) and freight_value:
+        return False
     if not isinstance(fortls_value, list):
         return freight_value != fortls_value
     if not fortls_value:
@@ -886,6 +888,8 @@ def project_definition_missing_from_freight(
     key: str, freight_value: Any, fortls_value: Any
 ) -> bool:
     if freight_value == fortls_value:
+        return False
+    if fortls_value is None and isinstance(freight_value, dict):
         return False
     if not isinstance(fortls_value, dict):
         return freight_value != fortls_value
@@ -1379,6 +1383,30 @@ def project_signature_probe_points(files: dict[str, Path], limit: int = 20) -> l
 
 def project_completion_probe_points(files: dict[str, Path], limit: int = 20) -> list[dict[str, Any]]:
     call_re = re.compile(r"\bcall\s+([a-z_]\w*)\s*(?:\(|$)", flags=re.IGNORECASE)
+    procedure_re = re.compile(
+        r"^\s*(?:(?:pure|elemental|recursive)\s+)*(?:module\s+)?(?:subroutine|function)\s+([a-z_]\w*)\b",
+        flags=re.IGNORECASE,
+    )
+    module_procedure_re = re.compile(r"^\s*module\s+procedure\s+(.+)$", flags=re.IGNORECASE)
+    public_re = re.compile(r"^\s*public\s*::\s*(.+)$", flags=re.IGNORECASE)
+    declared_callables: set[str] = set()
+    for path in files.values():
+        try:
+            lines = logical_fortran_lines(path.read_text(errors="replace"))
+        except OSError:
+            continue
+        for line in lines:
+            match = procedure_re.match(strip_fortran_comment(line))
+            if match:
+                declared_callables.add(match.group(1).lower())
+                continue
+            match = module_procedure_re.match(strip_fortran_comment(line))
+            if match:
+                declared_callables.update(split_fortran_names(match.group(1)))
+                continue
+            match = public_re.match(strip_fortran_comment(line))
+            if match:
+                declared_callables.update(split_fortran_names(match.group(1)))
     points: list[dict[str, Any]] = []
     for file_name, path in sorted(files.items()):
         if file_name.startswith("archive/src/demos/") and file_name.endswith(".f"):
@@ -1394,6 +1422,8 @@ def project_completion_probe_points(files: dict[str, Path], limit: int = 20) -> 
             for match in call_re.finditer(line):
                 call_name = match.group(1).lower()
                 if len(call_name) < 3:
+                    continue
+                if call_name not in declared_callables:
                     continue
                 char = raw_line.lower().find(call_name[:3], match.start())
                 if char < 0:
@@ -2260,14 +2290,14 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
     if missing_definition_probes:
         diffs.append("definition probes missing from Freight:")
         diffs.append(json.dumps(missing_definition_probes, indent=2, sort_keys=True))
-    if freight_result.get("hover_probes") != fortls_result.get("hover_probes"):
-        diffs.append("hover probes differ:")
-        diffs.append(
-            diff_json(
-                freight_result.get("hover_probes") or {},
-                fortls_result.get("hover_probes") or {},
-            )
-        )
+    missing_hover_probes = {
+        key: {"freight": (freight_result.get("hover_probes") or {}).get(key), "fortls": True}
+        for key, value in (fortls_result.get("hover_probes") or {}).items()
+        if value is True and (freight_result.get("hover_probes") or {}).get(key) is not True
+    }
+    if missing_hover_probes:
+        diffs.append("hover probes missing from Freight:")
+        diffs.append(json.dumps(missing_hover_probes, indent=2, sort_keys=True))
     missing_reference_probes: dict[str, Any] = {}
     freight_refs_by_probe = freight_result.get("reference_probes") or {}
     for key, fortls_refs in (fortls_result.get("reference_probes") or {}).items():

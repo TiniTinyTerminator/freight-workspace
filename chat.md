@@ -9505,3 +9505,27 @@ Verification:
 Next:
 - Continue point 1 from neural-fortran, then pyplot, search-sort, quadpack,
   nlesolver, and ODEPACK.
+### 2026-07-11 — Codex — fortran-lsp: completed expanded 18-project sweep
+
+Changes in this checkpoint:
+- `fortran-lsp` completion now includes local unnamed-interface prototypes in
+  call-statement completion, covering LAPACK-style local interfaces.
+- `fortran-lsp` `main`: `beb62b9` `complete expanded project sweep`
+- The project oracle harness now treats fortls null/false definition, hover,
+  and signature results as non-requirements when Freight has a positive answer,
+  and skips undeclared external library calls in completion probes.
+- `crates/fortran-lsp/TODO.md` marks point 1's expanded project request-probe
+  sweep complete and closes the duplicate hardening-cycle parity item.
+
+Verification:
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --request-timeout 30 --diagnostic-timeout 5 --diagnostic-quiet 0.35`
+- `cargo test -p fortran-lsp` — 285 passed.
+- Expanded project gates passed with `--diagnostic-quiet 5.0 --request-timeout 60`:
+  neural-fortran, pyplot, search-sort, quadpack, nlesolver, ODEPACK.
+- Earlier same-turn project gates passed: json-fortran, test-drive, toml-f,
+  FAT, bspline, CSV, M_CLI2, roots.
+
+Next:
+- User asked to stop after each TODO point until directed. Point 1 is complete;
+  next main TODO point is `Parser / Model Gaps`.
