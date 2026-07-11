@@ -9437,3 +9437,20 @@ Verification:
 - `python3 scripts/fortran_lsp_compare.py` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-minpack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
 - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --diagnostic-quiet 5.0 --request-timeout 30` — passed
+### 2026-07-11 — Codex — fortran-lsp: refreshed active TODO queue
+
+Changes pushed:
+- `crates/fortran-lsp/TODO.md` now distinguishes the earlier full 18-project
+  baseline pass from the current expanded project-mode request-probe sweep.
+- Point 1 has a new active queue for the json-fortran sweep failure:
+  empty highlight normalization, `null` fortls rename normalization, avoiding
+  broad derived-type reference probes, and converting concrete signature-help
+  gaps into regressions where they are real model bugs.
+- `fortran-lsp` `main`: `7a47522` `refresh fortran-lsp active todo queue`
+
+Verification:
+- Documentation-only change; no tests run for this entry.
+
+Left uncommitted:
+- Existing fortran-lsp model/workspace/tests changes and
+  `scripts/fortran_lsp_compare.py` harness changes are still in progress.
