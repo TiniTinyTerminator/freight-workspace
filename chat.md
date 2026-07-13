@@ -9556,3 +9556,33 @@ Next:
 - User asked to stop after each TODO point until directed. The completed point
   is hardening item `Preprocessor parity phase 2`; next open hardening item is
   `Procedure pointer and callback modelling`.
+
+### 2026-07-14 — Codex — fortran-lsp: procedure pointer callbacks
+
+Changes in this checkpoint:
+- `fortran-lsp` now treats `procedure(interface)` variables and dummies as
+  callable symbols by resolving their declared abstract-interface prototype for
+  hover, signature help, and argument diagnostics.
+- Procedure pointer components declared inside derived types now stay
+  `Variable` symbols instead of being confused with type-bound procedures, and
+  `obj%cb(...)` resolves through the component's procedure interface.
+- Imported abstract-interface prototypes are used for procedure variables, and
+  procedure-pointer assignment/call sites now resolve the pointer and target
+  definitions with focused regressions.
+- Updated `crates/fortran-lsp/TODO.md` to mark `Procedure pointer and callback
+  modelling` complete.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp procedure_` — 37 passed.
+- `cargo test -p fortran-lsp` — 294 passed.
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- Attempted deterministic harness:
+  `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --request-timeout 30 --diagnostic-timeout 5 --diagnostic-quiet 0.35`
+  but the local `/tmp/fortls-reference` oracle still exits before comparison
+  because its Python source tree is incomplete (`fortls.helper_functions` /
+  internal parser modules missing).
+
+Next:
+- Continue with hardening item `Generic overload selection by argument
+  characteristics`.
