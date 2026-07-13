@@ -9586,3 +9586,31 @@ Verification:
 Next:
 - Continue with hardening item `Generic overload selection by argument
   characteristics`.
+
+### 2026-07-14 — Codex — fortran-lsp: generic overload type selection
+
+Changes in this checkpoint:
+- Generic interface and type-bound generic selection now use a conservative
+  unique-best score from actual argument types to dummy declarations in
+  line-call paths. It recognizes declared variable types and simple literal
+  types, keeps optional/keyword compatibility as the gate, and falls back to
+  the existing selector when type evidence is absent or ambiguous.
+- Added regressions proving same-arity overloads select the integer-specific
+  ordinary generic and type-bound generic overloads for inlay hints.
+- Updated `crates/fortran-lsp/TODO.md` to mark `Generic overload selection by
+  argument characteristics` complete.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp generic_` — 16 passed.
+- `cargo test -p fortran-lsp` — 296 passed.
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- Attempted deterministic harness:
+  `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --request-timeout 30 --diagnostic-timeout 5 --diagnostic-quiet 0.35`
+  but the local `/tmp/fortls-reference` oracle still exits before comparison
+  because its Python source tree is incomplete (`fortls.helper_functions`
+  missing).
+
+Next:
+- Continue with hardening item `Semantic-token, folding, and document-highlight
+  audit`.
