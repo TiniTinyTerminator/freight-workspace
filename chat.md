@@ -9614,3 +9614,35 @@ Verification:
 Next:
 - Continue with hardening item `Semantic-token, folding, and document-highlight
   audit`.
+
+### 2026-07-14 — Codex — fortran-lsp: editor surface audit
+
+Changes in this checkpoint:
+- `fortran-lsp` semantic tokens now include named type-bound generic bindings
+  (`generic :: name => ...`) as method tokens.
+- `fortran-lsp` references now include type-bound method binding aliases when
+  the cursor resolves to the implementation target, so document highlights on
+  `obj%binding(...)` include the binding declaration and call member.
+- Added `fortran-lsp` semantic-token audit coverage for preprocessor macros,
+  type-bound bindings/generics, generic `module procedure` links, and submodule
+  procedure implementations.
+- Added a `freight` Fortran adapter regression covering document highlights and
+  folding ranges for type-bound/generic/interface shapes.
+- Updated `crates/fortran-lsp/TODO.md` to mark `Semantic-token, folding, and
+  document-highlight audit` complete.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `rustfmt crates/freight/src/lsp/indexers/Fortran.rs`
+- `cargo test -p fortran-lsp semantic_tokens_cover_editor_surface_audit_shapes`
+- `cargo test -p freight fortran_indexer_audits_editor_surfaces_for_type_bound_shapes`
+- `cargo test -p fortran-lsp` — 297 passed.
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- Attempted deterministic harness:
+  `python3 scripts/fortran_lsp_compare.py --freight target/debug/freight --request-timeout 30 --diagnostic-timeout 5 --diagnostic-quiet 0.35`
+  but the local `/tmp/fortls-reference` oracle still exits before comparison
+  because its Python source tree is incomplete (`fortls.helper_functions`
+  missing).
+
+Next:
+- Continue with hardening item `Incremental dependency invalidation`.
