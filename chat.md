@@ -9680,3 +9680,19 @@ Verification:
 Next:
 - Audit `crates/fortran-lsp/TODO.md` and `crates/freight/TODO.md` for any
   remaining Fortran-native integration gaps after the hardening list.
+
+### 2026-07-14 — Codex — freight: close native Fortran TODO pointer
+
+Changes in this checkpoint:
+- Updated `crates/freight/TODO.md` so the native Fortran section no longer
+  points at open crate-side gaps. `crates/fortran-lsp/TODO.md` has no unchecked
+  active items after the dependency-invalidation work.
+- Left existing unrelated Freight source edits (`src/build/cmake_toolchain.rs`,
+  `src/build/plugin.rs`) untouched.
+
+Verification:
+- Documentation-only change; no tests run for this checkpoint.
+
+Next:
+- Remaining LSP work is non-Fortran: clang-bridge parity/default-on and native
+  assembly hardening.
