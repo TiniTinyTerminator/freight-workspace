@@ -9646,3 +9646,37 @@ Verification:
 
 Next:
 - Continue with hardening item `Incremental dependency invalidation`.
+
+### 2026-07-14 — Codex — fortran-lsp: incremental dependency invalidation
+
+Changes in this checkpoint:
+- `fortran-lsp::Workspace` now caches direct include and `use module` reverse
+  dependency edges.
+- Workspace updates track a richer per-file API fingerprint (signature, args,
+  visibility, type spec, attributes, binding metadata) separate from the
+  name-only symbol index.
+- Edits to included files or provider files with changed APIs reparse only
+  direct dependents; body-only edits with unchanged symbols still avoid global
+  symbol-index rebuilding.
+- Added focused regressions for late include insertion and module dependent
+  tracking.
+- Updated `crates/fortran-lsp/TODO.md` to mark `Incremental dependency
+  invalidation` complete.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp workspace_tracks_direct` — 2 passed.
+- `cargo test -p fortran-lsp` — 299 passed.
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- Attempted bounded project-mode oracle runs:
+  - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-stdlib-fixture --max-files 5`
+    failed before comparison because `/tmp/fortls-reference` is missing
+    `fortls.helper_functions`.
+  - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-fpm-fixture --max-files 5`
+    failed before comparison for the same broken fortls checkout.
+  - `python3 scripts/fortran_lsp_compare.py --project /tmp/freight-odepack-fixture --max-files 5`
+    timed out waiting for the fortls oracle response.
+
+Next:
+- Audit `crates/fortran-lsp/TODO.md` and `crates/freight/TODO.md` for any
+  remaining Fortran-native integration gaps after the hardening list.
