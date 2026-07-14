@@ -9696,3 +9696,30 @@ Verification:
 Next:
 - Remaining LSP work is non-Fortran: clang-bridge parity/default-on and native
   assembly hardening.
+
+### 2026-07-14 — Codex — fortls oracle refresh
+
+Changes in this checkpoint:
+- Replaced the broken `/tmp/fortls-reference` checkout with a fresh
+  `fortran-lang/fortls` clone at `fc68d91`; the broken tree was moved to
+  `/tmp/fortls-reference-broken-20260714`.
+- Created `/tmp/fortls-venv`, installed the fresh checkout editable, and added
+  `/tmp/fortls-wrapper` so `scripts/fortran_lsp_compare.py` can use the venv
+  without argparse treating `-m fortls` as script options.
+- Updated `crates/fortran-lsp/TODO.md` with the repaired oracle setup and
+  current bounded-project results.
+
+Verification:
+- `/tmp/fortls-venv/bin/python -m fortls --version` — `3.2.3.dev33+gfc68d915b`.
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper` —
+  passed.
+- Bounded project checks now reach real comparisons:
+  - stdlib `--max-files 5`: definition/reference diffs in sampled
+    operator/to_string files.
+  - fpm `--max-files 5`: known null code-action harness mismatch.
+  - ODEPACK `--max-files 5 --request-timeout 90`: still times out waiting for
+    fortls response id 14003.
+
+Next:
+- Use `--fortls /tmp/fortls-wrapper` for future local differential runs.
