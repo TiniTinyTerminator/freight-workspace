@@ -9723,3 +9723,35 @@ Verification:
 
 Next:
 - Use `--fortls /tmp/fortls-wrapper` for future local differential runs.
+
+### 2026-07-15 — Codex — fortran-lsp: submodule definition parity
+
+Changes in this checkpoint:
+- `definition` on a submodule module-procedure implementation now stays on the
+  implementation symbol instead of jumping to the ancestor interface prototype.
+  Hover and `implementation_location` still use the prototype/implementation
+  cross-linking path.
+- Added a regression for stdlib-style `pure module function` implementations in
+  submodules, including references on the implementation header.
+- Updated `scripts/fortran_lsp_compare.py` so bounded project samples always
+  include the synthetic code-action probe files and so Freight-only
+  implementation locations are accepted when fortls returns `null`.
+- Updated `crates/fortran-lsp/TODO.md`: default, stdlib `--max-files 5`, and fpm
+  `--max-files 5` differential gates pass with `/tmp/fortls-wrapper`; ODEPACK
+  still times out waiting for fortls response id 14003.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp submodule_module_function_definition_stays_on_implementation`
+- `cargo test -p fortran-lsp parses_submodules_and_links_module_procedure_to_ancestor_interface`
+- `cargo test -p fortran-lsp full_module_subroutine_submodules_link_to_ancestor_interface`
+- `cargo build -p freight`
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper` — passed.
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper --project /tmp/freight-stdlib-fixture --max-files 5` — passed.
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper --project /tmp/freight-fpm-fixture --max-files 5` — passed.
+- `cargo test -p fortran-lsp` — 300 passed.
+
+Next:
+- Continue reducing the remaining oracle weak spot: ODEPACK's bounded fortls
+  timeout.

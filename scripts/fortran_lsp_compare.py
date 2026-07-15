@@ -459,7 +459,17 @@ def copy_project_fixture(source: Path, root: Path, max_files: int = 0) -> dict[s
     write_project_code_action_probe(root)
     files = fortran_files(root)
     if max_files > 0:
-        files = files[:max_files]
+        sampled = files[:max_files]
+        probe_files = [
+            root / ".freight-lsp-probes" / "code_action_export.f90",
+            root / ".freight-lsp-probes" / "code_action_missing_use.f90",
+        ]
+        seen = {path.resolve() for path in sampled}
+        for probe_file in probe_files:
+            if probe_file.exists() and probe_file.resolve() not in seen:
+                sampled.append(probe_file)
+                seen.add(probe_file.resolve())
+        files = sorted(sampled)
     return {relative_key(root, path): path for path in files}
 
 
@@ -2386,14 +2396,19 @@ def project_diff(freight_result: dict[str, Any], fortls_result: dict[str, Any]) 
                 sort_keys=True,
             )
         )
-    if freight_result.get("implementation_probes") != fortls_result.get("implementation_probes"):
-        diffs.append("implementation probes differ:")
-        diffs.append(
-            diff_json(
-                freight_result.get("implementation_probes") or {},
-                fortls_result.get("implementation_probes") or {},
-            )
-        )
+    missing_implementation_probes = {}
+    for key, fortls_value in (fortls_result.get("implementation_probes") or {}).items():
+        freight_value = (freight_result.get("implementation_probes") or {}).get(key)
+        if fortls_value is None:
+            continue
+        if freight_value != fortls_value:
+            missing_implementation_probes[key] = {
+                "freight": freight_value,
+                "fortls": fortls_value,
+            }
+    if missing_implementation_probes:
+        diffs.append("implementation probes missing from Freight:")
+        diffs.append(json.dumps(missing_implementation_probes, indent=2, sort_keys=True))
     missing_signature_probes: dict[str, Any] = {}
     freight_signatures = freight_result.get("signature_probes") or {}
     for key, fortls_value in (fortls_result.get("signature_probes") or {}).items():
