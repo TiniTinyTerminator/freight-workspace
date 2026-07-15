@@ -9755,3 +9755,34 @@ Verification:
 Next:
 - Continue reducing the remaining oracle weak spot: ODEPACK's bounded fortls
   timeout.
+
+### 2026-07-15 — Codex — fortran-lsp: ODEPACK semantic probe stabilization
+
+Changes in this checkpoint:
+- Optimized `Workspace::semantic_tokens` to scan identifiers once per file,
+  then resolve through file-local symbol indexes plus per-line scope and
+  per-symbol token-type caches.
+- Added `parser::all_identifier_occurrences` for the single-pass semantic scan.
+- Restored the project harness' intended semantic-token sampling policy:
+  bounded semantic probes now skip very large files (such as ODEPACK's 10k-line
+  `archive/src/opkda1.f`) instead of using huge fallback files to fill the
+  probe quota.
+- Updated `crates/fortran-lsp/TODO.md`: default, stdlib `--max-files 5`, fpm
+  `--max-files 5`, and ODEPACK `--max-files 5` all pass with
+  `/tmp/fortls-wrapper`.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo test -p fortran-lsp semantic_tokens`
+- `cargo build -p freight`
+- `python3 -m py_compile scripts/fortran_lsp_compare.py`
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper --project /tmp/freight-odepack-fixture --max-files 5` — passed.
+- `cargo test -p fortran-lsp` — 300 passed.
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper` — passed.
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper --project /tmp/freight-stdlib-fixture --max-files 5` — passed.
+- `python3 scripts/fortran_lsp_compare.py --fortls /tmp/fortls-wrapper --project /tmp/freight-fpm-fixture --max-files 5` — passed.
+
+Next:
+- Audit current Fortran TODOs and decide whether the completed native queue is
+  now strong enough to mark the overall `fully implement fortran-lsp` goal
+  complete, or whether another full fixture sweep is required.

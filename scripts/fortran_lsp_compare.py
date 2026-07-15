@@ -1615,8 +1615,8 @@ def project_folding_probe_files(files: dict[str, Path], limit: int = 20) -> list
 
 
 def project_semantic_probe_files(files: dict[str, Path], limit: int = 12) -> list[str]:
+    max_probe_lines = 2_500
     candidates: list[tuple[int, int, str]] = []
-    fallback: list[tuple[int, int, str]] = []
     patterns = [
         re.compile(r"^\s*#\s*(?:define|ifdef|ifndef|if|elif)\b", flags=re.IGNORECASE),
         re.compile(r"^\s*(?:module|submodule)\b", flags=re.IGNORECASE),
@@ -1646,16 +1646,9 @@ def project_semantic_probe_files(files: dict[str, Path], limit: int = 12) -> lis
         if has_semantic_shape or has_fixed_continuation:
             ext_priority = 1 if fixed_form else 0
             item = (ext_priority, line_count, file_name)
-            if line_count <= 1_200:
+            if line_count <= max_probe_lines:
                 candidates.append(item)
-            else:
-                fallback.append(item)
     selected = [file_name for _priority, _lines, file_name in sorted(candidates)[:limit]]
-    if len(selected) < limit:
-        selected.extend(
-            file_name
-            for _priority, _lines, file_name in sorted(fallback)[: limit - len(selected)]
-        )
     return selected
 
 
