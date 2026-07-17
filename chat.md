@@ -10206,3 +10206,26 @@ Next:
 - Continue the next unchecked clang-bridge TODO; crash containment itself is
   complete, while LLVM documents recovery as best-effort rather than a hard
   process-isolation guarantee.
+
+### 2026-07-17 — Codex — clang-bridge: semantic-token parity gaps
+
+Changes pushed in `crates/clang-bridge` commit `2802621`:
+- Added `AutoTypeLoc` handling so written `auto` placeholders emit native
+  `type` semantic tokens.
+- Added recursive namespace-component handling for clang 22
+  `NestedNameSpecifierLoc`, including multi-part qualifiers such as
+  `outer::inner::Value`.
+- Updated the B-24 audit from 3 missing identifier positions to 0 and closed
+  the TODO; 17 unchecked points remain.
+
+Verification:
+- Queried clangd 22 over JSON-RPC on `tests/fixtures/test.cpp`; its final three
+  positions are the two `auto` tokens as `type` and `geo` as `namespace`.
+- Added regressions for those exact oracle positions and a nested namespace
+  qualifier fixture.
+- `cargo test -p clang-bridge` — all tests passed; one timing probe ignored.
+- Repository diff checks passed.
+
+Next:
+- Begin differential diagnostics verification, including asynchronous
+  `publishDiagnostics`, ranges, severity, and related information.
