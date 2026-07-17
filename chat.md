@@ -10260,3 +10260,32 @@ Verification:
 Next:
 - Continue with signature-help differential verification, especially nested
   and partial calls and active-parameter selection.
+
+### 2026-07-17 — Codex — clang-bridge: signature-help differential
+
+Changes pushed in `crates/clang-bridge` commit `57ad245`:
+- Generalized the external oracle test to `tests/clangd_oracle.rs` for reuse by
+  the remaining differential points.
+- Compared bridge and clangd signature facts at six positions across nested
+  calls, resumed outer calls, and an incomplete final argument.
+- The bridge matched callable selection, parameter labels, and active
+  parameter without an algorithm change. Closed the TODO; 15 unchecked points
+  remain.
+
+Changes pushed in `crates/freight` commit `0b7eb70` on
+`adaptors-as-plugins`:
+- Wired native `ClangIndexer::signature_help` into Freight's LSP path.
+- Emits all bridge overload/parameter labels plus active signature/parameter.
+- Added an integration regression for an incomplete third argument.
+
+Verification:
+- `cargo test -p clang-bridge --test clangd_oracle -- --ignored --nocapture`
+  — both diagnostics and signature-help oracle tests passed against clangd 22.
+- `cargo test -p clang-bridge` — all normal tests passed; two external-oracle
+  tests and one timing probe ignored in the default run.
+- Focused Freight Clang indexer tests — 7 passed.
+- Formatting and repository diff checks passed.
+
+Next:
+- Continue with hover differential verification: signature, docs, type facts,
+  and the missing hover range at the Freight LSP boundary.
