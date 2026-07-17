@@ -10178,3 +10178,31 @@ Verification:
 Next:
 - Continue the default-on blockers. Crash containment is the next known-risk
   item and requires choosing and testing the process/LLVM failure boundary.
+
+### 2026-07-17 — Codex — clang-bridge: in-process crash containment
+
+Changes pushed in `crates/clang-bridge` commit `6e3aa90`:
+- Wrapped every clang parse, mutation, and AST traversal behind LLVM
+  `CrashRecoveryContext` boundaries.
+- Poisoned and quarantined a TU after a recovered failure, intentionally
+  leaking uncertain AST state and returning null-safe empty results afterward.
+- Added operation-level errors plus real `SIGABRT` recovery probes for index
+  and TU boundaries.
+- Closed the crash-containment TODO; 18 unchecked points remain.
+
+Changes pushed in `crates/freight` commit `e0d51ac` on
+`adaptors-as-plugins`:
+- Detects a poisoned cached TU, logs its captured clang failure, evicts it,
+  and reconstructs it from the latest live buffer on the next request.
+- Failed reparses now evict and rebuild immediately.
+
+Verification:
+- `cargo test -p clang-bridge` — all tests passed (one timing probe ignored).
+- Real-abort recovery tests — 2 passed after the final C++ rebuild.
+- Focused Freight Clang indexer tests — 5 passed.
+- `cargo check -p freight --features clang-bridge` and diff checks — passed.
+
+Next:
+- Continue the next unchecked clang-bridge TODO; crash containment itself is
+  complete, while LLVM documents recovery as best-effort rather than a hard
+  process-isolation guarantee.
