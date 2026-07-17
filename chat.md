@@ -9858,3 +9858,21 @@ Verification:
 
 Next:
 - Continue the assembly TODO with the fuller instruction/register database.
+
+### 2026-07-17 — Codex — clang-bridge: MIT license
+
+Changes in this checkpoint:
+- Added `crates/clang-bridge/LICENSE` with the MIT license text.
+- Declared `license = "MIT"` in the crate manifest and linked the license from
+  the README.
+- Confirmed `fortran-lsp` already has the same MIT license declaration and
+  license file.
+
+Verification:
+- `cargo metadata --no-deps --format-version 1` reports `MIT` for
+  `clang-bridge`.
+- `git diff --check -- Cargo.toml LICENSE README.md`
+
+Next:
+- Finish and verify the active clang-bridge UTF-16 position checkpoint before
+  committing and pushing the submodule and workspace pointer.
