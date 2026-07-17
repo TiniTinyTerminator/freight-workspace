@@ -10090,3 +10090,28 @@ Verification:
 Next:
 - Continue the remaining clang-bridge default-on queue; stale compile-command
   refresh is the next related state-management point.
+
+### 2026-07-17 — Codex — clang-bridge: targeted flag refresh
+
+Changes pushed in `crates/freight` commit `de767d8` on
+`adaptors-as-plugins`:
+- Replaced unconditional Clang TU-cache clearing during compile-command refresh
+  with comparison of each file's complete working directory and flag list.
+- Preserved unchanged ASTs and their LRU positions; evicted only changed or
+  removed entries while retaining open unsaved buffers for reparsing.
+- Added a regression covering unchanged, changed, and removed source entries.
+
+Changes pushed in `crates/clang-bridge` commit `034e7b2`:
+- Closed and documented stale-flag refresh in `TODO.md`; 21 unchecked points
+  remain.
+
+Verification:
+- Focused stale-flag refresh regression — passed.
+- `cargo test -p freight --lib --features clang-bridge` — 771 passed.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `cargo fmt -p freight -- --check` and `git diff --check` — passed.
+
+Next:
+- Continue the remaining default-on queue. Progress/status surfacing is the
+  next contained editor-facing point; synchronous reparse debouncing is a
+  larger state-machine change immediately after it.
