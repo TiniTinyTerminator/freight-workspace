@@ -9823,3 +9823,15 @@ Verification:
 
 Next:
 - Commit and push `crates/fortran-lsp`, then bump the workspace pointer.
+
+### 2026-07-17 — Codex — fortran-lsp: MIT license
+
+Changes in this checkpoint:
+- Added `crates/fortran-lsp/LICENSE` with the MIT license text.
+- Updated `crates/fortran-lsp/Cargo.toml` to declare `license = "MIT"`.
+
+Verification:
+- `cargo check -p fortran-lsp`
+
+Next:
+- Continue with the next requested freight-asm item.
