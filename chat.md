@@ -9802,3 +9802,24 @@ Verification:
 Next:
 - Push the `v1.0` tags after the README/root pointer commits, then start the
   native assembly (`freight-asm`) work.
+
+### 2026-07-17 — Codex — fortran-lsp: standalone executable
+
+Changes in this checkpoint:
+- Added `crates/fortran-lsp/src/main.rs`, producing a `fortran-lsp` stdio LSP
+  executable for users who want the Fortran server outside `freight lsp`.
+- The executable indexes the workspace root plus common `src`, `include`, and
+  `inc` directories, supports optional initialization settings for include
+  roots, line-length limits, and predefined macros, and exposes the existing
+  workspace features through standard LSP requests.
+- Updated `crates/fortran-lsp/README.md` and library docs to describe both
+  `freight lsp` embedding and standalone usage.
+
+Verification:
+- `cargo fmt -p fortran-lsp`
+- `cargo check -p fortran-lsp`
+- `cargo test -p fortran-lsp` — 300 passed.
+- `cargo run -p fortran-lsp -- --version`
+
+Next:
+- Commit and push `crates/fortran-lsp`, then bump the workspace pointer.
