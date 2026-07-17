@@ -10289,3 +10289,27 @@ Verification:
 Next:
 - Continue with hover differential verification: signature, docs, type facts,
   and the missing hover range at the Freight LSP boundary.
+
+### 2026-07-17 — Codex — clang-bridge: hover differential
+
+Changes pushed in `crates/clang-bridge` commit `f21aedc`:
+- Added half-open UTF-16 hover ranges and resolved value-type facts for
+  placeholder declarations such as `auto`.
+- Differentially verified function signature, documentation, deduced type,
+  and identifier ranges against clangd 22. Closed the hover TODO; 14 unchecked
+  points remain.
+
+Changes pushed in `crates/freight` commit `e3077bf` on
+`adaptors-as-plugins`:
+- Native hover responses now preserve token ranges and fall back to macro
+  hover from any cursor position inside the macro name.
+
+Verification:
+- The focused clangd hover oracle passed.
+- `cargo test -p clang-bridge` passed; three external-oracle tests and one
+  timing probe were ignored in the default run.
+- The focused Freight native-hover integration test passed.
+- `cargo check -p freight --features clang-bridge` and diff checks passed.
+
+Next:
+- Continue with call/type hierarchy edge-set differential verification.
