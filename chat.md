@@ -9876,3 +9876,34 @@ Verification:
 Next:
 - Finish and verify the active clang-bridge UTF-16 position checkpoint before
   committing and pushing the submodule and workspace pointer.
+
+### 2026-07-17 — Codex — clang-bridge: complete UTF-16 positions
+
+Changes pushed in `crates/clang-bridge` commit `bfa18fc`:
+- Added shared incoming and outgoing UTF-16 conversion helpers and applied them
+  across navigation, references/rename/highlights, document/workspace symbols,
+  diagnostics/fix-its, code actions, AST output, inclusions, semantic tokens,
+  inlay hints, and call/type hierarchy results.
+- Made the C ABI position/length contract explicit and updated Rust-side rename
+  and semantic-token documentation.
+- Added `tests/utf16_positions.rs` with BMP and surrogate-pair coverage, plus
+  focused incoming and semantic-token regressions.
+- Replaced the stale absolute-path `hello_hints` fixture with a hermetic source
+  fixture so it works after the example moved to `import std;`.
+- Reorganized `TODO.md` around the remaining default-on work and closed the
+  UTF-16 item.
+
+Verification:
+- `cargo test -p clang-bridge utf16 -- --nocapture` — 6 passed.
+- `cargo test -p clang-bridge` — 150 passed.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `git diff --cached --check` — passed before commit.
+
+Known follow-up:
+- `ClangTool::run` temporarily changes process CWD, so concurrent initial
+  parses can race. The new fixture serializes its own parse calls; `TODO.md`
+  records the production fix as a separate default-on risk.
+
+Next:
+- Continue the default-on queue with the next highest-priority clang-bridge
+  item after reconciling the TODO order.
