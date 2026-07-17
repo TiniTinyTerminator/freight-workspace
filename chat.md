@@ -9959,3 +9959,27 @@ Verification:
 Next:
 - Continue the crate-local default-on queue; Freight-side reparse debounce is
   still open as a separate cross-crate change.
+
+### 2026-07-17 — Codex — clang-bridge: lambda call hierarchy
+
+Changes pushed in `crates/clang-bridge` commit `4006e64`:
+- Call-hierarchy preparation now maps lambda-typed variables and invocation
+  references to the closure's `operator()` while preserving the variable name
+  and source location shown to clients.
+- Function-template specializations normalize to their primary templated method,
+  so captured generic-lambda invocations share a stable hierarchy USR.
+- `CallGraphVisitor` explicitly attributes calls inside a lambda body to its
+  call operator; default RecursiveASTVisitor traversal otherwise attributed
+  them to the enclosing function.
+- Added incoming and outgoing hierarchy coverage for a captured generic lambda
+  and closed Q-4 in `TODO.md`.
+
+Verification:
+- Focused lambda call-hierarchy regression — passed.
+- `cargo test -p clang-bridge` — 155 passed, 1 ignored timing probe.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `git diff --cached --check`
+
+Next:
+- Continue the remaining default-on audit/hardening items; the overall
+  clang-bridge goal is not complete yet.
