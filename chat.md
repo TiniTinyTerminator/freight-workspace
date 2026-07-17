@@ -9907,3 +9907,29 @@ Known follow-up:
 Next:
 - Continue the default-on queue with the next highest-priority clang-bridge
   item after reconciling the TODO order.
+
+### 2026-07-17 — Codex — clang-bridge: precompiled preamble reuse
+
+Changes pushed in `crates/clang-bridge` commit `df78867`:
+- Enabled `ASTUnit` precompiled-preamble creation after the first parse.
+- Added `tests/preamble.rs` covering first-include invalidation, include-graph
+  refresh, completion after repeated reparse, and post-completion AST integrity.
+- Added an ignored `<iostream>/<vector>` timing probe that reports initial,
+  reparse p50/p95, and completion p50/p95 without flaky timing assertions.
+- Fixed `cb_inclusions` for precompiled preambles by scanning loaded as well as
+  local SourceManager entries, mapping directive locations back to the current
+  main file, filtering the synthetic main-file entry, and deduplicating.
+- Closed the preamble, completion-latency, and related test-debt TODOs.
+
+Verification:
+- `cargo test -p clang-bridge --test preamble` — 2 passed, timing probe ignored.
+- Explicit timing probe — initial 606 ms; reparse p50/p95 60/70 ms;
+  completion p50/p95 7.5/8.1 ms on LLVM 22 debug build.
+- `cargo test -p clang-bridge` — 152 passed, 1 ignored.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `rustfmt --edition 2021 --check tests/preamble.rs`
+- `git diff --cached --check`
+
+Next:
+- Continue with synchronous LSP reparse/debounce or the next crate-local
+  default-on risk, keeping cross-crate changes in separate commits.
