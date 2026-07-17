@@ -10147,3 +10147,34 @@ Verification:
 Next:
 - Continue with synchronous native reparse debouncing and stale-version
   suppression, the remaining high-impact LSP-loop responsiveness item.
+
+### 2026-07-17 — Codex — clang-bridge: native reparse debounce
+
+Changes pushed in `crates/freight` commit `58e4fe4` on
+`adaptors-as-plugins`:
+- Moved blocking LSP input framing to a reader thread so the main server loop
+  can wake on debounce deadlines.
+- Added a 150 ms latest-version queue for native C/C++ `didChange` reparses.
+  Rapid edits reset the deadline; stale document versions remain rejected
+  across parse boundaries until close/reopen.
+- Semantic requests flush their URI before dispatch, workspace-symbol requests
+  flush all pending files, and save/close cancel obsolete queued work.
+- Added queue-level deadline/stale-version coverage and a server-handler
+  regression proving rapid changes apply only the newest text once.
+
+Changes pushed in `crates/clang-bridge` commit `f3f9eef`:
+- Closed and documented synchronous reparse debounce in `TODO.md`; 19
+  unchecked points remain.
+
+Verification:
+- Focused reparse regressions — 2 passed.
+- `cargo test -p freight --lib --features clang-bridge` — 774 passed.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `cargo clippy -p freight --lib --features clang-bridge` — passed with
+  pre-existing workspace warnings. Strict `-D warnings` remains blocked first
+  by the existing manual `-L` prefix slicing in `clang-bridge/build.rs`.
+- `cargo fmt -p freight -- --check` and repository diff checks — passed.
+
+Next:
+- Continue the default-on blockers. Crash containment is the next known-risk
+  item and requires choosing and testing the process/LLVM failure boundary.
