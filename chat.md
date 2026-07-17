@@ -10063,3 +10063,30 @@ Verification:
 Next:
 - Continue the remaining default-on work; TU memory limiting and stale-flag
   refresh are the next contained state-management items.
+
+### 2026-07-17 — Codex — clang-bridge: bounded translation-unit cache
+
+Changes pushed in `crates/freight` commit `77bc3df` on
+`adaptors-as-plugins`:
+- Bounded `ClangIndexer` to eight live translation units with least-recently-
+  used eviction.
+- Retained lightweight latest text for open buffers, allowing evicted TUs and
+  compile-flag refreshes to reconstruct unsaved state instead of reading stale
+  disk content.
+- Kept explicit eviction (`didClose`) responsible for clearing both AST and
+  live-buffer state.
+- Added regressions for LRU recency and unsaved-buffer reconstruction.
+
+Changes pushed in `crates/clang-bridge` commit `d64286f`:
+- Closed and documented the TU memory-cap item in `TODO.md`; 22 unchecked
+  points remain.
+
+Verification:
+- Focused TU-cache tests — 2 passed.
+- `cargo test -p freight --lib --features clang-bridge` — 770 passed.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `cargo fmt -p freight -- --check` and `git diff --check` — passed.
+
+Next:
+- Continue the remaining clang-bridge default-on queue; stale compile-command
+  refresh is the next related state-management point.
