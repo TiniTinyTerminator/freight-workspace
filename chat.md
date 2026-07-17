@@ -10229,3 +10229,34 @@ Verification:
 Next:
 - Begin differential diagnostics verification, including asynchronous
   `publishDiagnostics`, ranges, severity, and related information.
+
+### 2026-07-17 — Codex — clang-bridge: diagnostics differential
+
+Changes pushed in `crates/clang-bridge` commit `c6276e9`:
+- Added an explicitly invoked clangd JSON-RPC oracle that pumps asynchronous
+  diagnostics on a reader thread.
+- Differentially verified four malformed main-file errors and a transitive
+  nested-header error for message facts, UTF-16 ranges, severity, include
+  anchors, and related source locations.
+- Fixed zero-width fallback ranges and converted clang token ranges to
+  half-open ends. Closed the diagnostics TODO; 16 unchecked points remain.
+
+Changes pushed in `crates/freight` commit `34b6c9c` on
+`adaptors-as-plugins`:
+- Native diagnostics now preserve bridge end ranges.
+- Direct messages match clangd's capitalization/fix-available shape.
+- Header related information uses the full original range and
+  `Error occurred here`, matching clangd.
+
+Verification:
+- `cargo test -p clang-bridge --test diagnostics_oracle -- --ignored
+  --nocapture` — passed against clangd 22.
+- `cargo test -p clang-bridge` — all normal tests passed; the timing and
+  external-oracle tests were ignored in the default run.
+- Focused Freight Clang indexer tests — 6 passed.
+- `cargo check -p freight --features clang-bridge`, formatting, and diff checks
+  passed.
+
+Next:
+- Continue with signature-help differential verification, especially nested
+  and partial calls and active-parameter selection.
