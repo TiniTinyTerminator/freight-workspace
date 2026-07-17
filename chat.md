@@ -9835,3 +9835,26 @@ Verification:
 
 Next:
 - Continue with the next requested freight-asm item.
+
+### 2026-07-17 — Codex — freight: native assembly LSP end-to-end coverage
+
+Changes in this checkpoint:
+- Added `crates/freight/tests/lsp_asm.rs`, which starts the real `freight lsp`
+  stdio process with clangd and external `asm-lsp` disabled.
+- Covered `.s`, `.S`, `.asm`, and `.nasm` routing; GAS/NASM parsing; live-buffer
+  changes and diagnostics; every assembly provider; include navigation;
+  directional numeric labels; and same-file/cross-file references and rename.
+- Updated the assembly section of `crates/freight/TODO.md` with the durable test
+  and exact coverage, and refreshed the LSP module description.
+
+Verification:
+- `cargo fmt -p freight -- --check`
+- `cargo test -p freight --test lsp_asm` — passed.
+- `cargo test -p freight lsp::indexers::Asm::tests --lib` — 17 passed.
+- `cargo test -p freight` — assembly tests pass; the parallel library suite
+  reached 765/766 twice, with unrelated DAP adapter probe tests failing
+  nondeterministically (`explicit_lldb_dap...`, then `explicit_cuda_gdb...`).
+  The isolated LLDB-DAP test passed immediately.
+
+Next:
+- Continue the assembly TODO with the fuller instruction/register database.
