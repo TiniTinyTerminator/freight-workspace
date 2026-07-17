@@ -10013,3 +10013,26 @@ Next:
 - Continue the remaining clang-bridge default-on audit; the broad diagnostics
   differential against clangd remains open and is separate from this fixed
   delivery gap.
+
+### 2026-07-17 — Codex — clang-bridge: aggregate designator hints
+
+Changes pushed in `crates/clang-bridge` commit `f560b17`:
+- Replaced the untested positional aggregate-field walk with semantic-form
+  designator recovery aligned with clangd's current behavior.
+- Added `.field=` and `[N]=` hints for records, arrays, inherited aggregates,
+  brace-elided nested subobjects, and C++20 parenthesized aggregates.
+- Suppressed duplicate written designators, matching designator comments,
+  idiomatic zero initializers, reserved implementation fields, and bases that
+  cannot be designated.
+- Documented all four bridge inlay-hint kinds and closed stale IH-14; 24
+  unchecked TODO points remain.
+
+Verification:
+- Focused aggregate-designator tests — 3 passed.
+- `cargo test -p clang-bridge` — 159 passed, 1 ignored timing probe.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `git diff --check` — passed.
+
+Next:
+- Continue the default-on queue with the next known correctness or UX risk;
+  the broad clangd differential gate remains open.
