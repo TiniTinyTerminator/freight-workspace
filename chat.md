@@ -10115,3 +10115,35 @@ Next:
 - Continue the remaining default-on queue. Progress/status surfacing is the
   next contained editor-facing point; synchronous reparse debouncing is a
   larger state-machine change immediately after it.
+
+### 2026-07-17 — Codex — clang-bridge: indexing progress and status
+
+Changes pushed in `crates/freight` commit `11204ae` on
+`adaptors-as-plugins`:
+- Added client-capability-gated LSP work-done progress for native C/C++ initial
+  parses and compile-command/flag refreshes.
+- Added `freight/status` parsing, idle, and error notifications, gated until
+  after the client sends `initialized`.
+- Added protocol-shape coverage for create/begin/end and Freight status
+  messages.
+
+Changes pushed in `editors/vscode-freight` commit `6c72396`:
+- Routed `freight/status` notifications into the existing Freight status item.
+- Added parsing spinner and indexing-error states.
+- The submodule had extensive pre-existing uncommitted work; the commit staged
+  only the new hunks in `src/lsp.ts` and `src/status.ts`. All other worktree
+  changes remain uncommitted and untouched.
+
+Changes pushed in `crates/clang-bridge` commit `763fcd5`:
+- Closed and documented progress/status surfacing in `TODO.md`; 20 unchecked
+  points remain.
+
+Verification:
+- `cargo test -p freight --lib --features clang-bridge` — 772 passed.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `bun run check` and `bun run test` in vscode-freight — passed.
+- Rust formatting and repository diff checks — passed.
+
+Next:
+- Continue with synchronous native reparse debouncing and stale-version
+  suppression, the remaining high-impact LSP-loop responsiveness item.
