@@ -9786,3 +9786,19 @@ Next:
 - Audit current Fortran TODOs and decide whether the completed native queue is
   now strong enough to mark the overall `fully implement fortran-lsp` goal
   complete, or whether another full fixture sweep is required.
+
+### 2026-07-17 — Codex — fortran-lsp: v1.0 docs
+
+Changes in this checkpoint:
+- Added annotated `v1.0` tag locally in `crates/fortran-lsp` and the workspace
+  root for the completed native Fortran LSP milestone.
+- Rewrote `crates/fortran-lsp/README.md` as a readable general overview:
+  what the crate does, how `freight lsp` embeds it, a small library example,
+  design layout, validation commands, scope, and v1.0 status.
+
+Verification:
+- Documentation-only change; read the rendered Markdown source for accuracy.
+
+Next:
+- Push the `v1.0` tags after the README/root pointer commits, then start the
+  native assembly (`freight-asm`) work.
