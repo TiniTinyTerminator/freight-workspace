@@ -9983,3 +9983,33 @@ Verification:
 Next:
 - Continue the remaining default-on audit/hardening items; the overall
   clang-bridge goal is not complete yet.
+
+### 2026-07-17 — Codex — clang-bridge: included-header diagnostics
+
+Changes pushed in `crates/clang-bridge` commit `b69f742`:
+- Extended native diagnostics with an optional outermost main-file include
+  anchor while preserving the original header file and range.
+- Walked nested include chains through `SourceManager`, including locations
+  loaded from a precompiled preamble; direct main-file diagnostics remain
+  unanchored.
+- Added public Rust `IncludeAnchor` data and nested-header regressions.
+- Closed the dropped-header-diagnostics item in `TODO.md`; 25 unchecked points
+  remain.
+
+Changes pushed in `crates/freight` commit `abe94a1` on
+`adaptors-as-plugins`:
+- `ClangIndexer` now publishes header diagnostics as `In included file: ...`
+  on the direct main-file include path.
+- Added LSP `relatedInformation` linking to the original nested-header
+  diagnostic and an end-to-end indexer regression.
+
+Verification:
+- `cargo test -p clang-bridge` — 156 passed, 1 ignored timing probe.
+- Focused Freight included-header diagnostic test — passed.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `git diff --check` — passed in both submodules.
+
+Next:
+- Continue the remaining clang-bridge default-on audit; the broad diagnostics
+  differential against clangd remains open and is separate from this fixed
+  delivery gap.
