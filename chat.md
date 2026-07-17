@@ -9933,3 +9933,29 @@ Verification:
 Next:
 - Continue with synchronous LSP reparse/debounce or the next crate-local
   default-on risk, keeping cross-crate changes in separate commits.
+
+### 2026-07-17 — Codex — clang-bridge: deterministic concurrent parsing
+
+Changes pushed in `crates/clang-bridge` commit `c67ac33`:
+- Guarded the full `FixedCompilationDatabase`/`ClangTool` setup and run
+  lifecycle with a process-wide mutex because ClangTool temporarily changes
+  process CWD for each compilation command.
+- Replaced hash-derived `parse_unsaved` temporary names with LLVM's atomic
+  temporary-file creation while preserving source extensions.
+- Added `tests/concurrent_parse.rs`: twelve synchronized parses alternate
+  between projects with conflicting relative `config.hpp` files, and twelve
+  synchronized unsaved parses share one virtual URI with distinct contents.
+- Closed the concurrent initial-parse working-directory TODO.
+
+Verification:
+- `cargo test -p clang-bridge --test concurrent_parse` — 2 passed.
+- `cargo test -p clang-bridge --test hello_hints` — 2 passed; this had exposed
+  the colliding unsaved-temp bug under parallel test execution.
+- `cargo test -p clang-bridge` — 154 passed, 1 ignored timing probe.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `rustfmt --edition 2021 --check tests/concurrent_parse.rs`
+- `git diff --cached --check`
+
+Next:
+- Continue the crate-local default-on queue; Freight-side reparse debounce is
+  still open as a separate cross-crate change.
