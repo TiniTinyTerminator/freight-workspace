@@ -10036,3 +10036,30 @@ Verification:
 Next:
 - Continue the default-on queue with the next known correctness or UX risk;
   the broad clangd differential gate remains open.
+
+### 2026-07-17 — Codex — clang-bridge: full goto-definition ranges
+
+Changes pushed in `crates/clang-bridge` commit `06d1cf0`:
+- Extended `CB_Location` and the Rust `goto::Location` with an exclusive UTF-16
+  end position.
+- Definition navigation now returns the complete declaration-name token;
+  macro navigation returns the complete defined identifier.
+- Added normal-function, macro, and multibyte-line range regressions and closed
+  the zero-width goto TODO; 23 unchecked points remain.
+
+Changes pushed in `crates/freight` commit `cf2743d` on
+`adaptors-as-plugins`:
+- Forwarded the bridge end position into the LSP definition range.
+- Added an embedded-indexer regression proving the selected destination is the
+  full identifier rather than a zero-width point.
+
+Verification:
+- Focused bridge goto and UTF-16 tests — passed.
+- Focused Freight goto range test — passed.
+- `cargo test -p clang-bridge` — 159 passed, 1 ignored timing probe.
+- `cargo check -p freight --features clang-bridge` — passed.
+- `git diff --check` — passed in both submodules.
+
+Next:
+- Continue the remaining default-on work; TU memory limiting and stale-flag
+  refresh are the next contained state-management items.
